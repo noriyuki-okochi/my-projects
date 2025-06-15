@@ -32,6 +32,8 @@ mylog.setLevel(DEBUG)
 mylog.setLevel(INFO)  
 
 #　アプリケーションのグローバル変数の定義
+Frame_counter = 0  # フレームカウンター
+Fps = 30            # フレームレート
 Section_no = 0      # セクション番号
 Split_sec = 0       # スプリット秒
 Split_start = 0     # スプリットベース時間
@@ -61,7 +63,7 @@ def help():
     print(" -vERBOSE")
     print(" -aLL-FILE-TYPES")
     print(" -mANUAL-PLOT(dont use YOLO plot)")
-    print(" -rOW-IMAGE")
+    print(" -rAW-IMAGE")
     print(" -wRite-MOTION-FILE")
     print(" --- key operation ---")
     print(" s :スナップショットファイルの作成")
@@ -585,10 +587,11 @@ def plot(result, prepoints_buffer=None, annotated_frame=None):
         confR = result.keypoints.conf[max_no - 1][Kn2idx['right_wrist']].item()     # 右手首の信頼度を取得
         confL = result.keypoints.conf[max_no - 1][Kn2idx['left_wrist']].item()      # 左手首の信頼度を取得
 #       if confR < 0.90 or (Section_no > 4 and confL < 0.85) : #       信頼度が0.93未満の場合は描画しない（ー＞画像の欠落が著しい）
-        if confR < 0.85 : #       信頼度が0.93未満の場合は描画しない
+        if confR < 0.75 : #       信頼度が0.93未満の場合は描画しない
             mylog.log(INFO, f"[plot]: 対象ボックスのキーポイントの信頼度が低いので描画しない: confR={confR:.2f}, confL={confL:.2f}")
-            return annotated_frame
-#           return None
+            return annotated_frame  # -> オリジナル画像を表示する
+#           return None             # -> 前回の画像を再表示する
+
         # 対象ボックスのキーポイントの接続ラインを描画
         draw_kpts_line(annotated_frame, result.keypoints, max_no - 1)   
 
@@ -619,7 +622,8 @@ def plot(result, prepoints_buffer=None, annotated_frame=None):
                 if Split_start == 0 or (Section_no == 6 and Completed):     # スプリット秒が0、または開(6)は完了状態の場合
                     # スプリット秒が0の場合、動作の開始を判定
                     if section_started(Section_no, result, max_no - 1, arrow_length_angles):
-                        Split_start = time.time()                           # スプリット開始時間を記録
+#                       Split_start = time.time()                           # スプリット開始時間を記録
+                        Split_start = Frame_counter                         # スプリット開始時間を記録
                         Split_sec = 0
                         Step_counter = 0                                    # セクション内の動作カウンター
                         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
@@ -631,12 +635,17 @@ def plot(result, prepoints_buffer=None, annotated_frame=None):
                         Completed = True 
                         if Section_no != 6: Split_start = 0                 # スプリット開始時間をリセット
                         else: # 開(6)は完了状態を計測する
-                            Split_start = time.time()                           
+#                           Split_start = time.time()                           
+                            Split_start = Frame_counter                     # スプリット開始時間を記録)                           
                             Split_sec = 0                       
                         Step_counter = 0                                    # セクション内の動作カウンター
         #
+        '''        
         if Lap_start != 0:   Lap_sec = int(time.time() - Lap_start)         # ラップ秒を計算
         if Split_start != 0: Split_sec = int(time.time() - Split_start)     # スプリット秒を計算
+        '''
+        if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
+        if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
 
         # セクション情報をフレームに描画
         section_color =  (0, 255, 255)      # セクションの色（黄色）BGR
@@ -645,14 +654,14 @@ def plot(result, prepoints_buffer=None, annotated_frame=None):
         
         cv2.putText(annotated_frame, f"camera: {camera_pos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
         cv2.putText(annotated_frame, f"section: {Section_name[Section_no]}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, section_color, 2)
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6d}sec.", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
-        cv2.putText(annotated_frame, f"lap    : {Lap_sec:6}sec.", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
+        cv2.putText(annotated_frame, f"split   : {Split_sec:6.3f}sec.", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
+        cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.3f}sec.", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
     #
     return annotated_frame
 
 
 def main(): 
-    global Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed
+    global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed
     #
     # start of main
     #
@@ -738,11 +747,23 @@ def main():
     mylog.log(INFO,"YOLOv8 Pose Detectionを開始します")
     model = YOLO('yolov8n-pose.pt')  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
     model.info()  # モデル情報を表示
+    # 先頭フレームを読み込み
+    ret, frame = cap.read()
+    if not ret:
+        print("動画ファイルの読み込みに失敗しました")
+        cap.release()
+        return
+    # フレームのサイズを取得
+    frame_height, frame_width = frame.shape[:2] 
+    Fps = cap.get(cv2.CAP_PROP_FPS)  # フレームレートを取得
+    mylog.log(INFO, f"[main]:フレーム情報: {frame_width}x{frame_height}, Fps={Fps:.2f}")
+    Frame_counter = 1  # フレームカウンターの初期化
     #
     while True:
         ret, frame = cap.read()
         if not ret:
             break
+        Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_image is True:
             # 生画像を表示する場合
             annotated_frame = frame
@@ -762,6 +783,7 @@ def main():
                 # 検出結果を保存 
                 prePointsBuffer.append(points)                        
                 '''
+                # キーポイントの信頼度をチェック -> 右手首と左手首の信頼度が0.85以上の場合のみ保存
                 keyPoints = Keypoint(results[0], points['boxid'])  # キーポイントのデータ解析インスタンス
                 if keyPoints.conf('right_wrist') > 0.85 and keyPoints.conf('left_wrist') > 0.85:
                     # 右手首と左手首の信頼度が0.85以上の場合のみ保存
@@ -818,11 +840,13 @@ def main():
             Split_sec = 0
             Split_start = 0
             if Section_no == 0:
-                Lap_start = time.time()  # ラップ開始時間を記録
+#               Lap_start = time.time()  # ラップ開始時間を記録
+                Lap_start = Frame_counter  # ラップ開始時間を記録
                 Lap_sec = 0
                 milsec = time.time() * 1000  # ミリ秒を記録
             else: 
-                Split_start = time.time()
+#               Split_start = time.time()
+                Split_start = Frame_counter
         elif key == ord('9'):
             Lap_start = 0
         elif key == ord('.'):
