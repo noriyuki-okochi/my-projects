@@ -67,7 +67,11 @@ def help():
     print(" s :スナップショットファイルの作成")
     print(" o :出力ファイルへの書き込み開始")
     print(" c :出力ファイルへの書き込み停止")
+    print(" a :ログファイルへのアテンションメッセージ書き込み")
     print(" 0 :ラップ開始")
+    print(" 1-8:節の開始")
+    print(" .(>):描画間隔ダウン(0=Pause)")
+    print(" ,(<):描画間隔アップ")
     print(" q :処理の中断")
     print(" --- example ---")
     print("例)当日作成の動画ファイルから選択 : python yolo.py")  
@@ -578,10 +582,13 @@ def plot(result, prepoints_buffer=None, annotated_frame=None):
             mylog.log(INFO, f"[plot]: 対象ボックスの判定不可")
             return annotated_frame
         # 対象ボックスのキーポイントの左（右）手首座標データの信頼度を取得
-        conf = result.keypoints.conf[max_no - 1][Kn2idx['right_wrist']].item()  # 右手首の信頼度を取得
-        if conf < 0.75: #       信頼度が0.93未満の場合は描画しない
-            mylog.log(INFO, f"[plot]: 対象ボックスのキーポイントの信頼度が低いので描画しない: conf={conf:.2f}")
-            return None
+        confR = result.keypoints.conf[max_no - 1][Kn2idx['right_wrist']].item()     # 右手首の信頼度を取得
+        confL = result.keypoints.conf[max_no - 1][Kn2idx['left_wrist']].item()      # 左手首の信頼度を取得
+#       if confR < 0.90 or (Section_no > 4 and confL < 0.85) : #       信頼度が0.93未満の場合は描画しない（ー＞画像の欠落が著しい）
+        if confR < 0.85 : #       信頼度が0.93未満の場合は描画しない
+            mylog.log(INFO, f"[plot]: 対象ボックスのキーポイントの信頼度が低いので描画しない: confR={confR:.2f}, confL={confL:.2f}")
+            return annotated_frame
+#           return None
         # 対象ボックスのキーポイントの接続ラインを描画
         draw_kpts_line(annotated_frame, result.keypoints, max_no - 1)   
 
@@ -752,8 +759,14 @@ def main():
                 points =  { 'boxid': -1, 'keypoints': None }                        
                 points['boxid'] =  get_max_box(results[0]) - 1  # 面積最大のボックスを取得
                 points['keypoints'] = results[0].keypoints
-                # 検出結果を保存                        
+                # 検出結果を保存 
                 prePointsBuffer.append(points)                        
+                '''
+                keyPoints = Keypoint(results[0], points['boxid'])  # キーポイントのデータ解析インスタンス
+                if keyPoints.conf('right_wrist') > 0.85 and keyPoints.conf('left_wrist') > 0.85:
+                    # 右手首と左手首の信頼度が0.85以上の場合のみ保存
+                    prePointsBuffer.append(points)                        
+                '''
                 milsec = ms
                    
             # 検出結果をフレームに描画
@@ -813,11 +826,11 @@ def main():
         elif key == ord('9'):
             Lap_start = 0
         elif key == ord('.'):
-            if iwait > 1: iwait = iwait - 1
-            print(f"(>)down iwait={iwait}")
+            if iwait > 0: iwait = iwait - 1     # 0で停止
+            print(f"(>)up iwait={iwait} 0=Pause")
         elif key == ord(','):
             iwait = iwait + 1
-            print(f"up(<) iwait={iwait}")
+            print(f"down(<) iwait={iwait}")
         elif key == ord('a'):
             attention += 1
             mylog.log(INFO, f"!!Attention({attention})-{chr(key)}")
