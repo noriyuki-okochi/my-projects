@@ -359,8 +359,8 @@ def adjust_frame_contrast(frame, alpha=1,beta=0):
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult, arrows):
-    keypoints = myResult.keypoints                        # キーポイントリスト(Tensor)
-    boxes = myResult.boxes    
+#    keypoints = myResult.keypoints                     # キーポイントリスト(Tensor)
+    boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
     arrow = arrows[0]                                   # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
@@ -377,9 +377,12 @@ def tracking_result( myResult, arrows):
         if idx > 12: continue
         
         key_name = name
-        x = keypoints.xy[box_id][idx][0].item()         # キーポイントX座標
-        y = keypoints.xy[box_id][idx][1].item()         # キーポイントY座標
-        xy_conf = keypoints.conf[box_id][idx].item()    # キーポイントの信頼度
+#        x = keypoints.xy[box_id][idx][0].item()         # キーポイントX座標
+#        y = keypoints.xy[box_id][idx][1].item()         # キーポイントY座標
+#        xy_conf = keypoints.conf[box_id][idx].item()    # キーポイントの信頼度
+        x = keyPoints.points[idx][0]         # キーポイントX座標(Numpy)
+        y = keyPoints.points[idx][1]         # キーポイントY座標(Numpy)
+        xy_conf = keyPoints.confs[idx]       # キーポイントの信頼度(Numpy)
         norm, angle = arrow[idx]                        # 移動ベクトルの長さと角度
         ratio = norm/box_h                              # ボックスの高さに対する比率
                 
