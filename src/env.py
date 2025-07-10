@@ -19,6 +19,8 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
 Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle'] 
 
+# 動作解析データのサンプリング間隔（フレーム数）
+Sample_flames:int = 8
 #
 # テキスト属性
 #
