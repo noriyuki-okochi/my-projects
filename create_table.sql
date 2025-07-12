@@ -1,11 +1,23 @@
-drop table if exists keypoints_name;
-create table if not exists keypoints_name( id int NOT NULL,
+-- drop table if exists keypoints_config;
+create table if not exists keypoints_config( id int NOT NULL,
                                     key_name text NOT NULL,
                                     updated_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     PRIMARY KEY(id)
                                 );
-drop table if exists keypoints_data;
-create table if not exists keypoints_data( case_name text NOT NULL,
+-- drop table if exists frame_info;
+create table if not exists frame_info( case_name text NOT NULL,
+                                    img_path text,
+                                    fps real NOT NULL,
+                                    height int NOT NULL,
+                                    width int NOT NULL,
+                                    import int DEFAULT(0),
+                                    csv_path text,
+                                    updated_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
+                                    inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
+                                    PRIMARY KEY(case_name)
+                                );
+drop table if exists tracking_data;
+create table if not exists tracking_data( case_name text NOT NULL,
                                     frame_no int NOT NULL,
                                     key_id int NOT NULL,
                                     key_name text NOT NULL,
@@ -19,6 +31,9 @@ create table if not exists keypoints_data( case_name text NOT NULL,
                                     norm real NOT NULL,
                                     ratio real NOT NULL,
                                     angle real NOT NULL, 
+                                    eyes_span real NOT NULL, 
+                                    shds_span real NOT NULL, 
+                                    hips_span real NOT NULL, 
                                     inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     time_epoch integer,
                                     section integer,  
