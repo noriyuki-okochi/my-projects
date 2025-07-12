@@ -10,19 +10,29 @@ from datetime import datetime
 # Private API Class for sqlite3from env import *
 #
 class MyDb:
-    def __init__(self, dbpath='../yolo-data.db'):
+    def __init__(self, dbpath='./yolo-tracking.db'):
         self.dbpath = dbpath
         self.conn = sqlite3.connect(dbpath, check_same_thread=False)    # open database
         self.conn.row_factory = sqlite3.Row
         self.cur = self.conn.cursor()
+        self.mode = ''
         self.case_name = 'none'
         self.frame_no = 0
         self.section = 0
+        self.csvpath = ''
+        self.csvfile = None
         
+    def open_csv(self):
+        # CSV出力ファイルの作成
         timestamp = datetime.now().strftime('%Y%m%d')
-        self.logfile = open(dbpath[:dbpath.rfind('/')+1] + f"log{timestamp}.txt", 'a') 
-        self.logfile.write(f"DB opened: {dbpath}\n")
-        self.logfile.flush()
+        self.csvpath = self.dbpath[:self.dbpath.rfind('/')+1] + f"tracking{timestamp}_{self.case_name}.csv"
+        self.csvfile = open( self.csvpath, 'w')
+        # カラム名を出力
+        names ="case_name,frame_no,key_id,key_name,box_id,box_w,box_h,box_conf,x,y,xy_conf,norm,ratio,angle,eyes_span,shds_span,hips_span,"\
+            + "inserted_at,time_epoch,section\n"
+        self.csvfile.write(names)
+        self.csvfile.flush()
+            
 
     def rollback(self):
         self.conn.rollback()
@@ -36,126 +46,127 @@ class MyDb:
     def execute(self, sql):
         return self.cur.execute(sql)
 #
+#
+#
+    def insert_frame_info(self, data_list):
+        
+        # 重複キーの存在チェック
+        sql = f"select * from frame_info where case_name='{self.case_name}'"
+        rs = self.cur.execute(sql).fetchone()
+        if rs != None:
+            sql = f"delete from frame_info where case_name ='{self.case_name}'"
+            self.cur.execute(sql)
+
+        d = datetime.now()
+        timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
+        
+        values = f"'{self.case_name}', '{data_list[0]}', {data_list[1]:.3f}, {data_list[2]}, {data_list[3]}, '{data_list[4]}',"\
+               + f" '{timestamp}', '{timestamp}'"
+            
+        sql = "insert into frame_info"\
+            + "(case_name, img_path, fps, height, width, csv_path, updated_at, inserted_at)"\
+            + f" values({values})"
+
+        self.cur.execute(sql)
+        self.commit()
+ 
 # insert samplling rates logs.
 #
-    def insert_keypoints(self, data_list):
+    def insert_tracking_data(self, data_list):
         
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
         time_epoc = int(time.mktime(d.timetuple()))
         
-        values = f"'{self.case_name}', {self.frame_no},"
+        if self.mode == '':
+            values = f"'{self.case_name}', {self.frame_no},"
+        else:
+            values = f"{self.case_name}, {self.frame_no},"
+            
         
         for i, value in enumerate(data_list):
-            if i == 0 or i == 2:                # key_id or box_id
+            if i == 0 or i == 2:                            # key_id or box_id
                 values += f" {value}, "
-            elif i == 1:                        # key_name
-                values += f" '{value}', "
+            elif i == 1:                                    # key_name
+                if self.mode == '':  values += f" '{value}', " 
+                else:  values += f" {value}, "
             else:
                 values += f" {value:.3f}, "
             
         values += f" '{timestamp}', {time_epoc}, {self.section}"
             
-        sql = "insert into keypoints_data"\
-            + "(case_name, frame_no, key_id,"\
-            + " key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle, inserted_at, time_epoch, section)"\
-            + f" values({values})"
-
-        self.cur.execute(sql)
-        
-    def pandas_read_ratelogs(self, params):
-        if params['sym'] == '*':
-            sql ="select * from ratelogs where length(symbol) < 6"
+        if self.mode == 'csv':
+            self.csvfile.write(f"{values}\n")
         else:
-            sql ="select * from ratelogs where symbol = :sym"
-        if params['limit'] > 0:
-            sql += " LIMIT :limit"
-        # return pandas.read_sql_query(sql, con=self.conn, params=params)
-        return pandas.read_sql_query(sql, con=self.conn, index_col='inserted_at',\
-                                     parse_dates=('inserted_at'), params=params)
+            sql = "insert into tracking_data"\
+                + "(case_name, frame_no, key_id,"\
+                + " key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle,"\
+                + " eyes_span, shds_span, hips_span, inserted_at, time_epoch, section)"\
+                + f" values({values})"
+            self.cur.execute(sql)
+#
+#
+    def delete_tracking_data(self):
+        sql = f"delete from tracking_data where case_name = '{self.case_name}'"
+        try:
+            self.cur.execute(sql)
+        except:
+            print("[delete_tracking_data]:no records.")
         
+                   
 #
-# logout
+# select FPS from balance-table
 #
-    def logwrite(self, msg):
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.logfile.write(f"{timestamp}{msg}\n")
-        self.logfile.flush()
+    def get_fps(self, case_name=None):
+        FPS = None
+        import_count = 0
+        if case_name is None:
+            case_name = self.case_name
 
-
-''' 
-#
-# insert auto-orders log
-#
-    def insert_orders(self, id, exchange, pair, trade, extype, rate, amount):
-        # insert new datas
-        sql = "insert into orders(id, exchange, pair, order_side, order_type, rate, amount)"
-        sql += f" values({id},'{exchange}','{pair}','{trade}','{extype}',{rate},{amount})"
-        #print(sql)
-        self.cur.execute(sql)
-        #
-        self.conn.commit()
-#
-#
-# insert or update balance-table
-#
-    def update_balance(self, exchange, symbol, amount, rate, jpy):
-        pre = jpy
-        symbol = symbol.lower()
-        sql = "select * from balance where "\
-            + f"exchange='{exchange}' and symbol='{symbol}'"
-        rs = self.cur.execute(sql).fetchone()
-        if rs == None:
-            sql = "insert into balance(exchange,symbol,amount,rate,jpy) values("\
-                + f"'{exchange}',"\
-                + f"'{symbol}',"\
-                + f"{amount},"\
-                + f"{rate},"\
-                + f"{jpy})"
-            self.cur.execute(sql)
-        else:
-            pre = rs['jpy']
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            sql = "update balance set "\
-                + f"amount={amount},rate={rate},"\
-                + f"updated_at='{timestamp}'"\
-                + f" where exchange='{exchange}' and symbol='{symbol}'"
-            self.cur.execute(sql)
-        self.conn.commit()
-        return int(pre)
-#
-# select amount from balance-table
-#
-    def get_balanceAmount(self, exchange, symbol):
-        amount = None
-        symbol = symbol.lower()
-        sql = "select * from balance where "\
-            + f"exchange='{exchange}' and symbol='{symbol}'"
+        sql = f"select fps, import from frame_info where case_name='{case_name}'"
 
         rs = self.cur.execute(sql).fetchone()
         if rs != None:
-            amount = rs['amount']
+            FPS = rs['fps']
+            import_count = rs['import']
+        return FPS, import_count
 
-        print(f">get_balanceAmount=>amount={amount}:sql={sql}")
-        return amount
+    def get_file_path(self, case_name=None):
+        FPS = None
+        import_count = 0
+        if case_name is None:
+            case_name = self.case_name
+
+        sql = f"select img_path, csv_path from frame_info where case_name='{case_name}'"
+
+        rs = self.cur.execute(sql).fetchone()
+        if rs != None:
+            img_path = rs['img_path']
+            csv_path = rs['csv_path']
+        return img_path, csv_path
+    
+    def update_import(self, import_count):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        sql = "update frame_info set "\
+            + f"import={import_count},"\
+            + f"updated_at='{timestamp}'"\
+            + f" where case_name='{self.case_name}'"
+        self.cur.execute(sql)
+        self.conn.commit()
+        
 #
-# adjust amount 
-#  
-    def adjust_balance(self, exchange, symbol, trade, amount):
-        symbol = symbol.lower()        
-        c_amount = self.get_balanceAmount(exchange, symbol)
-        if c_amount != None:
-            if trade == 'SELL':
-                c_amount -= amount
-            else:     # 'BUY'
-                c_amount += amount
-            sql = f"update balance set amount = {c_amount} where "\
-                + f"exchange='{exchange}' and symbol='{symbol}'"
-
-            print(f">adjust_balance:sql={sql}")
-            self.cur.execute(sql)
-            self.conn.commit()            
-        return c_amount
-'''
-
+#
+#       
+    def pandas_read_tracking(self, key_id):
+        
+        sql = f"select * from tracking_data where key_id={key_id} and case_name='{self.case_name}'"
+        return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
+        
+    def pandas_read_frame(self, name=None):
+        
+        sql = 'select * from frame_info'
+        if name is not None:
+            sql += f" where case_name='{name}'"
+        return pandas.read_sql_query(sql, con=self.conn)
+#
 #eof
