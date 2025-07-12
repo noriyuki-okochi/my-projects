@@ -201,7 +201,12 @@ class RingBuffer:
         idx = self.index - ipos 
         if idx < 0: idx = self.length - (ipos - self.index)
         return self.buffer[idx]
-
+    
+    def clear(self):
+        self.buffer = []
+        self.index = 0      # 書き込みインデックス
+        self.length = 0
+        
     def len(self):
         return self.length
 #
@@ -276,6 +281,21 @@ class BoundaryBoxError(Exception):
     pass
 
 class MyResult(Keypoint):
+    MaxBox_id:int = None
+    XYWH:int = [None, None, None, None]
+    Skip:bool = False
+    # 補正対象のキーポイントの信頼度閾値テーブル
+    # --'nose', 
+    #   'left_eye',             'right_eye',                'left_ear',             'right_ear', 
+    #   'left_shoulder',        'right_shoulder',           'left_elbow',           'right_elbow', 
+    #   'left_wrist',           'right_wrist',              'left_hip',             'right_hip',
+    #   'left_knee',            'right_knee',               'left_ankle',           'right_ankle'--
+    Limit_val = [ {'valid':0, 'limit':0.0}, 
+        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, 
+        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, 
+        {'valid':0, 'limit':0.85}, {'valid':0, 'limit':0.92},{'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0},
+        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}]
+    
     def __init__(self, result, boxid=None):
         if boxid is None:
             boxno = get_max_box(result)
@@ -285,23 +305,25 @@ class MyResult(Keypoint):
         self.result = result
         self.confs = result.keypoints.conf[boxid].numpy()
         self.points = result.keypoints.xy[boxid].numpy()
-        # 補正対象のキーポイントの信頼度閾値テーブル
-        # 'nose', 'left_eye', 'right_eye', 'left_ear', 
-        # 'right_ear','left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 
-        #  'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
-        # 'left_knee', 'right_knee', 'left_ankle', 'right_ankle'}
-        self.limit_val = [ 
-            0,    0,    0,   0,
-            0,   0,    0,    0,   0, 
-            0, 0.92, 0,   0,
-            0,    0,    0,   0]
+        self.xywh = result.boxes.xywh[boxid].numpy()
+
+        if boxid != MyResult.MaxBox_id or MyResult.Skip == True:
+            mylog.log(INFO, f"[MyResult]:フレーム={Frame_counter}, MaxBox_id changed.[{MyResult.MaxBox_id} -> {boxid}], xywh={self.xywh}") 
+            if MyResult.MaxBox_id != None and abs(int(self.xywh[0]) - int(MyResult.XYWH[0])) > int(MyResult.XYWH[2]):
+                MyResult.Skip = True
+                raise BoundaryBoxError('Target boundary-box can not be found.')
+            MyResult.Skip = False
+            MyResult.MaxBox_id = boxid
+            MyResult.XYWH = self.xywh
 
     def adjust_points(self, prePoints):
         for key, idx in Kn2idx.items():
-            if self.limit_val[idx] != 0 and self.confs[idx] < self.limit_val[idx]:
+            if self.confs[idx] > MyResult.Limit_val[idx]['limit']: 
+                MyResult.Limit_val[idx]['valid'] = 1
+            if self.Limit_val[idx]['valid'] == 1 and self.confs[idx] < MyResult.Limit_val[idx]['limit']:
                 self.points[idx] = prePoints[idx]           
                 mylog.log(INFO, f"[adjust_points]:フレーム={Frame_counter}, Key={key},"\
-                              + f" conf={self.confs[idx]:.3f}({self.limit_val[idx]:.3f})") 
+                              + f" conf={self.confs[idx]:.3f}({MyResult.Limit_val[idx]['limit']:.3f})")
         
     def xy(self, pnt_name):
         """
@@ -369,24 +391,22 @@ def tracking_result( myResult, arrows):
     box_conf = boxes.conf[box_id].item()                # 解析対象の信頼度
 
     keyPoints = myResult                                # キーポイントのデータ解析インスタンス
-    eyes_len, x = keyPoints.norm('right_eye', 'left_eye')            # 右目と左目のベクトルの長さと角度を計算       
-    shds_len, x = keyPoints.norm('right_shoulder', 'left_shoulder')  # 右目と左目のベクトルの長さと角度を計算       
+    eyes_span, x = keyPoints.norm('right_eye', 'left_eye')              # 右目と左目のベクトルの長さと角度を計算       
+    shds_span, x = keyPoints.norm('right_shoulder', 'left_shoulder')    # 右肩と左肩のベクトルの長さと角度を計算       
+    hips_span, x = keyPoints.norm('right_hip', 'left_hip')              # 右腰と左腰のベクトルの長さと角度を計算       
     
     for name, idx in Kn2idx.items():
         key_id = idx
         if idx > 12: continue
         
         key_name = name
-#        x = keypoints.xy[box_id][idx][0].item()         # キーポイントX座標
-#        y = keypoints.xy[box_id][idx][1].item()         # キーポイントY座標
-#        xy_conf = keypoints.conf[box_id][idx].item()    # キーポイントの信頼度
-        x = keyPoints.points[idx][0]         # キーポイントX座標(Numpy)
-        y = keyPoints.points[idx][1]         # キーポイントY座標(Numpy)
-        xy_conf = keyPoints.confs[idx]       # キーポイントの信頼度(Numpy)
+        x = keyPoints.points[idx][0]                    # キーポイントX座標(Numpy)
+        y = keyPoints.points[idx][1]                    # キーポイントY座標(Numpy)
+        xy_conf = keyPoints.confs[idx]                  # キーポイントの信頼度(Numpy)
         norm, angle = arrow[idx]                        # 移動ベクトルの長さと角度
         ratio = norm/box_h                              # ボックスの高さに対する比率
                 
-        data_list = [key_id, key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle, eyes_len, shds_len]
+        data_list = [key_id, key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle, eyes_span, shds_span, hips_span]
         
         Db.insert_tracking_data( data_list )  # データベースに挿入
     
@@ -475,16 +495,12 @@ def section_started(section_no, myResult, arrows):
         
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), anglL={int(anglL)}°, pre_anglR={int(pre_anglR)}° ,anglER={int(anglER)}°"\
                       + f" conf={keyPoints.conf('left_wrist'):.2f}")
-#        mylog.log(INFO, f">>>   [ normR > {int(thsd(0.06))} or normL > {int(thsd(0.06))} ]")
-#        if  normR > thsd(0.06) or normL > thsd(0.06):
         mylog.log(INFO, f">>>   [ normR > {int(thsd(0.06))} ]")
 
-#        if  normR > thsd(0.06):
         if  normR > thsd(0.035):
             # 右手首の移動ベクトルの長さが15以上の場合（引分け大三への動作開始）
             Step_counter += 1
             if Step_counter == 1:   started = True
-#            if Step_counter == 2:   started = True
         '''
         if started == False:
             # 右手首の移動ベクトルの角度が80度以上の場合（引分け大三への動作開始）
@@ -526,8 +542,6 @@ def section_started(section_no, myResult, arrows):
     # 8-Zan-shin  ->  9-''(弓倒し)
     elif section_no == 8:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
-#        mylog.log(INFO, f">>>   [ normR > {int(thsd(0.085))} or normL > {int(thsd(0.085))} ]")
-#        if normR > thsd(0.085) or normL > thsd(0.085):
         mylog.log(INFO, f">>>   [ normR > {int(thsd(0.085))} ]")
 
         if normR > thsd(0.085):
@@ -951,7 +965,7 @@ def main():
     milsec = 0  # ミリ秒
     attention = 0
     prePointsBuffer = RingBuffer(4)                 # 検出結果を保存するリングバッファ（4回分を保存）                           
-    preResult = RingBuffer(1)                       # 前回の検出結果（補整済）を保存するリングバッファ                           
+    preResult = RingBuffer(2)                       # 前回の検出結果（補整済）を保存するリングバッファ                           
     preFrame = None                                 # 前回のフレームを保存する変数
     #
     case_name = None                                # ケース名（動画ファイル名）
@@ -981,10 +995,10 @@ def main():
         raw_image = True        # 生画像を表示するオプション
 
         
-    if '-m' in opts:            # 手動（OpenCV）で解析データをプロットするオプション
+    if not raw_image and ('-m' in opts):            # 手動（OpenCV）で解析データをプロットするオプション
         manual_plot = True
         
-    if '-t' in opts:
+    if not raw_image and ('-t' in opts):
         Tracking_only = True    # トラッキングのみを行うオプション
 #        Tracking_on = True      # トラッキングを有効にする
         i = args.index('-t') 
@@ -1116,11 +1130,12 @@ def main():
             try:
                 myResult = MyResult(result)
             except BoundaryBoxError as e:
-                print(e)
-                mylog.log(INFO, "[main]検出結果の描画をスキップ")
+                print(f"フレーム({Frame_counter}):{e}")
+                mylog.log(INFO, f"[main]:フレーム({Frame_counter}):検出結果の描画をスキップ")
+                preResult.clear()
                 annotated_frame = frame
             else:
-                if preResult.len() > 0:
+                if preResult.len() > 1 and Section_no > 1:
                     myResult.adjust_points(preResult.get().points)
                 # リングバッファに保存
                 preResult.append( myResult )       
