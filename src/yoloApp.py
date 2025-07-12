@@ -74,13 +74,14 @@ def help():
     print(" --- key operation ---")
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
-    print(" t :トラッキング開始／停止（'0'->'t'の順")
+    print(" t :トラッキング開始／停止（'0'->'t'の順）")
     print(" a :ログファイルへのアテンションメッセージ出力")
+    print(" r :繰り返し再生開始／終了（'-r'時のみ有効）")
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
+    print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
-    print(" p :一時停止／再開")
     print(" q :処理の終了")
     print(" --- example ---")
     print("例)当日作成の動画ファイルから選択 : python yoloApp.py")  
@@ -292,7 +293,7 @@ class MyResult(Keypoint):
     #   'left_knee',            'right_knee',               'left_ankle',           'right_ankle'--
     Limit_val = [ {'valid':0, 'limit':0.0}, 
         {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, 
-        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, 
+        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.85}, {'valid':0, 'limit':0.0}, 
         {'valid':0, 'limit':0.85}, {'valid':0, 'limit':0.92},{'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0},
         {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}]
     
@@ -957,18 +958,19 @@ def main():
     cam_id = None                                   # デフォルトのカメラID
     raw_image = False                               # 生画像を表示するオプション
     manual_plot = False                             # 手動でプロットするオプション
+    repeat_mode = False                             # '-r'再生の繰り返し
     idir = PICT_PATH                                # 初期ディレクトリを指定
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
     filetypes = f"WIN_{timestamp}_*.mp4"            #'*WIN_YYYYmmdd_10_46_55_Pro.mp4'  # 動画ファイル名
     iwait = 1                                       # ウィンドウの更新間隔（ミリ秒）
-    milsec = 0  # ミリ秒
+    file_name = None
     attention = 0
     prePointsBuffer = RingBuffer(4)                 # 検出結果を保存するリングバッファ（4回分を保存）                           
     preResult = RingBuffer(2)                       # 前回の検出結果（補整済）を保存するリングバッファ                           
     preFrame = None                                 # 前回のフレームを保存する変数
     #
-    case_name = None                                # ケース名（動画ファイル名）
+    case_name = None                                # ケース名（デフォルト：動画ファイル名）
     #
     # print command line(arguments)
     args = sys.argv
@@ -1110,6 +1112,11 @@ def main():
         # 次のフレームの読み込み
         ret, frame = cap.read()
         if not ret:
+            if repeat_mode:
+                cap.release()
+                cap = cv2.VideoCapture(file_name)  # 動画ファイルのパスを指定
+                Frame_counter = 0
+                continue
             break
         Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_image is True:
@@ -1212,6 +1219,15 @@ def main():
             else: 
                 print(f"出力ファイルに書き込みを停止します: {out_file}")
                 mylog.log(INFO, ">> image write pause")
+
+        elif key == ord('r') and raw_image:
+            repeat_mode = True if repeat_mode is False else False  # 'r'キーで一開始／停止
+            if repeat_mode: 
+                print("繰り返し再生を開始します")
+                mylog.log(INFO, ">> repeat video-mode start")
+            else: 
+                print("繰り返し再生を終了します")
+                mylog.log(INFO, ">> repeat video-mode pause")
 
         elif key >= ord('0') and key <= ord('8'):
             # セクション番号を設定
