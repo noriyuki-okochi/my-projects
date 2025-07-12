@@ -42,8 +42,9 @@ key_names:str = [name for name in Kn2idx]
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("chart.py -case {'<case-name1>[,<case_name2>']|-L(ist-case_names)} [-import [<csv-file-path>]] {<key_name1>|[ <key_name2>...]|*}\n"\
-         + "        [-second <col_name>] [-p(ast-frames(sec.))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames(sec./counts)>] \n"\
+    print("chart.py -case {'<case-name1>[,<case_name2>']|-L(ist-case_names)} [-import [<csv-file-path>]] \n"\
+         + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span]\n"\
+         + "        [-p(ast-frames(sec.))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames(sec./counts)>] \n"\
          + "        [-m] [-b(ottom)] [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
@@ -113,7 +114,7 @@ if '-import' in cmds:
     # DBへトラッキングデータ登録
     db.delete_tracking_data()      # 登録済データの削除
     df.to_sql('tracking_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[chart]info:import '{csvfile}' to 'trackinng_data'{df.shape}.")
+    print(f"[chart]info:import '{csvfile}' to 'tracking_data'{df.shape}.")
     # インポート実行回数更新
     count += 1
     db.update_import(count)
@@ -131,6 +132,23 @@ if selnum == 0:
         selkeys.append(key)         # all keys
     selnum = 4   
 #
+# 1軸のrangeを指定するコマンドオプションの解析
+#
+range_min:float = 0.00
+range_max:float = 0.40
+if '-range' in args:
+    i = args.index('-range')
+    if len(args) > (i + 1):
+        range = args[i+1].split(',')
+        try:
+            if range[0] != '': 
+                range_min = float(range[0])
+            if len(range) > 1 and range[1] != '': 
+                range_max = float(range[1])
+        except ValueError:
+            pass
+print(f"[chart]info:range_min={range_min},range_max={range_max}.")
+#
 # 2軸のカラムを指定するコマンドオプションの解析
 #
 second_name:str = None
@@ -142,6 +160,12 @@ if '-second' in args:
             print(f"[chart]error:'{second_name}' not found. following names variable.")
             print(Col_names)
             exit()
+#
+# spanデータの表示を指定するコマンドオプションの解析
+#
+span_visible:bool = False
+if '-span' in args:
+    span_visible = True
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
@@ -251,11 +275,12 @@ for icount, key in enumerate(selkeys, start=1):
         #
         # データの作成、編集
         #
-        df['eyes_ratio'] = df["eyes_len"]/df["box_h"]                       # バウンダリーボックスの高さに対する比率に変換
+        df['eyes_ratio'] = df["eyes_span"]/df["box_h"]                       # バウンダリーボックスの高さに対する比率に変換
         df['eyes_ratio'] = df['eyes_ratio'].where(df['eyes_ratio'] < 0.5)   #  0.5以上は欠測地(NaN)に置換する
         df['eyes_ratio'].ffill()                                            # 欠測値を直前の値に置換する
         
-        df['shds_ratio'] = df["shds_len"]/df["box_h"]
+        df['shds_ratio'] = df["shds_span"]/df["box_h"]
+        df['hips_ratio'] = df["hips_span"]/df["box_h"]
         '''
         # 移動平均
         df['mvave_norm'] = df["ratio"].rolling(10).mean()   
@@ -294,6 +319,7 @@ for icount, key in enumerate(selkeys, start=1):
                             row = irow, 
                             col = icol   
                         )
+        #  
         '''
         fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                     name="move-ave",
@@ -305,22 +331,31 @@ for icount, key in enumerate(selkeys, start=1):
                             col = icol   
                         )
         '''
-        # < eyes_len >
-        fig = fig.add_trace( go.Scatter(x=mdf.index, 
-                                    name="eyes-length",
-                                    y=mdf["eyes_ratio"], 
-                                    mode="lines"),
-                            row = irow, 
-                            col = icol   
-                        )
-        # < shds_len >
-        fig = fig.add_trace( go.Scatter(x=mdf.index, 
-                                    name="shoulders-length",
-                                    y=mdf["shds_ratio"], 
-                                    mode="lines"),
-                            row = irow, 
-                            col = icol   
-                        )
+        if span_visible:
+            # < eyes_span >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name="eyes-span",
+                                        y=mdf["eyes_ratio"], 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol   
+                            )
+            # < shds_span >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name="shoulders-span",
+                                        y=mdf["shds_ratio"], 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol   
+                            )
+            # < hips_span >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name="hips-span",
+                                        y=mdf["hips_ratio"], 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol   
+                            )
         # < add secondary column >
         if selnum == 1 and second_name is not None:
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
@@ -380,7 +415,7 @@ if selnum == 4:
     fig.update(layout_xaxis2_rangeslider_visible=False)
     fig.update(layout_xaxis3_rangeslider_visible=False)
     fig.update(layout_xaxis4_rangeslider_visible=False)
-    fig.update_yaxes(range=(0.0, 0.40))
+    fig.update_yaxes(range=(range_min, range_max))
     fig.update_layout(
         showlegend = False
     )
@@ -390,7 +425,7 @@ else:
         fig.update(layout_xaxis2_rangeslider_visible=False)
         fig.update(layout_xaxis2_showticklabels = False)
         fig.update_traces(dict(showlegend = False), row=2, col=1)
-        fig.update_yaxes(range=(0.0, 0.40))
+        fig.update_yaxes(range=(range_min, range_max))
         #fig.update_xaxes(showticklabels = False)
     elif selnum == 1:
         if second_name is not None:
@@ -403,7 +438,7 @@ else:
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
             xaxis1_title = "Frame count", 
-            yaxis = dict(title='norm/height',range=(0.0, 0.40),showgrid=True), 
+            yaxis = dict(title='norm/height',range=(range_min, range_max),showgrid=True), 
             yaxis3= dict(title='conf', side='left', showgrid=True), 
             showlegend = True
         )
