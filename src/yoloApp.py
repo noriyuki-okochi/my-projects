@@ -64,7 +64,7 @@ Update_tracking:bool = False     # DBのトラッキングデータ(section,comp
 Db = MyDb(DB_PATH)  
 Db.mode = 'csv'
 # YOLOv8モデル
-V8_model:str = 'v8n'  # YOLOv8のモデルファイル名
+V8_model:str = 'v8s'  # YOLOv8のモデルファイル名
 #
 # YOLOv8とOpenPoseの組み合わせ例（Ultralytics YOLOv8 + YOLOv8-poseモデル利用）
 # このコードは、YOLOv8を使用してカメラまたは動画ファイルから骨格検出を行うものです。
@@ -81,12 +81,12 @@ def help():
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
     print(" -w(rite-analized-image-file)")
-    print(" -f(lame-count) for sampling data")
+    print(" -f(lame-count) for sampling data: default=8")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
-    print(" -WMA(window-size::use Weight-Moving-Average data)")
-    print(" -V(8-pose model-file)")
+    print(" -WMA(window-size::use Weight-Moving-Average data: default=5)")
+    print(" -V(8-pose model-file):default=v8s")
     print(" -h(elp)")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-2>")
@@ -100,6 +100,7 @@ def help():
     print(" r :繰り返し再生開始／停止（'-r'時、有効）")
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
+    print(" c :警告メッセージのクリア")
     print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
@@ -635,13 +636,18 @@ def section_started(section_no, myResult, arrows = None):
             # 右手首の移動ベクトルの長さが10以上の場合（引分けの完了）
             Step_counter = Step_counter + 1
             if Step_counter == PRM[4]: started = True    #  停止状態の５回保持で完了
+        else:
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
+            if normR > thsd(PRM[5]):
+                # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
+                Alart_id = Alart_KaiNasi
+                Step_error = True
     
     # 6-Kai  ->  7-Hanare        
     elif section_no == 6:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
 
-#       if normR > thsd(0.085) and normL > thsd(0.085):
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
             # 右手首の移動ベクトルの長さが10以上の場合（離れ）
             started = True
@@ -859,7 +865,7 @@ def section_completed(section_no, myResult, arrows = None):
                 # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
                 mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[5]} and (normR > {int(thsd(PRM[6]))}) ]")
                 if (Step_counter%10) > PRM[5] and normR > thsd(PRM[6]):
-                    Alart_id = Alart_Kai
+                    Alart_id = Alart_KaiNasi
                     Step_error = True
         elif Step_counter < 21:     # 一度でも静止状態をたもった場合は、Step_counterを10にしない
             # 右手首と左手首が鼻より高い
@@ -875,6 +881,13 @@ def section_completed(section_no, myResult, arrows = None):
             # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
             Step_counter = Step_counter + 1
             if Step_counter == PRM[4]:  completed = True
+        else:
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and normL > {int(thsd(PRM[6]))} ]")
+
+            if normR > thsd(PRM[5]) and normL > thsd(PRM[6]):
+                # 右手首の移動ベクトルの長さが大きい（会不十分で離れ）
+                Alart_id = Alart_KaiFusoku
+                Step_error = True
     
     # 7-Hanare        
     elif section_no == 7:  
@@ -1038,6 +1051,8 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
                             # セクション内の動作が不正な場合
                             Alart_section = Section_no
                             mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
+                            if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
+                            Step_counter = 0
                             Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
                     #
                 else:
@@ -1055,8 +1070,9 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
                             # セクション内の動作が不正な場合
                             Alart_section = Section_no
                             mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                            if Alart_id == Alart_Monomi: Section_no = 4     # 物見なしで打ちおこしの場合
-                            if Alart_id == Alart_Kai: Section_no = 7        # 会なしで離れた場合
+                            if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
+                            if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
+                            if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
                             Step_counter = 0
                             Nop_counter = 0
                     #
@@ -1183,7 +1199,8 @@ def main():
                 return
 #
     # YOLOv8モデルファイル指定
-    V8_model = 'v8s' if '-V8s' in opts else 'v8n'  # YOLOv8のモデルファイルを指定: 
+    if '-V8n' in opts:
+        V8_model = 'v8n' # YOLOv8nモデルを使用 
 
     # サンプリングフレーム数を取得
     opt_val  = [opt for opt in opts if opt.startswith('-f')]
@@ -1549,6 +1566,10 @@ def main():
             attention += 1
             mylog.log(INFO, f"!!Attention({attention}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
             print(f"アテンション({attention}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
+
+        elif key == ord('c'):
+            Section_color =  YELLOW             # セクションの色（黄色）BGR
+            Alart_message = ''                  # アラートメッセージをリセット
     #
     # リソースの解放
     if Tracking_only: Db.csvfile.close() 
