@@ -19,6 +19,7 @@ class MyDb:
         self.case_name = 'none'
         self.frame_no = 0
         self.section = 0
+        self.completed = 0
         self.csvpath = ''
         self.csvfile = None
         
@@ -29,7 +30,7 @@ class MyDb:
         self.csvfile = open( self.csvpath, 'w')
         # カラム名を出力
         names ="case_name,frame_no,key_id,key_name,box_id,box_w,box_h,box_conf,x,y,xy_conf,norm,ratio,angle,eyes_span,shds_span,hips_span,"\
-            + "inserted_at,time_epoch,section\n"
+            + "inserted_at,time_epoch,section,completed\n"
         self.csvfile.write(names)
         self.csvfile.flush()
             
@@ -46,7 +47,7 @@ class MyDb:
     def execute(self, sql):
         return self.cur.execute(sql)
 #
-#
+# insert frame_info table
 #
     def insert_frame_info(self, data_list):
         
@@ -54,6 +55,7 @@ class MyDb:
         sql = f"select * from frame_info where case_name='{self.case_name}'"
         rs = self.cur.execute(sql).fetchone()
         if rs != None:
+            # 重複キーが存在する場合は削除
             sql = f"delete from frame_info where case_name ='{self.case_name}'"
             self.cur.execute(sql)
 
@@ -67,6 +69,18 @@ class MyDb:
             + "(case_name, img_path, fps, height, width, csv_path, updated_at, inserted_at)"\
             + f" values({values})"
 
+        self.cur.execute(sql)
+        self.commit()
+#
+# update frame_info table
+#
+    def update_frame_info(self, col_name, value):
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        sql = f"update frame_info set"\
+            + f" {col_name} = {value},"\
+            + f" updated_at='{timestamp}'"\
+            + f" where case_name='{self.case_name}'"
         self.cur.execute(sql)
         self.commit()
  
@@ -93,7 +107,7 @@ class MyDb:
             else:
                 values += f" {value:.3f}, "
             
-        values += f" '{timestamp}', {time_epoc}, {self.section}"
+        values += f" '{timestamp}', {time_epoc}, {self.section}, {self.completed}"
             
         if self.mode == 'csv':
             self.csvfile.write(f"{values}\n")
@@ -101,7 +115,7 @@ class MyDb:
             sql = "insert into tracking_data"\
                 + "(case_name, frame_no, key_id,"\
                 + " key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle,"\
-                + " eyes_span, shds_span, hips_span, inserted_at, time_epoch, section)"\
+                + " eyes_span, shds_span, hips_span, inserted_at, time_epoch, section, completed)"\
                 + f" values({values})"
             self.cur.execute(sql)
 #
@@ -112,7 +126,24 @@ class MyDb:
             self.cur.execute(sql)
         except:
             print("[delete_tracking_data]:no records.")
-        
+#
+#
+    def update_tracking_section(self):
+        sql = "update tracking_data set "\
+            + f"section={self.section},"\
+            + f"completed={self.completed}"\
+            + f" where case_name='{self.case_name}' and frame_no={self.frame_no}"
+        self.cur.execute(sql)
+        self.conn.commit()
+#
+#
+    def update_tracking_tag(self, tag_name, tag_value):
+        sql = "update tracking_data set "\
+            + f"{tag_name}={tag_value}"\
+            + f" where case_name='{self.case_name}' and frame_no={self.frame_no}"
+        #print(f"update_tracking_tag: {sql}")
+        self.cur.execute(sql)
+        self.conn.commit()
                    
 #
 # select FPS from balance-table

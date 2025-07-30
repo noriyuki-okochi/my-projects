@@ -7,7 +7,6 @@ import sys
 import os
 # local
 import pandas as pd
-#import numpy as np
 import plotly.graph_objects as go
 #import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
@@ -43,9 +42,9 @@ key_names:str = [name for name in Kn2idx]
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("chart.py -case {'<case-name1>[,<case_name2>']|-L(ist-case_names)} [-import [<csv-file-path>]] \n"\
-         + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span]\n"\
-         + "        [-p(ast-frames(sec.))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames(sec./counts)>] \n"\
-         + "        [-m] [-b(ottom)] [-h(elp)] [-d(ebug)]")
+         + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
+         + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
+         + "        [-m(ulti)] [-b(ottom)] [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
@@ -105,7 +104,7 @@ if '-import' in cmds:
     
     if csvfile == '' or os.path.isfile(csvfile) == False:
         # ファイルが存在しないとき終了
-        print(f"[chart]error: '{csvfile}' not found.")
+        print(f"[chart]error: csv-file({csvfile}) not found.")
         exit(0)    
     # CSVファイルを読み込む
     df = pd.read_csv(csvfile)
@@ -117,7 +116,7 @@ if '-import' in cmds:
     print(f"[chart]info:import '{csvfile}' to 'tracking_data'{df.shape}.")
     # インポート実行回数更新
     count += 1
-    db.update_import(count)
+    db.update_frame_info('import', count)
 #
 if count == 0:
     print(f"[chart]error:No tracking data. you must import csv-file.")
@@ -167,26 +166,51 @@ span_visible:bool = False
 if '-span' in args:
     span_visible = True
 #
+## 移動平均データの表示を指定するコマンドオプションの解析
+sma_visible:bool = False
+sma_window:int = Window_size
+wma_visible:bool = False
+wma_window:int = Window_size
+
+if '-SMA' in args:
+    sma_visible = True
+    i = args.index('-SMA')
+    if len(args) > (i + 1) and args[i+1].isnumeric():
+        sma_window = int(args[i+1])
+        if sma_window < 2 or sma_window > 20:
+            print(f"[chart]error:illegal SMA window size:{sma_window}.")
+            exit(0)
+if '-WMA' in args:
+    wma_visible = True
+    i = args.index('-WMA')
+    if len(args) > (i + 1) and args[i+1].isnumeric():
+        wma_window = int(args[i+1])
+        if wma_window < 2 or wma_window > 20:
+            print(f"[chart]error:illegal WMA window size:{wma_window}.")
+            exit(0)
+##
+#
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
-LAST_SEC = 60               # display frames(default is 60sec.)
-unit_sec:bool = True
-last_default:bool = True
-last:int = int(LAST_SEC)         
+LAST_FRAMES = 500               # display frames(default is 500 frames)
+last:int = int(LAST_FRAMES)     # 表示フレーム数      
 mlast:int = [None, None]
+p_option:bool = True            # '-p'オプションは遡って表示するフレーム数を指定  
+
+
 #
 nums = [int(num) for num in args if num.isnumeric()]
 if len(nums) > 0:               # display frames
-    last = int(nums[0])         # sec/frames
-    last_default = False
+    last = int(nums[0])         # frames
 #
 pf_opt = [opt[1:] for opt in opts if opt.startswith('-p') or opt.startswith('-f')]
-# '-pxxx'は秒単位で最後から遡る時間を指定、 '-fxxxx'はフレーム単位で開始フレームを指定
-#  -f'xxxx,yyyy'はケース比較時の、各ケースに対する開始フレームを指定
+# '-pxxx'は最後から遡るフレーム数を指定、 '-fxxxx'は開始フレーム数を指定
+#  -f'xxxx,yyyy'はケース比較時の、各ケースに対する開始フレーム数を指定
+
 if len(pf_opt) > 0:
     nums = pf_opt[0].split(',')
     if nums[0][0] == 'f':       
-        unit_sec = False
+        p_option = False
     if nums[0][1:].isnumeric(): mlast[0] = int(nums[0][1:])
     if len(nums) > 1 and nums[1].isnumeric():  mlast[1] = int(nums[1])
     else: mlast[1] = mlast[0]
@@ -248,7 +272,7 @@ if verbose:
     print(f"case_names:{case_names}")
     print(f"last:{last}")               # 表示フレーム数   
     print(f"mlast:{mlast}")             # 表示フレーム数   
-    print(f"unit_sec={unit_sec}, default_last={last_default}, case_compare={case_compare}, section_conf={m_flg}")   
+    print(f"case_compare={case_compare}, section_conf={m_flg}")   
     print(f"selnum:{selnum}")           
     fig.print_grid()
 #
@@ -271,42 +295,45 @@ for icount, key in enumerate(selkeys, start=1):
         print(f"[chart]info:{df.shape}")
         start_frame_no = df.index[0]
         last_frame_no = df.index[-1]
+        frame_length = last_frame_no - start_frame_no + 1
         print(f"[chart]info:frame_no = [{start_frame_no} -> {last_frame_no}]")
         #
         # データの作成、編集
         #
-        df['eyes_ratio'] = df["eyes_span"]/df["box_h"]                       # バウンダリーボックスの高さに対する比率に変換
-        df['eyes_ratio'] = df['eyes_ratio'].where(df['eyes_ratio'] < 0.5)   #  0.5以上は欠測地(NaN)に置換する
-        df['eyes_ratio'].ffill()                                            # 欠測値を直前の値に置換する
-        
-        df['shds_ratio'] = df["shds_span"]/df["box_h"]
-        df['hips_ratio'] = df["hips_span"]/df["box_h"]
-        '''
-        # 移動平均
-        df['mvave_norm'] = df["ratio"].rolling(10).mean()   
-        '''
+        if span_visible:
+            df['eyes_ratio'] = df["eyes_span"]/df["box_h"]                       # バウンダリーボックスの高さに対する比率に変換
+            df['eyes_ratio'] = df['eyes_ratio'].where(df['eyes_ratio'] < 0.5)   #  0.5以上は欠測地(NaN)に置換する
+            df['eyes_ratio'].ffill()                                            # 欠測値を直前の値に置換する
+            
+            df['shds_ratio'] = df["shds_span"]/df["box_h"]
+            df['hips_ratio'] = df["hips_span"]/df["box_h"]
+
+        if sma_visible:        
+            # 単純移動平均
+            df['SMA_norm'] = df["ratio"].rolling(sma_window).mean()   
+            
+        if wma_visible:        
+            # 加重移動平均
+            #weights = [0.1, 0.2, 0.3, 0.4, 0.5]
+            #weights = np.arange(1, wma_window + 1)
+            weights = WMA_weights
+            df['WMA_norm'] = df["ratio"].rolling(wma_window).apply(lambda x: np.dot(x, weights) / sum(weights), raw=True)
         #
         # 表示範囲の計算とデータの抽出
         #
         if icount == 1:
-            if unit_sec:   # '時間単位で秒を指定
-                mlast[icase] = int(FPS*mlast[icase])            # (sec. -> frames)
-                if last == 0: last = mlast[icase]
-                else: last = int(FPS*last)   
-            else:          # '-fxxxx' は開始フレームをフレームカウントで指定
-                mlast[icase] = last_frame_no - mlast[icase]
-                if last_default: last = int(FPS*last)           # (sec. -> frames)
-                else:
-                    if last == 0: last = mlast[icase]           # 指定開始フレームから最後まで
+            if not p_option:   # '-fxxxx' は開始フレームをフレーム数で指定
+                mlast[icase] = frame_length - mlast[icase]
+            if last > mlast[icase] or last == 0: 
+                last = mlast[icase]
+            print(f"[chart]info: mlast[{icase}]={mlast[icase]}, last={last}")                
                 
-            if (last > last_frame_no) or (mlast[icase] < 0 or mlast[icase] > last_frame_no):
-                print(f"[chart]error:illegal values. last={last}, mlast={mlast[icase]}")
-                exit(0)
         #
         mdf = df.tail(mlast[icase])
         if mlast[icase] > last:
             mdf = mdf.head(last)
         print(f"[chart]info:{mdf.shape}")
+        print(f"[chart]info:frame_no = [{mdf.index[0]} -> {mdf.index[-1]}]")
         #
         # データのプロット
         # < ratio >
@@ -320,17 +347,29 @@ for icount, key in enumerate(selkeys, start=1):
                             col = icol   
                         )
         #  
-        '''
-        fig = fig.add_trace( go.Scatter(x=mdf.index, 
-                                    name="move-ave",
-                                    y=mdf["mvave_norm"], 
-                                    mode="lines"),
-                                    #line_color= 'gray',                                  
-                                    #line={'dash':'dot'},
-                            row = irow, 
-                            col = icol   
-                        )
-        '''
+        if sma_visible:
+            #  < 単純移動平均 >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name=f"SMA{sma_window}",
+                                        y=mdf["SMA_norm"], 
+                                        mode="lines",
+                                        #line_color= 'gray',                                  
+                                        line={'dash':'dot'}),
+                                row = irow, 
+                                col = icol   
+                            )
+        if wma_visible:
+            #  < 加重移動平均 >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name=f"WMA{wma_window}",
+                                        y=mdf["WMA_norm"], 
+                                        mode="lines",
+                                        #line_color= 'gray',                                  
+                                        line={'dash':'dot'}),
+                                row = irow, 
+                                col = icol   
+                            )
+            
         if span_visible:
             # < eyes_span >
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
@@ -382,6 +421,35 @@ for icount, key in enumerate(selkeys, start=1):
                                     name="section",
                                     y=mdf["section"],
                                     marker_color='grey'),
+                            row = 2, 
+                            col = 1,
+                            secondary_y=True
+                        )
+            # < completed >
+            fig = fig.add_trace( go.Bar(x=mdf.index, 
+                                    name="completed",
+                                    y=mdf["completed"],
+                                    marker_color='black'),
+                            row = 2, 
+                            col = 1,
+                            secondary_y=True
+                        )
+            # < tag1(completed) >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                    name="tag1",
+                                    y=mdf["tag1"],
+                                    marker_color= 'cyan',
+                                    mode="markers"),
+                            row = 2, 
+                            col = 1,
+                            secondary_y=True
+                        )
+            # < tag2(started) >
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                    name="tag2",
+                                    y=mdf["tag2"],
+                                    marker_color= 'blue',
+                                    mode="markers"),
                             row = 2, 
                             col = 1,
                             secondary_y=True
