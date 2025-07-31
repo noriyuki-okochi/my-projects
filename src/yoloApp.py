@@ -71,16 +71,17 @@ V8_model:str = 'v8s'  # YOLOv8のモデルファイル名
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-r]|[-m|[-t|-u] <case_name>] [-f<flame_count>] [-WMA<window_size>] [-w]\n"\
-        + "                         [{ -{p|P}'(<section-no>,<index>)=<value>'}...] [{ -S(<section-no>}...]\n"\
-        + "                         [-V8{s|n}] [-h] [-v] [-d<debug-level>]")
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-r [-clip]]|[-m|[-t|-u] <case_name>] [-f<flame_count>] [-WMA<window_size>]\n"\
+        + "                         [{ -{p|P}'(<section-no>,<index>)=<value>'}...] [{ -S(<section-no>}...] [-V8{s|n}] [-w]\n"\
+        + "                         [-h] [-v] [-d<debug-level>]")
     print(" --- option ---")
     print(" -a(ll-file-types)")
     print(" -m(anual-plot::dont use YOLO plot)")
     print(" -r(aw-image)")
+    print(" -clip(raw-image)")
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
-    print(" -w(rite-analized-image-file)")
+    print(" -w(rite-image-file)")
     print(" -f(lame-count) for sampling data: default=8")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
@@ -101,6 +102,8 @@ def help():
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
     print(" c :警告メッセージのクリア")
+    print(" u :再生速度アップ")
+    print(" d :再生速度ダウン")
     print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
@@ -1118,6 +1121,45 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
     #
     return annotated_frame
 #
+# マウスドラッグ・イベント関数
+#
+# グローバル変数
+Rect_start = None
+Rect_end = None
+Drawing = False
+Roi_set = False
+
+def draw_rectangle(event, x, y, flags, param):
+    global Rect_start, Rect_end, Drawing, Roi_set
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        # ボタンダウン
+        Rect_start = (x, y)
+        Drawing = True
+
+    elif event == cv2.EVENT_MOUSEMOVE and Drawing:
+        # ドラッグ
+        Rect_end = (x, y)
+
+    elif event == cv2.EVENT_LBUTTONUP:
+        # ボタンアップ
+        Rect_end = (x, y)
+        Drawing = False
+        vect = np.array(Rect_end) - np.array(Rect_start)    # 2点のベクトルを計算
+        length, _ = vector_length_angle(vect)               # ベクトルの長さと角度を計算
+        if length > 100: Roi_set = True
+#
+# キー入力の現在モード('PWR','PWT'）を編集する関数
+#
+def edit_key_mode(frame_height, iwait, out_file, imgWriteEnabled, raw_image, repeat_mode ):
+ 
+        mode_str = 'P' if  iwait == 0 else 'p'
+        if out_file != '':  mode_str += 'W' if imgWriteEnabled else 'w'
+        if raw_image:       mode_str += 'R' if repeat_mode else 'r'
+        if Tracking_only:   mode_str += 'T' if Tracking_on else 't'
+        
+        return (10, frame_height - 40), mode_str
+#
 # Main process to play video with form-analize by YOLOv8
 #
 def main(): 
@@ -1131,6 +1173,7 @@ def main():
     #
     cam_id = None                                   # デフォルトのカメラID
     raw_image = False                               # 生画像を表示するオプション
+    clip_image = False                              # 生画像をクリップしてファイルを作成
     manual_plot = False                             # 手動でプロットするオプション
     repeat_mode = False                             # '-r'再生の繰り返し
     idir = PICT_PATH                                # 初期ディレクトリを指定
@@ -1173,8 +1216,9 @@ def main():
     #
     if '-r' in opts:
         raw_image = True        # 生画像を表示するオプション
+        if '-clip' in opts: clip_image = True
 
-        
+       
     if not raw_image and ('-m' in opts):            # 手動（OpenCV）で解析データをプロットするオプション
         manual_plot = True
         
@@ -1329,25 +1373,7 @@ def main():
     # 動画ファイルが開けない場合のエラーハンドリング
     if not cap.isOpened():
         print("カメラor動画ファイルが見つかりません")
-        return
-    # 映像出力ファイルの設定
-    imgWriteEnabled = False
-    out_file = ''
-    if ('-w' in opts) or ('-wo' in opts):
-        out_file = f"{idir}/_WIN_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"  # 出力ファイル名を指定   
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        cv2Video = cv2.VideoWriter(out_file, fourcc, cap.get(cv2.CAP_PROP_FPS),
-                    (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
-    #
-    # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
-    #
-    print(f"YOLO{V8_model} Pose Detectionを開始します")
-    print(f"YOLOv8 ログレベル={mylog_level}")
-    print(f"Tracking_only={Tracking_only}")
-    
-    mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
-    model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
-    model.info()  # モデル情報を表示
+        return    
     #
     # 先頭フレームを読み込み
     #
@@ -1356,10 +1382,59 @@ def main():
         print("動画ファイルの読み込みに失敗しました")
         cap.release()
         return
-    
     # フレームのサイズを取得
-    frame_height, frame_width = frame.shape[:2] 
-    Fps = cap.get(cv2.CAP_PROP_FPS)                                                 # フレームレートを取得
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) 
+    Fps = cap.get(cv2.CAP_PROP_FPS)   
+        
+    imgWriteEnabled = False
+    if clip_image:   
+        # クリッピング処理ウィンドウとコールバック登録
+        cv2.namedWindow("Select ROI")
+        cv2.setMouseCallback("Select ROI", draw_rectangle)
+        while True:
+            temp_frame = frame.copy()
+            if Drawing and Rect_start and Rect_end:
+                cv2.rectangle(temp_frame, Rect_start, Rect_end, (0, 255, 0), 2)
+            cv2.imshow("Select ROI", temp_frame)
+            key_val = cv2.waitKey(1) & 0xFF 
+            if key_val == ord("q") or Roi_set:
+                break
+        #
+        cv2.destroyWindow("Select ROI")
+        if key_val == ord("q") : return
+        # ROI座標の取得
+        x1, y1 = Rect_start
+        x2, y2 = Rect_end
+        x1, x2 = sorted([x1, x2])
+        y1, y2 = sorted([y1, y2])
+        frame_width = x2 - x1
+        frame_height = y2 - y1
+        imgWriteEnabled = True
+
+    # 映像出力ファイルの設定
+    out_file = ''
+    if ('-w' in opts) or clip_image:
+        if raw_image is True:
+            out_file = f"{idir}/YOLO_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"  # 出力ファイル名を指定   
+        else:
+            out_file = f"{idir}/_WIN_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
+        print(f"出力ファイル：{out_file}: {frame_width}x{frame_height}")
+    #
+    if not raw_image:
+        #
+        # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
+        #
+        print(f"YOLO{V8_model} Pose Detectionを開始します")
+        print(f"YOLOv8 ログレベル={mylog_level}")
+        print(f"解析パラメータ={param_nm}")
+        
+        mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
+        model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
+        model.info()  # モデル情報を表示
     
     if Tracking_only:
         # トラッキングデータの情報テーブルに登録 
@@ -1367,9 +1442,11 @@ def main():
     
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     mylog.log(INFO, f"[main]:起動パラメータ情報:WMA_on={WMA_on}, WindowSize={Window_size}:case_name={case_name}")
-    mylog.log(INFO, f"[main]:フレーム情報: {file_name}:{frame_width}x{frame_height}, Fps={Fps:.2f}")
-    mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.)")
-    print(f"サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.)")
+    mylog.log(INFO, f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
+    print(f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
+    if not raw_image:
+        mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.)")
+        print(f"サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.)")
     
     Frame_counter = 1  # フレームカウンターの初期化
     #
@@ -1395,8 +1472,11 @@ def main():
             break
         Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_image is True:
-            # 生画像を表示する場合
-            annotated_frame = frame
+            if clip_image:
+                annotated_frame = frame[y1:y2, x1:x2]
+            else:
+                # 生画像を表示する場合
+                annotated_frame = frame
         else:
             # フレームのコントラストと明るさを調整
             #frame = adjust_frame_contrast(frame, alpha=1.8, beta=20)  # コントラストと明るさを調整
@@ -1457,13 +1537,16 @@ def main():
                     annotated_frame = plot( myResult )
     
         # ウィンドウに表示
+        if not clip_image:
+            mode_pos, mode_str = edit_key_mode(frame_height, iwait, out_file, imgWriteEnabled, raw_image, repeat_mode)
+            cv2.putText(annotated_frame, f"mode  : {mode_str}", mode_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
+        #        
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
         
         if imgWriteEnabled:
             # 出力ファイルに書き込み
             cv2Video.write(annotated_frame)
-            
         #キー入力をチェックするする
         key = cv2.waitKey(iwait) & 0xFF
         if key == -1: 
@@ -1479,7 +1562,15 @@ def main():
         elif key == ord('p'):
             iwait = 0 if iwait > 0 else iwait_init  # 'p'キーで一時停止/再開
             if iwait == 0: print("一時停止しました")
-            else: print("再開しました")
+            else: print(f"再開しました: {iwait}ミリ秒")
+        
+        elif key == ord('u'):
+            iwait = iwait - 5 if iwait > 5 else iwait   # 'u'キーでウィンドウの更新間隔を短くする
+            print(f"ウィンドウの更新間隔を短くしました: {iwait}ミリ秒")
+            
+        elif key == ord('d'):
+            iwait = iwait + 5 if iwait < (1000 - 5) else iwait  # 'd'キーでウィンドウの更新間隔を長くする
+            print(f"ウィンドウの更新間隔を長くしました: {iwait}ミリ秒")
             
         elif key == ord('t') and Tracking_only:
             Tracking_on = True if Tracking_on is False else False  # 't'キーで一開始／停止
