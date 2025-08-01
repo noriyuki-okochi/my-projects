@@ -6,7 +6,7 @@ import tkinter.filedialog as filedialog
 import sys
 import os
 from datetime import datetime
-import time
+from copy import copy 
 
 import numpy as np
 import math
@@ -474,7 +474,6 @@ class MyResult(Keypoint):
         else:
             mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
-###
 ###
 #    画像のコントラストと明るさを調整する関数
 #
@@ -1121,34 +1120,6 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
     #
     return annotated_frame
 #
-# マウスドラッグ・イベント関数
-#
-# グローバル変数
-Rect_start = None
-Rect_end = None
-Drawing = False
-Roi_set = False
-
-def draw_rectangle(event, x, y, flags, param):
-    global Rect_start, Rect_end, Drawing, Roi_set
-
-    if event == cv2.EVENT_LBUTTONDOWN:
-        # ボタンダウン
-        Rect_start = (x, y)
-        Drawing = True
-
-    elif event == cv2.EVENT_MOUSEMOVE and Drawing:
-        # ドラッグ
-        Rect_end = (x, y)
-
-    elif event == cv2.EVENT_LBUTTONUP:
-        # ボタンアップ
-        Rect_end = (x, y)
-        Drawing = False
-        vect = np.array(Rect_end) - np.array(Rect_start)    # 2点のベクトルを計算
-        length, _ = vector_length_angle(vect)               # ベクトルの長さと角度を計算
-        if length > 100: Roi_set = True
-#
 # キー入力の現在モード('PWR','PWT'）を編集する関数
 #
 def edit_key_mode(frame_height, iwait, out_file, imgWriteEnabled, raw_image, repeat_mode ):
@@ -1160,6 +1131,63 @@ def edit_key_mode(frame_height, iwait, out_file, imgWriteEnabled, raw_image, rep
         
         return (10, frame_height - 40), mode_str
 #
+# モザイク処理
+#
+def mosaic_area( src, y, x, height, width, ratio=0.1):
+    #print(f"[mosice_area]:({y}, {x}), height={height}, width={width}")
+    dst_area = src[y:y + height, x:x + width]
+    small = cv2.resize(dst_area, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
+    zoom = cv2.resize(small, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+    src[y:y + height, x:x + width] = zoom
+    return src
+#
+# マウスドラッグ・イベント関数
+#
+class Rect:
+    def __init__(self):
+        self.start = None
+        self.end = None
+        self.drawing = False
+        self.roi_set = False
+        self.x = [None, None]
+        self.y = [None, None]
+    
+    def clear(self):
+        self.__init__()
+            
+    def length(self):
+        vect = np.array(self.end) - np.array(self.start)    # 2点のベクトルを計算
+        norm, _ = vector_length_angle(vect)               # ベクトルの長さと角度を計算
+        return norm
+    
+    def width_height(self):
+        x1, y1 = self.start
+        x2, y2 = self.end
+        self.x[0], self.x[1] = sorted([x1, x2])
+        self.y[0], self.y[1] = sorted([y1, y2])        
+        return  (self.x[1] - self.x[0]), (self.y[1] - self.y[0])
+    
+# グローバル変数
+Rect_area = Rect()
+
+def draw_rectangle(event, x, y, flags, param):
+    global Rect_area
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        # ボタンダウン
+        Rect_area.start = (x, y)
+        Rect_area.drawing = True
+
+    elif event == cv2.EVENT_MOUSEMOVE and Rect_area.drawing:
+        # ドラッグ
+        Rect_area.end = (x, y)
+
+    elif event == cv2.EVENT_LBUTTONUP:
+        # ボタンアップ
+        Rect_area.end = (x, y)
+        Rect_area.drawing = False
+        if Rect_area.length() > 100: Rect_area.roi_set = True
+#
 # Main process to play video with form-analize by YOLOv8
 #
 def main(): 
@@ -1167,6 +1195,7 @@ def main():
     global Step_error, Section_color, Alart_message
     global Tracking_only, Tracking_on, Update_tracking
     global WMA_on, Window_size, WMA_weights, Sample_frames, V8_model
+    global Rect_area
 
     #
     # start of main
@@ -1385,33 +1414,60 @@ def main():
     # フレームのサイズを取得
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) 
-    Fps = cap.get(cv2.CAP_PROP_FPS)   
-        
+    Fps = cap.get(cv2.CAP_PROP_FPS)       
     imgWriteEnabled = False
-    if clip_image:   
-        # クリッピング処理ウィンドウとコールバック登録
+    
+    # クリッピング領域
+    rectAreas = []
+    if clip_image: 
+        #---------------------------------------------------------------------  
+        # クリッピング・ウィンドウとマウスイベント・コールバック登録
         cv2.namedWindow("Select ROI")
         cv2.setMouseCallback("Select ROI", draw_rectangle)
+        # クリッピング処理
         while True:
-            temp_frame = frame.copy()
-            if Drawing and Rect_start and Rect_end:
-                cv2.rectangle(temp_frame, Rect_start, Rect_end, (0, 255, 0), 2)
+            temp_frame = frame.copy()   # 読み込んだ先頭フレーム上で矩形領域を指定する
+            for rect in rectAreas:
+                # 指定済み矩形のライン描画
+                cv2.rectangle(temp_frame, rect.start, rect.end, GREEN, 1)
+                
+            if Rect_area.drawing and Rect_area.start and Rect_area.end:
+                # 矩形のライン描画
+                cv2.rectangle(temp_frame, Rect_area.start, Rect_area.end, GREEN, 2)
+            # キーオペレーションのヘルプ表示
+            hight, _ = temp_frame.shape[:2]
+            help_str = "r(eset)|c(onfirm)|q(uit)"
+            cv2.putText(temp_frame, help_str, (10, hight - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
             cv2.imshow("Select ROI", temp_frame)
+            #
             key_val = cv2.waitKey(1) & 0xFF 
-            if key_val == ord("q") or Roi_set:
+            if Rect_area.roi_set: 
+                # 連続して領域を指定する（先頭がクリッピング領域、2番目からモザイク領域）
+                Rect_area.roi_set = False
+                rectAreas.append( copy(Rect_area) )
+                continue            
+            if key_val == ord("r"):
+                # 全てキャンセルして指定し直す
+                Rect_area.roi_set = False
+                rectAreas.clear()
+                continue
+            if key_val == ord("q") or key_val == ord("c") :
+                # 処理を中断、または継続する
                 break
         #
         cv2.destroyWindow("Select ROI")
-        if key_val == ord("q") : return
-        # ROI座標の取得
-        x1, y1 = Rect_start
-        x2, y2 = Rect_end
-        x1, x2 = sorted([x1, x2])
-        y1, y2 = sorted([y1, y2])
-        frame_width = x2 - x1
-        frame_height = y2 - y1
+        if key_val == ord("q") : return     # 以降の処理を中断してプログラムを終了
+        if len(rectAreas) == 0:
+            print(f"クリッピング領域を指定してください。")
+            return
+        # クリッピング領域座標の取得
+        rect = rectAreas.pop(0)
+        frame_width, frame_height = rect.width_height()
+        frame_x = rect.x[0]
+        frame_y = rect.y[0]
         imgWriteEnabled = True
-
+        #------------------------------------------------------------------------
+    #
     # 映像出力ファイルの設定
     out_file = ''
     if ('-w' in opts) or clip_image:
@@ -1422,7 +1478,7 @@ def main():
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
-        print(f"出力ファイル：{out_file}: {frame_width}x{frame_height}")
+        print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
     #
     if not raw_image:
         #
@@ -1473,7 +1529,13 @@ def main():
         Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_image is True:
             if clip_image:
-                annotated_frame = frame[y1:y2, x1:x2]
+                # クリッピング処理
+                annotated_frame = frame[ frame_y:frame_y + frame_height, frame_x:frame_x + frame_width ]
+                for rect in rectAreas:
+                    # モザイク処理
+                    w, h = rect.width_height()
+                    annotated_frame = mosaic_area( annotated_frame, \
+                                                   (rect.y[0] - frame_y), (rect.x[0] - frame_x), h, w )
             else:
                 # 生画像を表示する場合
                 annotated_frame = frame
