@@ -9,8 +9,8 @@ PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/'
 #   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
 
 # セクション名の定義
-Section_names = [' ', '1.Asi-bumi', '2.Dou-zukuri', '3.Yu-gamae', '4.Uti-okosshi', 
-                     '5.Hiki-wake', '6.Kai', '7.Hanare', '8.Zan-shin', '']  # セクション名
+Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
+                  '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
 # キーポイントのインデックスを定義
 Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4, 
         'left_shoulder':5, 'right_shoulder':6, 'left_elbow':7, 'right_elbow':8, 
@@ -133,11 +133,11 @@ Alart_KaiFusoku = 6  # 「会不十分な離れ」のアラートID
 Alart_msg = {
    0:'',
    3:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
-   30:'警告：物見が定まらないを検知しました。',
+   30:'<警告>：「物見定まらず」を検知しました。',
    5:'Warning:Detected illegal action in section-5.(KAI nasi)',
-   50:'警告：会なし離れを検知しました。',
+   50:'<警告>：「会なし離れ」を検知しました。',
    6:'Warning:Detected illegal action in section-6.(KAI fusoku)',
-   60:'警告：会不十分な離れを検知しました。'
+   60:'<警告>：「会不十分な離れ」を検知しました。'
 }
 # 
 # テキスト属性
@@ -164,7 +164,7 @@ BG_BLUE = '44'
 BG_PURPLE = '45'
 BG_CYAN = '46'
 BG_WHITE = '4f'
-#
+#　カラー(B,G,R)
 YELLOW = (0, 255, 255)  # 黄色
 GREEN = (0, 255, 0)    # 緑色
 RED = (0, 0, 255)      # 赤色

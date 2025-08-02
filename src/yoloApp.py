@@ -7,7 +7,7 @@ import sys
 import os
 from datetime import datetime
 from copy import copy 
-
+from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import math
 
@@ -989,7 +989,28 @@ def draw_kpts_line(annotated_frame, points):
     #draw_kpt_line(annotated_frame, points, legR_line, color=(255, 0, 0), weight=2, radius=3)   # 右脚
     #draw_kpt_line(annotated_frame, points, legL_line, color=(255, 0, 0), weight=2, radius=3)   # 左脚
     draw_kpt_line(annotated_frame, points, eye_line,  color=(255, 0, 0), weight=2, radius=3)    # 目
-
+#
+# 日本語テキストの描画
+#
+def draw_text(imag, message, point, color ):
+    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
+    font_path = 'meiryob.ttc'
+    font_size = 20
+    '''
+    b, g, r = color
+    font_color = (r, g, b)
+    '''
+    font = ImageFont.truetype( font_path, font_size )
+    font_color = color
+    #
+    img_pil = Image.fromarray( imag )
+    draw = ImageDraw.Draw( img_pil )
+    _, y1, _, y2 = draw.textbbox( point, message, font )
+    h = y2 - y1
+    x, y = point
+    draw.text( (x, y - h), message, font_color, font )
+    return np.array( img_pil )
+    
 #
 # 検出結果をフレームに描画する関数
 #
@@ -1106,17 +1127,21 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
    
         section_name = Section_names[Section_no]    # セクション名を取得
         if Step_counter > 0:                        # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
-            section_name += f"({Step_counter})"     
+            #section_name += f"({Step_counter})"     
+            section_name += f"（{Step_counter}）"     
         if Alart_id > 0: 
-            Alart_message = Alart_msg[Alart_id]
+            #Alart_message = Alart_msg[Alart_id]
+            Alart_message = Alart_msg[Alart_id*10]
             print(f"{Alart_msg[Alart_id*10]}")
             mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
                    
-        cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
-        cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
-        cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 2)
-        cv2.putText(annotated_frame, Alart_message, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, RED, 2)
+        cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
+        annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
+        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        #cv2.putText(annotated_frame, Alart_message, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, RED, 2)
+        annotated_frame = draw_text(annotated_frame, Alart_message, (10, 110), RED)
     #
     return annotated_frame
 #
@@ -1472,9 +1497,9 @@ def main():
     out_file = ''
     if ('-w' in opts) or clip_image:
         if raw_image is True:
-            out_file = f"{idir}/YOLO_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"  # 出力ファイル名を指定   
+            out_file = f"{idir}YOLO_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"  # 出力ファイル名を指定   
         else:
-            out_file = f"{idir}/_WIN_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"
+            out_file = f"{idir}_WIN_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
