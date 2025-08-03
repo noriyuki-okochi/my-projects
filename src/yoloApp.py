@@ -1150,11 +1150,10 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
 def edit_key_mode(frame_height, iwait, out_file, imgWriteEnabled, raw_image, repeat_mode ):
  
         mode_str = 'P' if  iwait == 0 else 'p'
-        if out_file != '':  mode_str += 'W' if imgWriteEnabled else 'w'
         if raw_image:       mode_str += 'R' if repeat_mode else 'r'
+        if out_file != '':  mode_str += 'W' if imgWriteEnabled else 'w'
         if Tracking_only:   mode_str += 'T' if Tracking_on else 't'
-        
-        return (10, frame_height - 40), mode_str
+        return (10, frame_height - 20), mode_str
 #
 # モザイク処理
 #
@@ -1295,6 +1294,9 @@ def main():
             if Update_tracking and fps is None:
                 print(f"> '{case_name}' not found in frame_info table.")
                 return
+        else:
+            print("ケース名の指定がありません")
+            return
 #
     # YOLOv8モデルファイル指定
     if '-V8n' in opts:
@@ -1407,12 +1409,8 @@ def main():
             print("動画ファイルの選択がキャンセルされました")
             return
         
+        print(f"[main]:入力ファイル：{file_name}")
         cap = cv2.VideoCapture(file_name)  # 動画ファイルのパスを指定
-        iwait = 1  # 動画ファイルの場合はウィンドウの更新間隔を長くする
-        #
-        if case_name is None:
-            # 動画ファイル名からケース名を取得
-            case_name = os.path.basename(file_name).split('.')[0]
             
     # トラッキングデータのケース名を設定
     if Tracking_only: 
@@ -1496,14 +1494,16 @@ def main():
     # 映像出力ファイルの設定
     out_file = ''
     if ('-w' in opts) or clip_image:
-        if raw_image is True:
-            out_file = f"{idir}YOLO_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"  # 出力ファイル名を指定   
+        if file_name is None:
+            out_file = f"{idir}YOLO_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"
         else:
-            out_file = f"{idir}_WIN_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"
+            base_name = os.path.basename(file_name)
+            out_file = f"{idir}_{base_name}"
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
         print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
+        #print(f"os.sep: {os.sep}")
     #
     if not raw_image:
         #
@@ -1626,7 +1626,14 @@ def main():
         # ウィンドウに表示
         if not clip_image:
             mode_pos, mode_str = edit_key_mode(frame_height, iwait, out_file, imgWriteEnabled, raw_image, repeat_mode)
-            cv2.putText(annotated_frame, f"mode  : {mode_str}", mode_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
+            mode_str = f"mode  : {mode_str}"
+            if raw_image:
+                x, y = mode_pos
+                size, base = cv2.getTextSize(mode_str,cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2 )
+                w, h = size
+                #x = frame_width - w - x
+                mode_pos = (x, y - h - base)
+            cv2.putText(annotated_frame, mode_str, mode_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
         #        
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
@@ -1662,9 +1669,9 @@ def main():
         elif key == ord('t') and Tracking_only:
             Tracking_on = True if Tracking_on is False else False  # 't'キーで一開始／停止
             if Tracking_on: 
-                print("トラッキングを開始します")
+                print(f"トラッキングを開始します: {Db.csvpath}")
                 Db.update_frame_info('start_frame', Frame_counter)  # 開始フレーム番号
-                mylog.log(INFO, ">> Trucking start")
+                mylog.log(INFO, f">> Trucking start: {Db.csvpath}")
             else: 
                 print("トラッキングを停止します")
                 Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
