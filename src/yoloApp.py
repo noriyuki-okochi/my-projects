@@ -168,7 +168,7 @@ def get_max_box(result):
         if result.boxes.conf[i].item() < 0.3: 
             mylog.log(DEBUG, f"[get_max_box]: boxid={i}, conf={result.boxes.conf[i].item():.2f}  skip....")
             continue  # 信頼度が低いボックスは無視
-        x, y, w, h = map(int, boxes.xywh[i])
+        _, _, w, h = map(int, boxes.xywh[i])
         area = np.append(area, w * h)                   # 面積を計算して追加
     if len(area) > 0:
         # 最大のボックスのインデックスを取得
@@ -193,7 +193,7 @@ def get_camera_pos(myResult):
 
     length, angle = keyPoints.norm('right_shoulder', 'left_shoulder')       # 右肩と左肩のベクトルの長さと角度を計算
     l_conf = keyPoints.conf('left_shoulder')
-    length_h, x = keyPoints.norm('right_hip', 'left_hip')                   # 右腰と左腰のベクトルの長さと角度を計算
+    length_h, _ = keyPoints.norm('right_hip', 'left_hip')                   # 右腰と左腰のベクトルの長さと角度を計算
 
     ipos = 0
 #    if length < thsd(0.120) and l_conf < 0.96:  # 右肩と左肩のベクトルの長さが100未満の場合
@@ -397,7 +397,7 @@ class MyResult(Keypoint):
         points.append(self.points[idx])         # 現在のポイントを追加
         
         for i in range(len(points) - 1):        # リストの最後の要素までループ
-            length, angle = vector_length_angle( (points[i + 1] - points[i]) )    
+            length, _ = vector_length_angle( (points[i + 1] - points[i]) )    
             arrow_length.append(length)         # 移動ベクトルの長さを追加
             
         mylog.log(DEBUG, f"[vector_length]: idx={idx}, points={points}, arrow_length={arrow_length}")
@@ -547,8 +547,8 @@ def section_started(section_no, myResult, arrows = None):
         arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]
 
     normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
-    normL, anglL = arrow[Kn2idx['left_wrist']]                      # 左手首の移動ベクトルの長さと角度
-    normS, x = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
+    normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
+    normS, _ = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
     xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
     
     started = False
@@ -574,7 +574,7 @@ def section_started(section_no, myResult, arrows = None):
     PRM = get_action_param(StartAction_params, param_nm)[section_no]  
     # 0-Start  ->  1-Asi-bumi
     if section_no == 0:    
-        lenS, x = keyPoints.norm('left_shoulder', 'right_shoulder')          # 右肩と左肩のベクトルの長さと角度を計算
+        lenS, _ = keyPoints.norm('left_shoulder', 'right_shoulder')          # 右肩と左肩のベクトルの長さと角度を計算
         mylog.log(INFO, f">>>   lenS={int(lenS)}({thsd.ratio(lenS):.3f}), normS={(int(normS))}({thsd.ratio(normS):.3f})")
         mylog.log(INFO, f">>>   [ lenS < {int(thsd(PRM[0]))} and normS > {int(thsd(PRM[1]))} ]")
 
@@ -594,7 +594,7 @@ def section_started(section_no, myResult, arrows = None):
     
     # 2-Dou-zukuri  ->  3-Yu-gamae        
     elif section_no == 2:  
-        lenY, x = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算       
+        lenY, _ = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算       
         mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f})")
         mylog.log(INFO, f">>>   [ lenY > {int(thsd(PRM[0]))} and normR > {int(thsd(PRM[1]))} ]")
 
@@ -628,8 +628,8 @@ def section_started(section_no, myResult, arrows = None):
     
     # 5-Hiki-wake  ->  6-Kai        
     elif section_no == 5:  
-        normER, x = arrow[Kn2idx['right_elbow']]                    # 右肘の移動ベクトルの長さと角度
-        normEL, x = arrow[Kn2idx['left_elbow']]                     # 左肘の移動ベクトルの長さと角度
+        normER, _ = arrow[Kn2idx['right_elbow']]                    # 右肘の移動ベクトルの長さと角度
+        normEL, _ = arrow[Kn2idx['left_elbow']]                     # 左肘の移動ベクトルの長さと角度
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
                         + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
@@ -714,15 +714,15 @@ def section_completed(section_no, myResult, arrows = None):
         arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]
     
     normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
-    normL, x = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
-    normER, x = arrow[Kn2idx['right_elbow']]                        # 右肘の移動ベクトルの長さと角度
-    normEL, x = arrow[Kn2idx['left_elbow']]                         # 左肘の移動ベクトルの長さと角度
+    normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
+    normER, _ = arrow[Kn2idx['right_elbow']]                        # 右肘の移動ベクトルの長さと角度
+    normEL, _ = arrow[Kn2idx['left_elbow']]                         # 左肘の移動ベクトルの長さと角度
     
     xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
     xy_wristL = keyPoints.xy('left_wrist')                          # 左手首の座標
     xy_nose = keyPoints.xy('nose')                                  # 鼻の座標
 
-    lenY, x = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
+    lenY, _ = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
     
     completed = False
     # 共通の開始条件を取得
@@ -749,7 +749,7 @@ def section_completed(section_no, myResult, arrows = None):
     # 1-Asi-bumi
     if section_no == 1:  
         if Step_counter == 0:
-            lenY, x = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算
+            lenY, _ = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算
             conf= keyPoints.conf('left_eye')       
             mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f}), conf={conf:.2f}")
             mylog.log(INFO, f">>>   [  lenY > {int(thsd(PRM[0]))} and conf > {PRM[1]:.2f} ]")
@@ -758,9 +758,9 @@ def section_completed(section_no, myResult, arrows = None):
                 # 右目と左目のベクトルの長さが10以上、左目の信頼度が0.5以上の場合（正面を向く）
                 Step_counter = 10
         else:
-            normN, x = arrow[Kn2idx['nose']]                        # 鼻の移動ベクトルの長さと角度
-            normHR, x = arrow[Kn2idx['right_hip']]                  # 左腰の移動ベクトルの長さと角度
-            normHL, x = arrow[Kn2idx['left_hip']]                   # 左腰の移動ベクトルの長さと角度
+            normN, _ = arrow[Kn2idx['nose']]                        # 鼻の移動ベクトルの長さと角度
+            normHR, _ = arrow[Kn2idx['right_hip']]                  # 左腰の移動ベクトルの長さと角度
+            normHL, _ = arrow[Kn2idx['left_hip']]                   # 左腰の移動ベクトルの長さと角度
             mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), normN={int(normN)}({thsd.ratio(normN):.3f}), "\
                             + f" normHR={int(normHR)}({thsd.ratio(normHR):.3f}), normHR={int(normHL)}({thsd.ratio(normHL):.3f})") 
 
@@ -908,8 +908,8 @@ def section_completed(section_no, myResult, arrows = None):
     
     # 8-Zan-shin(弓倒し)        
     elif section_no == 9:  
-        x, angER = keyPoints.norm('right_elbow', 'right_wrist')             # 右肘から右手首へのベクトルの長さと角度を計算
-        normS, x = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
+        _, angER = keyPoints.norm('right_elbow', 'right_wrist')             # 右肘から右手首へのベクトルの長さと角度を計算
+        normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
         mylog.log(INFO, f">>>   angER= {angER:.1f}°, normSR={int(normS)}({thsd.ratio(normS):.3f})")
         mylog.log(INFO, f">>>   [ angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f} ]")
 
@@ -1525,6 +1525,7 @@ def main():
     mylog.log(INFO, f"[main]:起動パラメータ情報:WMA_on={WMA_on}, WindowSize={Window_size}:case_name={case_name}")
     mylog.log(INFO, f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
     print(f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
+    
     if not raw_image:
         mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.)")
         print(f"サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.)")
