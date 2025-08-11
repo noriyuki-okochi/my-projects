@@ -254,6 +254,7 @@ elif selnum == 1:
     if m_flg == True :
         fig = make_subplots(rows=2, cols=1, vertical_spacing=0.2,
                             subplot_titles=[selkeys[0],'xy_conf'],
+                            shared_xaxes=True,
                             specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
     elif case_compare == True:
         fig = make_subplots(rows=2, cols=1, vertical_spacing=0.1,
@@ -501,8 +502,8 @@ else:
                             secondary_y=True, showgrid=False,
                             row=1, col=1)
     if m_flg == True :
-        fig.update(layout_xaxis_rangeslider_visible=False)
-        fig.update(layout_xaxis2_showticklabels = False)
+        fig.update(layout_xaxis2_rangeslider_visible=True)
+        fig.update(layout_xaxis2_showticklabels = True)
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
             xaxis1_title = "Frame count", 
