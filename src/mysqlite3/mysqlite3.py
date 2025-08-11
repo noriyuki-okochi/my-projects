@@ -186,7 +186,7 @@ class MyDb:
         self.conn.commit()
         
 #
-#
+#   read tracking_data(return pandas-DataFrame)
 #       
     def pandas_read_tracking(self, key_id):
         
@@ -199,5 +199,61 @@ class MyDb:
         if name is not None:
             sql += f" where case_name='{name}'"
         return pandas.read_sql_query(sql, con=self.conn)
+#
+# insert act_param table
+#
+    def insert_act_param(self, act_param_tbl):
+        frame_model = act_param_tbl['frame'].split('-')
+        if len(frame_model) < 2: return False
+        if not frame_model[0].isnumeric(): return False
+        frame = int(frame_model[0])
+        model = frame_model[1]
+        
+        step = act_param_tbl['step']
+        act = act_param_tbl['act']
+        act_param = act_param_tbl['param']
+        
+        # 登録済データを削除
+        sql = f"delete from act_param where frame={frame} and model='{model}' and step={step} and act={act}"
+        rs = self.cur.execute(sql)
+
+        for sect, row_list in enumerate(act_param):
+            for idx, val in enumerate(row_list):
+                if val is None: break
+                values = f"{frame}, '{model}', {step}, {act}, {sect}, {idx}, {val}"
+                sql = "insert into act_param"\
+                    + "(frame, model, step, act, sect, idx, val)"\
+                    + f" values({values})"
+                self.cur.execute(sql)
+        self.commit()
+        return True
+#
+# load act_param table
+#
+    def load_act_param(self, act_param_tbl):
+        rec_count = 0
+        frame_model = act_param_tbl['frame'].split('-')
+        if len(frame_model) < 2: return False
+        if not frame_model[0].isnumeric(): return False
+        frame = int(frame_model[0])
+        model = frame_model[1]        
+        step = act_param_tbl['step']
+        act = act_param_tbl['act']
+
+        for sect in range(11):
+            raw_vals = [None]*10
+            sql = f"select * from act_param where "\
+                + f"frame={frame} and model='{model}' and step={step} and act={act} and sect={sect}"\
+                + f" order by idx asc"
+            rs = self.cur.execute(sql).fetchone()
+            while rs != None:
+                idx = rs['idx']
+                if idx < 0 or idx > 9: continue
+                raw_vals[idx]= rs['val']
+                rs = self.cur.fetchone()
+                rec_count += 1
+            #
+            act_param_tbl['param'].append(raw_vals)
+        return rec_count
 #
 #eof

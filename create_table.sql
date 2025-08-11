@@ -18,7 +18,7 @@ create table if not exists frame_info( case_name text NOT NULL,
                                     inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     PRIMARY KEY(case_name)
                                 );
-drop table if exists tracking_data;
+--drop table if exists tracking_data;
 create table if not exists tracking_data( case_name text NOT NULL,
                                     frame_no int NOT NULL,
                                     key_id int NOT NULL,
@@ -43,4 +43,15 @@ create table if not exists tracking_data( case_name text NOT NULL,
                                     tag1 int DEFAULT(NULL),
                                     tag2 int DEFAULT(NULL),                               
                                     PRIMARY KEY(case_name, frame_no, key_id)
+                                );
+--drop table if exists act_param;
+create table if not exists act_param( frame int  NOT NULL,
+                                    model text NOT NULL,
+                                    step int NOT NULL,
+                                    act int NOT NULL,
+                                    sect int NOT NULL,
+                                    idx int NOT NULL,
+                                    val real NOT NULL,
+                                    inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
+                                    PRIMARY KEY(frame, model, step, act, sect, idx)
                                 );
