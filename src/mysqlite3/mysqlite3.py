@@ -83,6 +83,20 @@ class MyDb:
             + f" where case_name='{self.case_name}'"
         self.cur.execute(sql)
         self.commit()
+#
+# delete frame_info table
+#
+    def delete_case(self, case_name):
+        ret = False
+        # キーの存在チェック
+        sql = f"select * from frame_info where case_name='{case_name}'"
+        rs = self.cur.execute(sql).fetchone()
+        if rs != None:
+            # キーが存在する場合は削除
+            sql = f"delete from frame_info where case_name ='{case_name}'"
+            self.cur.execute(sql)
+            ret = True
+        return ret
  
 # insert samplling rates logs.
 #
