@@ -860,8 +860,16 @@ def section_completed(section_no, myResult):
                     Step_error = True
         elif Step_counter < 21:     # 一度でも静止状態をたもった場合は、Step_counterを10にしない
             # 右手首と左手首が鼻より高い
-            Step_counter = 10
-
+            if Step_counter < 10: 
+                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[7]))} ]")
+                if normL < thsd(PRM[7]):  Step_counter += 1
+                if Step_counter > PRM[8]: Step_counter = 10
+            elif Step_counter < 12:
+                mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[9]))} ]")
+                if normL > thsd(PRM[9]):  Step_counter = 11
+                else:
+                    mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[9]))} ]")
+                    if normR > thsd(PRM[9]):  Step_counter = 12
     # 6-Kai            
     elif section_no == 6:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
@@ -999,7 +1007,31 @@ def draw_text(imag, message, point, color ):
     x, y = point
     draw.text( (x, y - h), message, font_color, font )
     return np.array( img_pil )
+#
+# 表示セクション名と色を返す関数 
+def edit_section_name(no, counter):
+    # セクション名を編集する
+    name = Section_names[no]    
+    if counter > 0:                     # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
+        if no == 5 and counter == 10:
+            name += f"（{Step_names[1]}）"      # 大三
+        elif no == 5 and counter == 11:
+            name += f"（{Step_names[2]}）"      # 押し
+        elif no == 5 and counter == 12:
+            name += f"（{Step_names[3]}）"      # 引き
+        else: name += f"（{counter}）" 
     
+    # セクションの色を設定    
+    if Step_error or Section_color == RED: 
+        if Section_no > Alart_section + 1:
+            # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
+            color = YELLOW
+        else:  color = RED                      # 不正な動作のセクションの色（赤色）BGR
+    else:
+        color =  YELLOW                         # セクションの色（黄色）BGR
+        if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
+
+    return name, color  
 #
 # 検出結果をフレームに描画する関数
 #
@@ -1102,28 +1134,18 @@ def plot(myResult, annotated_frame=None):
         # セクション情報をフレームに描画
         if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
         if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
-
-        if Step_error or Section_color == RED: 
-            if Section_no > Alart_section + 1:
-                # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
-                Section_color = YELLOW
-                #Alart_message = ''  
-            else:  Section_color = RED                     # 不正な動作のセクションの色（赤色）BGR
-        else:
-            Section_color =  YELLOW                 # セクションの色（黄色）BGR
-            if Completed: Section_color = GREEN     # 完了したセクションの色（緑色）BGR
-        others_color =  WHITE                       # その他の色（白）
    
-        section_name = Section_names[Section_no]    # セクション名を取得
-        if Step_counter > 0:                        # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
-            #section_name += f"({Step_counter})"     
-            section_name += f"（{Step_counter}）"     
+        # セクション名を変種
+        section_name, Section_color = edit_section_name(Section_no, Step_counter)   
+        others_color =  WHITE                       # その他の色（白）
+
         if Alart_id > 0: 
             #Alart_message = Alart_msg[Alart_id]
             Alart_message = Alart_msg[Alart_id*10]
             print(f"{Alart_msg[Alart_id*10]}")
             mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
-                   
+            
+        # テキストの描画           
         cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
         #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
         annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
