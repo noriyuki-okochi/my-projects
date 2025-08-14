@@ -20,12 +20,13 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
 Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle'] 
 
-# 動作解析データのサンプリング間隔（フレーム数）
+# 動作解析起点データのサンプリング間隔（フレーム数）
 Sample_frames:int = 8
+Sample_lag:int = 0
 
 # 移動平均のウィンドウサイズと重みの設定
-Window_size = 5   # ウィンドウサイズを設定
-WMA_weights = np.arange(1, Window_size + 1)
+Window_size = 8   # ウィンドウサイズを設定
+#WMA_weights = np.arange(1, Window_size + 1)
 
 # 動作完了解析パラメータ（act = 0）
 CompleteAction_param = {'frame': '',      # <frame>-<model>
@@ -43,7 +44,7 @@ StartAction_param = {'frame': '',
 #
 # 初期登録用動作完了解析パラメータ
 #
-InitAction_param_nms = ['18-n', '8-n', '8-s']
+InitAction_param_nms = ['1.7-s']
 #
 CompleteAction_params = [
     {'frame': '18-n',   #約1.0秒
@@ -60,7 +61,7 @@ CompleteAction_params = [
         [10, None, None, None, None, None, None, None],         # 7.離れ
         [0.10, 0.10, 3, None, None, None, None, None],          # 8.残心
         [25.0, 95.0, 0.030, 2, 0.085, None, None, None],        # 9.弓倒し
-        [0.900, 0.100, None, None, None, None, None, None]      #10.共通
+        [0.900, None, None, None, None, None, None, None]       #10.共通
      ]
     },
     {'frame': '8-n',  # 約0.5秒
@@ -77,7 +78,7 @@ CompleteAction_params = [
         [5, None, None, None, None, None, None, None],          # 7.離れ
         [0.085, 0.085, 3, None, None, None, None, None],        # 8.残心
         [25.0, 95.0, 0.030, 5, 0.085, None, None, None],        # 9.弓倒し
-        [0.900, 0.100, None, None, None, None, None, None]      #10.共通
+        [0.900, None, None, None, None, None, None, None]       #10.共通
      ]
     },
    {'frame': '8-s',  # 約0.5秒
@@ -94,7 +95,24 @@ CompleteAction_params = [
         [5, None, None, None, None, None, None, None],          # 7.離れ
         [0.080, 0.080, 3, None, None, None, None, None],        # 8.残心
         [25.0, 95.0, 0.030, 5, 0.085, None, None, None],        # 9.弓倒し
-        [0.900, 1.00, None, None, None, None, None, None]      #10.共通
+        [0.900, None, None, None, None, None, None, None]       #10.共通
+     ]
+    },
+   {'frame': '1.7-s',  # 約0.5秒
+     'step': 1,
+     'act': 0,
+     'param': [
+        [None, None, None, None, None, None, None, None],       # 0.
+        [0.028, 0.5, 0.015, 0.015, 0.015, 0.015, 0.015, 9],     # 1.足踏み
+        [50.0, 90.0, 0.015, 2, 0.040, 5, None, None],           # 2.胴作り
+        [0.015, 0.015, 0.015, 0.015, 5, 0.027, 2, 0.04 ],       # 3.弓構え
+        [0.005, 0.005, 0.005, 0.005, 9, None, None, None],      # 4.打起こし
+        [0.008, 1.000, 0.008, 1.000, 5, 0, 0.085, None],        # 5.引分け
+        [0.008, 0.008, 0.008, 0.008, 5, 0.050, 0.00, None],     # 6.会
+        [5, None, None, None, None, None, None, None],          # 7.離れ
+        [0.080, 0.080, 3, None, None, None, None, None],        # 8.残心
+        [25.0, 95.0, 0.030, 5, 0.085, None, None, None],        # 9.弓倒し
+        [0.900, None, None, None, None, None, None, None]       #10.共通
      ]
     }
 ]
@@ -115,7 +133,7 @@ StartAction_params = [
         [0.085, None, None, None, None, None, None, None],      # 7.離れ
         [0.085, 0.085, None, None, None, None, None, None],     # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],           # 9.弓倒し
-        [0.900, 0.100, None, None, None, None, None, None]      #10.共通
+        [0.900, None, None, None, None, None, None, None]       #10.共通
      ]
     },          
     {'frame': '8-n',    # 約0.5秒
@@ -132,7 +150,7 @@ StartAction_params = [
         [0.085, None, None, None, None, None, None, None],      # 7.離れ
         [0.1, 0.1, None, None, None, None, None, None],         # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],           # 9.弓倒し
-        [0.900, 0.100, None, None, None, None, None, None]      #10.共通
+        [0.900, None, None, None, None, None, None, None]       #10.共通
      ]
     },          
     {'frame': '8-s',    # 約0.5秒
@@ -149,7 +167,24 @@ StartAction_params = [
         [0.085, None, None, None, None, None, None, None],      # 7.離れ
         [0.085, 0.085, None, None, None, None, None, None],     # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],           # 9.弓倒し
-        [0.900, 1.00, None, None, None, None, None, None]      #10.共通
+        [0.900, None, None, None, None, None, None, None]       #10.共通
+     ]
+    },          
+    {'frame': '1.7-s',    # 約0.5秒
+     'step': 1,
+     'act': 1,
+     'param': [
+        [0.120, 0.140, None, None, None, None, None, None],     # 0.
+        [0.080, 2, None, None, None, None, None, None],         # 1.足踏み
+        [0.030, 0.035, 3, None, None, None, None, None],        # 2.胴作り
+        [0.040, 0.040, 3, None, None, None, None, None],        # 3.弓構え
+        [0.013, 0.015, 0.90, 1, None, None, None, None],        # 4.打起こし
+        [0.008, 0.008, 0.008, 0.008, 6, 0.050, None, None],     # 5.引分け
+        [0.050, 0.000, None, None, None, None, None, None],     # 6.会
+        [0.085, None, None, None, None, None, None, None],      # 7.離れ
+        [0.085, 0.085, None, None, None, None, None, None],     # 8.残心
+        [0.085, 2, 0.085, 2, None, None, None, None],           # 9.弓倒し
+        [0.900, None, None, None, None, None, None, None]       #10.共通
      ]
     }          
 ]

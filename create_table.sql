@@ -46,6 +46,7 @@ create table if not exists tracking_data( case_name text NOT NULL,
                                 );
 --drop table if exists act_param;
 create table if not exists act_param( frame int  NOT NULL,
+                                    lag int default(0),
                                     model text NOT NULL,
                                     step int NOT NULL,
                                     act int NOT NULL,
@@ -53,5 +54,5 @@ create table if not exists act_param( frame int  NOT NULL,
                                     idx int NOT NULL,
                                     val real NOT NULL,
                                     inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
-                                    PRIMARY KEY(frame, model, step, act, sect, idx)
+                                    PRIMARY KEY(frame, lag, model, step, act, sect, idx)
                                 );

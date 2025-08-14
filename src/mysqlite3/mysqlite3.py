@@ -83,6 +83,20 @@ class MyDb:
             + f" where case_name='{self.case_name}'"
         self.cur.execute(sql)
         self.commit()
+#
+# delete frame_info table
+#
+    def delete_case(self, case_name):
+        ret = False
+        # キーの存在チェック
+        sql = f"select * from frame_info where case_name='{case_name}'"
+        rs = self.cur.execute(sql).fetchone()
+        if rs != None:
+            # キーが存在する場合は削除
+            sql = f"delete from frame_info where case_name ='{case_name}'"
+            self.cur.execute(sql)
+            ret = True
+        return ret
  
 # insert samplling rates logs.
 #
@@ -93,21 +107,21 @@ class MyDb:
         time_epoc = int(time.mktime(d.timetuple()))
         
         if self.mode == '':
-            values = f"'{self.case_name}', {self.frame_no},"
+            values = f"'{self.case_name}',{self.frame_no},"
         else:
-            values = f"{self.case_name}, {self.frame_no},"
+            values = f"{self.case_name},{self.frame_no},"
             
         
         for i, value in enumerate(data_list):
             if i == 0 or i == 2:                            # key_id or box_id
-                values += f" {value}, "
+                values += f"{value},"
             elif i == 1:                                    # key_name
-                if self.mode == '':  values += f" '{value}', " 
-                else:  values += f" {value}, "
+                if self.mode == '':  values += f"'{value}'," 
+                else:  values += f"{value},"
             else:
-                values += f" {value:.3f}, "
+                values += f"{value:.3f},"
             
-        values += f" '{timestamp}', {time_epoc}, {self.section}, {self.completed}"
+        values += f"'{timestamp}',{time_epoc},{self.section},{self.completed}"
             
         if self.mode == 'csv':
             self.csvfile.write(f"{values}\n")
@@ -144,7 +158,14 @@ class MyDb:
         #print(f"update_tracking_tag: {sql}")
         self.cur.execute(sql)
         self.conn.commit()
-                   
+#
+    def clear_tracking_tag(self, tag_name):
+        sql = "update tracking_data set "\
+            + f"{tag_name}=NULL"\
+            + f" where case_name='{self.case_name}' and {tag_name} IS NOT NULL"
+        #print(f"update_tracking_tag: {sql}")
+        self.cur.execute(sql)
+        self.conn.commit()                   
 #
 # select FPS from balance-table
 #
@@ -205,8 +226,12 @@ class MyDb:
     def insert_act_param(self, act_param_tbl):
         frame_model = act_param_tbl['frame'].split('-')
         if len(frame_model) < 2: return False
-        if not frame_model[0].isnumeric(): return False
-        frame = int(frame_model[0])
+        frame_lag = frame_model[0].split('.')
+        if not frame_lag[0].isnumeric(): return False
+        frame = int(frame_lag[0])
+        lag = 0
+        if len(frame_lag) > 1:
+            if frame_lag[1].isnumeric(): lag = int(frame_lag[1])
         model = frame_model[1]
         
         step = act_param_tbl['step']
@@ -214,15 +239,15 @@ class MyDb:
         act_param = act_param_tbl['param']
         
         # 登録済データを削除
-        sql = f"delete from act_param where frame={frame} and model='{model}' and step={step} and act={act}"
+        sql = f"delete from act_param where frame={frame} and lag={lag} and model='{model}' and step={step} and act={act}"
         rs = self.cur.execute(sql)
 
         for sect, row_list in enumerate(act_param):
             for idx, val in enumerate(row_list):
                 if val is None: break
-                values = f"{frame}, '{model}', {step}, {act}, {sect}, {idx}, {val}"
+                values = f"{frame}, {lag}, '{model}', {step}, {act}, {sect}, {idx}, {val}"
                 sql = "insert into act_param"\
-                    + "(frame, model, step, act, sect, idx, val)"\
+                    + "(frame, lag, model, step, act, sect, idx, val)"\
                     + f" values({values})"
                 self.cur.execute(sql)
         self.commit()
@@ -234,8 +259,12 @@ class MyDb:
         rec_count = 0
         frame_model = act_param_tbl['frame'].split('-')
         if len(frame_model) < 2: return False
-        if not frame_model[0].isnumeric(): return False
-        frame = int(frame_model[0])
+        frame_lag = frame_model[0].split('.')
+        if not frame_lag[0].isnumeric(): return False
+        frame = int(frame_lag[0])
+        lag = 0
+        if len(frame_lag) > 1:
+            if frame_lag[1].isnumeric(): lag = int(frame_lag[1])
         model = frame_model[1]        
         step = act_param_tbl['step']
         act = act_param_tbl['act']
@@ -243,7 +272,7 @@ class MyDb:
         for sect in range(11):
             raw_vals = [None]*10
             sql = f"select * from act_param where "\
-                + f"frame={frame} and model='{model}' and step={step} and act={act} and sect={sect}"\
+                + f"frame={frame} and lag={lag} and model='{model}' and step={step} and act={act} and sect={sect}"\
                 + f" order by idx asc"
             rs = self.cur.execute(sql).fetchone()
             while rs != None:

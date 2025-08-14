@@ -41,7 +41,7 @@ key_names:str = [name for name in Kn2idx]
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("chart.py -case {'<case-name1>[,<case_name2>']|-L(ist-case_names)} [-import [<csv-file-path>]] \n"\
+    print("chart.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
          + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-h(elp)] [-d(ebug)]")
@@ -76,6 +76,16 @@ if len(case_names) > 0 and case_names[0] == '-L':
         print(fdf.iloc[i])        
     exit(0)
 
+if len(case_names) > 0 and '-D' in opts:
+    #
+    # 登録済ケースの削除
+    #
+    for name in case_names:
+        if db.delete_case(name) is True:
+            print(f"[chart]:info: case_name='{name}' deleted.")
+        else:
+            print(f"[chart]:error: case_name='{name}' not found.")            
+    exit(0)
 if len(case_names) == 0:
     print("[chart]:error:'-case <name>' must be specified.")
     exit(0)
@@ -254,6 +264,7 @@ elif selnum == 1:
     if m_flg == True :
         fig = make_subplots(rows=2, cols=1, vertical_spacing=0.2,
                             subplot_titles=[selkeys[0],'xy_conf'],
+                            shared_xaxes=True,
                             specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
     elif case_compare == True:
         fig = make_subplots(rows=2, cols=1, vertical_spacing=0.1,
@@ -501,8 +512,8 @@ else:
                             secondary_y=True, showgrid=False,
                             row=1, col=1)
     if m_flg == True :
-        fig.update(layout_xaxis_rangeslider_visible=False)
-        fig.update(layout_xaxis2_showticklabels = False)
+        fig.update(layout_xaxis2_rangeslider_visible=True)
+        fig.update(layout_xaxis2_showticklabels = True)
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
             xaxis1_title = "Frame count", 
