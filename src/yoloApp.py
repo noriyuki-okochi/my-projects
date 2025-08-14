@@ -48,32 +48,31 @@ Alart_id:int = 0            # アラート番号
 Alart_message:str = ''      # アラートメッセージ
 Section_color:list = YELLOW # セクションの色（黄色）BGR
 
-WMA_on:bool = False         # 移動平均のフラグ
-
 # カメラの位置を定義
-Camera_position:int = 0 # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
-CameraPos:str = ''      # カメラの位置名
+Camera_position:int = 0     # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
+CameraPos:str = ''          # カメラの位置名
 CameraPos_name = ['', 'Front-side', 'Right-side', 'Upper-side']  # カメラの位置
 
 # トラッキングフラグ
-Tracking_only:bool = False  # トラッキングフラグ
-Tracking_on:bool = False    # トラッキングオン
-Update_tracking:bool = False     # DBのトラッキングデータ(section,completed)更新
+Tracking_only:bool = False      # トラッキングフラグ
+Tracking_enabled:bool = False        # トラッキングオン
+Update_tracking:bool = False    # DBのトラッキングデータ(section,completed)更新
+Update_enabled:bool = False     # DBのトラッキングデータ更新オン
 
 # データベースのインスタンスを作成
 Db = MyDb(DB_PATH)  
-Db.mode = 'csv'
+Db.mode = 'csv'         # 解析結果のトラッキングデータをCSVファイルに出力する
 # YOLOv8モデル
-V8_model:str = 'v8s'  # YOLOv8のモデルファイル名
+V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 #
 # YOLOv8とOpenPoseの組み合わせ例（Ultralytics YOLOv8 + YOLOv8-poseモデル利用）
 # このコードは、YOLOv8を使用してカメラまたは動画ファイルから骨格検出を行うものです。
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-r ]|[-m|[-t|-u] <case_name>] [-f<frame_count>] [-WMA<window_size>]\n"\
-        + "                         [{ -{p|P}'(<section-no>,<index>)=<value>'}...] [{ -S(<section-no>}...] [-l<step-no>] [-V8{s|n}] [-w]\n"\
-        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-i]")
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-r ]|[-m|[-t|-u] <case_name>] [-f'<frame_count>[.<lag>]'] [-W<window_size>]\n"\
+        + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-l<step-no>] [-V8{s|n}] [-w]\n"\
+        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-i] [--]")
     print(" --- option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
@@ -82,18 +81,19 @@ def help():
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
     print(" -w(rite-video-file)")
-    print(" -f(rame-count) for sampling data: default=8")
+    print(" -f(rame-count) and lag for sampling data: default=8,0")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
-    print(" -WMA(window-size::use Weight-Moving-Average data: default=5)")
+    print(" -W(window-size::ring-buffer-size: default=8)")
     print(" -V(8-pose model-file):default=v8s")
     print(" -l(evel):step-no default=1")
     print(" -h(elp)")
-    print(" -g(uidance)<color>::[Y|G|B|W]")
+    print(" -g(uidance)<color>::[Y|G|B|W]: yellow, green(default), black, white")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-2>")
     print(" -i(nitial entry to act_table)")
+    print(" --(auto-pouse imidiately after start)")
     print(" --- key operation ---")
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
@@ -106,8 +106,8 @@ def help():
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
     print(" c :警告メッセージのクリア")
-    print(" u :再生速度アップ")
-    print(" d :再生速度ダウン")
+    print(" k :再生速度アップ")
+    print(" l :再生速度ダウン")
     print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
@@ -121,6 +121,7 @@ def help():
     print("例)ローカルのplot機能で解析結果を描画: python yoloApp.py -a -m")  
     return
 #
+# 動作解析パラメータテーブルをログファイルに出力する
 def print_param(tbl):
     mylog.log(INFO, f"frame:{tbl['frame']}, step = {tbl['step']}, act = {tbl['act']}")
     for sect, raw_vals in enumerate(tbl['param']):
@@ -417,7 +418,7 @@ class MyResult(Keypoint):
             return
         
         # リングバッファからキーポイントの時系列データを取得して、各点の移動ベクトルの長さの加重平均を計算
-        for key, idx in Kn2idx.items():
+        for _, idx in Kn2idx.items():
             # リングバッファから過去のポイント座標を取得
             points = []
             for i in range(window):
@@ -430,7 +431,7 @@ class MyResult(Keypoint):
     
     # 各キーポイントの過去から現在位置への移動ベクトルの長さと角度を計算する                    
     def calc_arrow_length_angles(self, prepointsBuffer):
-        for i in range(0, prepointsBuffer.length - 1):          # 0は直近のポイントなので1から始める
+        for i in range(0, prepointsBuffer.length):              # 直近のポイント(=0)から始める
             preResult = prepointsBuffer.get( i )                # 過去のキーポイントデータを取得     
             arrow_points = self.points - preResult.points       # 過去のキーポイントと現在位置の差分ベクトルを計算
             # 各ベクトルの長さと角度を計算してリストにタプルとして格納
@@ -492,15 +493,13 @@ def adjust_frame_contrast(frame, alpha=1,beta=0):
     return adjusted_frame
 #
 # 解析結果をトラッキングする関数              
-def tracking_result( myResult, arrows = None):
+def tracking_result( myResult):
 #    keypoints = myResult.keypoints                     # キーポイントリスト(Tensor)
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
-    arrow = None                                        # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
-    if arrows is not None: arrow = arrows[0]  
-    else:         
-        arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]
+    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
+    arrow = myResult.arrow_length_angles[Sample_lag]  
     
     box_h = boxes.xywh[box_id][3].item()                # 解析対象のボックスの高さ
     box_w = boxes.xywh[box_id][2].item()                # 解析対象のボックスの幅
@@ -533,7 +532,7 @@ def tracking_result( myResult, arrows = None):
 #
 # 次のセクションが開始したかどうかを判定する関数
 #
-def section_started(section_no, myResult, arrows = None):
+def section_started(section_no, myResult):
     global Step_counter, Step_error, Alart_id
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
@@ -541,14 +540,8 @@ def section_started(section_no, myResult, arrows = None):
     
     thsd = Threshold(keyPoints.block_height)        # バウンディングボックスの高さを基準に閾値設定インスタンス
     
-    arrow = None                                    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
-    ave_arrow = None
-    if arrows is not None: 
-        arrow = arrows[0]
-        ave_arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]          
-    else:          
-        arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]
-        ave_arrow = arrow
+    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
+    arrow = myResult.arrow_length_angles[Sample_lag]
 
     normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
     normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
@@ -559,12 +552,11 @@ def section_started(section_no, myResult, arrows = None):
     # 共通の開始条件を取得
     PRM = StartAction_param['param'][10]        # 10は共通の開始条件     
     conf = keyPoints.conf('right_wrist')                            # 右手首の座標の信頼度
-    ave_normR,_ = ave_arrow[Kn2idx['right_wrist']]  # 右手首の移動ベクトルの長さの加重平均値    
     
-    if conf < PRM[0] or ave_normR > thsd(PRM[1]) and (section_no > 0 and section_no < 8):
-        # 右手首の信頼度が低い、または移動ベクトルの加重平均値が大きい
+    if conf < PRM[0] and (section_no > 0 and section_no < 8):
+        # 右手首の信頼度が低い
         mylog.log(INFO, f"started({section_no}): right-wrist-conf={conf:.2f}({PRM[0]:.2f}), "\
-                      + f"ave-norm={ave_normR:.3f}({thsd(PRM[1]):.3f})  skip....")
+                      + f" skip....")
         return started
 
     mylog.log(INFO, f"started ({section_no}):フレーム={Frame_counter}\n"\
@@ -701,7 +693,7 @@ def section_started(section_no, myResult, arrows = None):
 #
 #セクションが完了したかどうかを判定する関数
 #
-def section_completed(section_no, myResult, arrows = None):
+def section_completed(section_no, myResult):
     global Step_counter, Step_error, Alart_id
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
@@ -709,14 +701,8 @@ def section_completed(section_no, myResult, arrows = None):
     
     thsd = Threshold(keyPoints.block_height)        # バウンディングボックスの高さを基準に閾値設定インスタンス
 
-    arrow = None                                    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
-    ave_arrow = None
-    if arrows is not None: 
-        arrow = arrows[0]  
-        ave_arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]          
-    else:         
-        arrow = [ myResult.tuple_ave_angle(idx) for idx in range(len(Kn2idx)) ]
-        ave_arrow = arrow
+    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
+    arrow = myResult.arrow_length_angles[Sample_lag]  
     
     normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
     normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
@@ -733,12 +719,11 @@ def section_completed(section_no, myResult, arrows = None):
     # 共通の開始条件を取得
     PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
-    ave_normR,_ = ave_arrow[Kn2idx['right_wrist']]  # 右手首の移動ベクトルの長さの加重平均値    
     
-    if conf < PRM[0] or ave_normR > thsd(PRM[1]) and (section_no > 1 and section_no < 9):
-        # 右手首の信頼度が低い、または移動ベクトルの加重平均値が大きい
+    if conf < PRM[0]  and (section_no > 1 and section_no < 9):
+        # 右手首の信頼度が低い
         mylog.log(INFO, f"completed({section_no}): right-wrist-conf={conf:.2f}({PRM[0]:.2f}), "\
-                      + f"ave-norm={ave_normR:.3f}({thsd(PRM[1]):.3f})  skip....")
+                      + f" skip....")
         return completed
 
     mylog.log(INFO, f"completed({section_no}):フレーム={Frame_counter}\n"\
@@ -1018,12 +1003,12 @@ def draw_text(imag, message, point, color ):
 #
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult, prepoints_buffer=None, annotated_frame=None):
+def plot(myResult, annotated_frame=None):
     global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, CameraPos, Nop_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
     result = myResult.result
-    mylog.log(DEBUG, f"Tracking_on={Tracking_on}")
+    mylog.log(DEBUG, f"Tracking_enabled={Tracking_enabled}")
     mylog.log(DEBUG, f"[plot]: {type(result.keypoints)},{len(result.keypoints)}個のキーポイント")
 
     if annotated_frame is None:
@@ -1038,12 +1023,10 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
             # カメラの位置取得（足踏み完了まで）
             CameraPos = get_camera_pos(myResult)                
 
-        arrow_length_angles = myResult.arrow_length_angles
-
         # セクション情報を更新
-        tracking_flg = True if Tracking_only or Update_tracking else False
+        arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
         
-        if ( tracking_flg or CameraPos == 'Right-side' or CameraPos == 'Front-side') and arrow_length_angles[0] is not None:
+        if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
             # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
             if Lap_start > 0:    
                 # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
@@ -1051,7 +1034,7 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
                 Alart_id = 0
                 if Section_no == 0 or Completed:
                     # 動作の開始を判定
-                    if section_started(Section_no, myResult, arrow_length_angles if not WMA_on else None):
+                    if section_started(Section_no, myResult):
                         Split_start = Frame_counter                         # スプリット開始時間を記録
                         Split_sec = 0
                         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
@@ -1084,7 +1067,7 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
                     #
                 else:
                     # 動作の完了を判定
-                    if section_completed(Section_no, myResult, arrow_length_angles if not WMA_on else None):
+                    if section_completed(Section_no, myResult):
                         Completed = True 
                         if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
                             Split_start = 0                                 # スプリット開始時間をリセット
@@ -1108,12 +1091,13 @@ def plot(myResult, prepoints_buffer=None, annotated_frame=None):
                 Db.section = Section_no        # トラッキングデータのセクション番号を設定              
                 Db.completed = 1 if Completed else 0
 
-                if Tracking_on:
+                if Tracking_enabled:
                     # 解析結果のデータをトラッキング登録先（DB/CSV）に出力する
-                    tracking_result(myResult, arrow_length_angles if not WMA_on else None)
-                if Update_tracking:
+                    tracking_result(myResult)
+                if Update_enabled:
                     # トラッキングデータのテーブル（'section'/'completed'）を更新する
-                    Db.update_tracking_section()            
+                    Db.update_tracking_section()  
+                    if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
         #
         # セクション情報をフレームに描画
         if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
@@ -1157,7 +1141,8 @@ def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, c
         mode_str = 'P' if  iwait == 0 else 'p'
         if raw_video and not clip_video: mode_str += 'R' if repeat_mode else 'r'
         if out_file != '':  mode_str += 'W' if videoWriteEnabled else 'w'
-        if Tracking_only:   mode_str += 'T' if Tracking_on else 't'
+        if Tracking_only:   mode_str += 'T' if Tracking_enabled else 't'
+        if Update_tracking: mode_str += 'U' if Update_enabled else 'u'
         return (10, frame_height - 20), mode_str
 #
 # キー入力のガイダンスを編集する関数
@@ -1166,7 +1151,8 @@ def edit_key_ope(out_file, raw_video, clip_video):
  
         ope_str = '(q)uit:(p)ause:(>)skip:(<)rewind:(u)p-speed:(d)own:(s)nap'
         if out_file != '':  ope_str += ':(w)rite-video'
-        if Tracking_only:   ope_str += ':(t)raking'
+        if Tracking_only:   ope_str += ':(t)racking'
+        if Update_tracking: ope_str += ':(u)pdate-tracking'
         if raw_video and (not clip_video):   ope_str += ':(r)epeat-play'
         return  ope_str
 #
@@ -1232,8 +1218,8 @@ def draw_rectangle(event, x, y, flags, param):
 def main(): 
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
-    global Tracking_only, Tracking_on, Update_tracking
-    global WMA_on, Window_size, WMA_weights, Sample_frames, V8_model
+    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled
+    global Window_size, Sample_frames, Sample_lag, V8_model
     global StartAction_param, CompleteAction_param
     global Rect_area
 
@@ -1258,12 +1244,13 @@ def main():
     #
     case_name = None                                # ケース名（デフォルト：動画ファイル名）
     #
-    tag_section = 0
+    tag1_section = 0
+    tag2_section = 0
     attention = 0
     # print command line(arguments)
     args = sys.argv
     # コマンドライン引数を辞書に変換
-    args_dict = {arg: idx for idx, arg in enumerate(args)}
+    #args_dict = {arg: idx for idx, arg in enumerate(args)}
 
     cmdline = 'python '
     for arg in args:
@@ -1342,20 +1329,29 @@ def main():
     # サンプリングフレーム数を取得
     opt_val  = [opt for opt in opts if opt.startswith('-f')]
     if len(opt_val) > 0:
-        if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
-            Sample_frames = int(opt_val[0][2:])
-    param_nm = f"{Sample_frames}-{V8_model[-1:]}"
+        if len(opt_val[0]) > 2 :
+            vals = opt_val[0][2:].split('.')
+            if vals[0].isnumeric(): 
+                Sample_frames = int(vals[0])
+            if len(vals) > 1 and vals[1].isnumeric(): 
+                Sample_lag = int(vals[1])
+    #print(f"frames={Sample_frames}, lag={Sample_lag}")
+    #
+    if Sample_lag > 0:
+        param_nm = f"{Sample_frames}.{Sample_lag}-{V8_model[-1:]}"
+    else:               
+        param_nm = f"{Sample_frames}-{V8_model[-1:]}"
     
     # 動作解析パラメータをDBからロードする
     CompleteAction_param['frame'] = param_nm
     CompleteAction_param['step'] = step_no
     if Db.load_act_param(CompleteAction_param) == 0:    
-        print(f"サンプリングフレーム数={Sample_frames}の動作完了解析パラメータが登録されていません")
+        print(f"{param_nm}の動作完了解析パラメータが登録されていません")
         return
     StartAction_param['frame'] = param_nm
     StartAction_param['step'] = step_no
     if Db.load_act_param(StartAction_param) == 0:    
-        print(f"サンプリングフレーム数={Sample_frames}の動作開始解析パラメータが登録されていません")
+        print(f"{param_nm}の動作開始解析パラメータが登録されていません")
         return
 
     # 異常動作解析をスキップするパラメータを無効化するためのパラメータ変更オプションに変換する
@@ -1409,27 +1405,25 @@ def main():
             return
                 
     # ウィンドウサイズを取得
-    opt_val  = [opt for opt in opts if opt.startswith('-WMA')]
+    opt_val  = [opt for opt in opts if opt.startswith('-W')]
     if len(opt_val) > 0:
-        WMA_on = True   
-        if len(opt_val[0]) > 4 and opt_val[0][4:].isnumeric():
-            Window_size = int(opt_val[0][4:])  
-            WMA_weights = np.arange(1, Window_size + 1)
+        if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
+            Window_size = int(opt_val[0][2:])  
     
     # ファイル選択のファイルタイプを設定        
     if '-a' in opts:
         filetypes = ALL_TYPES
         
     # キーオペレーションのガイダンス表示
-    color = 'W'
+    color = 'G'
     guid_opt = [opt for opt in opts if opt.startswith('-g')]
     if len(guid_opt) > 0:
         guidance = True 
         if len(guid_opt[0]) > 2: color = guid_opt[0][2].upper()
-    if color == 'G': guid_color = GREEN
+    if color == 'W': guid_color = WHITE
     elif color == 'Y': guid_color = YELLOW
     elif color == 'B': guid_color = BLACK
-    else: guid_color = WHITE
+    else: guid_color = GREEN
 
         
     # YOLOV8のログレベルを設定
@@ -1576,14 +1570,14 @@ def main():
     
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
-    mylog.log(INFO, f"[main]:起動パラメータ情報:WMA_on={WMA_on}, WindowSize={Window_size}:case_name={case_name}")
-    print(f"[main]:起動パラメータ情報:WMA_on={WMA_on}, WindowSize={Window_size}:case_name={case_name}")
+    mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
+    print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
     mylog.log(INFO, f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
     print(f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
         
     if not raw_video:
-        mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.)")
-        print(f"[main]:サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.)")    
+        mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.), Lag={Sample_lag}")
+        print(f"[main]:サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.), Lag={Sample_lag}")    
     #   
     Frame_counter = 1                   # フレームカウンターの初期化
     if raw_video is True:
@@ -1591,7 +1585,11 @@ def main():
     else: 
         iwait_init = 1
     # ウィンドウの更新間隔を設定
-    iwait = iwait_init        
+    if '--' in opts:
+        # '--'オプションが指定されている場合、ウィンドウの更新間隔を0に設定（起動直後にPAUSE状態にする）
+        iwait = 0
+    else:
+        iwait = iwait_init        
     print(f"[main]:iwait={iwait}")
     mylog.log(INFO, f"[main]:iwait={iwait}")
 
@@ -1653,17 +1651,12 @@ def main():
                 
                 # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
                 myResult.calc_arrow_length_angles(prePointsBuffer)
-                if WMA_on:       
-                    # キーポイントの変位ベクトル（長さ）の移動平均を計算する    
-                    myResult.calc_moving_average(prePointsBuffer, WMA_weights)
-                else:
-                    # キーポイントの変位ベクトル（長さ）の移動平均を計算する    
-                    myResult.calc_moving_average(prePointsBuffer, WMA_weights)
+
                 # {Sample_frames}フレーム毎に検出結果を保存
-                if (Frame_counter%Sample_frames) == 0 or Frame_counter == 2:
+                if (Frame_counter%Sample_frames) == 0 or Frame_counter < Sample_frames:
                     # 検出結果（補正済）を保存 
                     prePointsBuffer.append( myResult )                        
-                    mylog.log(INFO, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
+                    mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
                                 + f"フレーム={Frame_counter}, buffer_length={prePointsBuffer.length}")
 
                 # 検出結果をフレームに描画
@@ -1674,7 +1667,7 @@ def main():
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
                         # 生画像に手動（OpenCV）で描画
-                        annotated_frame = plot( myResult, prePointsBuffer, frame)
+                        annotated_frame = plot( myResult, frame)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
@@ -1720,17 +1713,17 @@ def main():
             if iwait == 0: print("一時停止しました")
             else: print(f"再開しました: {iwait}ミリ秒")
         
-        elif key == ord('u'):
-            iwait = iwait - 5 if iwait > 5 else iwait   # 'u'キーでウィンドウの更新間隔を短くする
-            print(f"ウィンドウの更新間隔を短くしました: {iwait}ミリ秒")
+        elif key == ord('k'):
+            iwait = iwait - 5 if iwait > 5 else iwait   # 'k'キーでウィンドウの更新間隔を短くする
+            print(f"動画の再生間隔を短くしました（早送り再生）: {iwait}ミリ秒")
             
-        elif key == ord('d'):
-            iwait = iwait + 5 if iwait < (1000 - 5) else iwait  # 'd'キーでウィンドウの更新間隔を長くする
-            print(f"ウィンドウの更新間隔を長くしました: {iwait}ミリ秒")
+        elif key == ord('l'):
+            iwait = iwait + 5 if iwait < (1000 - 5) else iwait  # 'l'キーでウィンドウの更新間隔を長くする
+            print(f"動画の再生間隔を長くしました（スロー再生）: {iwait}ミリ秒")
             
         elif key == ord('t') and Tracking_only:
-            Tracking_on = True if Tracking_on is False else False  # 't'キーで一開始／停止
-            if Tracking_on: 
+            Tracking_enabled = True if Tracking_enabled is False else False  # 't'キーで一開始／停止
+            if Tracking_enabled: 
                 print(f"トラッキングを開始します: {Db.csvpath}")
                 Db.update_frame_info('start_frame', Frame_counter)  # 開始フレーム番号
                 mylog.log(INFO, f">> Trucking start: {Db.csvpath}")
@@ -1738,6 +1731,15 @@ def main():
                 print("トラッキングを停止します")
                 Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
                 mylog.log(INFO, ">> Trucking pause")
+
+        elif key == ord('u') and Update_tracking:
+            Update_enabled = True if Update_enabled is False else False  # 't'キーで一開始／停止
+            if Update_enabled: 
+                print(f"トラッキングDB更新を開始します")
+                mylog.log(INFO, f">> Update-Trucking start")
+            else: 
+                print("トラッキングDB更新を停止します")
+                mylog.log(INFO, ">> Update-Trucking pause")
         
         elif key == ord('s'):
             # スクリーンショットを保存
@@ -1777,6 +1779,8 @@ def main():
             Step_error = False                  # 不正な動作フラグ
             Section_color =  YELLOW             # セクションの色（黄色）BGR
             Alart_message = ''                  # アラートメッセージをリセット
+            tag1_section = Section_no
+            tag2_section = Section_no
             if Section_no == 0:
                 Lap_start = Frame_counter       # ラップ開始時間を記録
                 Lap_sec = 0
@@ -1804,12 +1808,14 @@ def main():
             print(f"フレーム={Frame_counter}")
  
         elif key == ord('n') and Update_tracking:
-            tag_section += 1 
-            print(f"tag登録(n): value={tag_section}")
-            Db.update_tracking_tag( 'tag2', tag_section )  # 節の動作開始（次の節へ移行）を更新
+            tag2_section += 1 
+            Db.update_tracking_tag( 'tag2', tag2_section )  # 節の動作開始（次の節へ移行）を更新
+            print(f"tag2登録(n): value={tag2_section}")
+
         elif key == ord('b') and Update_tracking:
-            print(f"tag登録(b): value={tag_section}")
-            Db.update_tracking_tag( 'tag1', tag_section )  # 節の動作完了を登録
+            Db.update_tracking_tag( 'tag1', tag1_section )  # 節の動作完了を登録
+            print(f"tag1登録(b): value={tag1_section}")
+            tag1_section += 1 
             
         elif key == ord('a'):
             attention += 1
@@ -1822,11 +1828,20 @@ def main():
             print(f"パラメータ:{param_nm} テーブル登録完了")
             
         elif key == ord('c'):
-            Section_color =  YELLOW             # セクションの色（黄色）BGR
-            Alart_message = ''                  # アラートメッセージをリセット
+            if Alart_message != '':
+                Section_color =  YELLOW             # セクションの色（黄色）BGR
+                Alart_message = ''                  # アラートメッセージをリセット
+            if Update_tracking and tag1_section > 0:
+                Db.clear_tracking_tag('tag1')       # 節の動作完了をクリア
+                print(f"tag1クリア")
+            if Update_tracking and tag2_section > 0:
+                Db.clear_tracking_tag('tag2')       # 節の動作開始（次の節へ移行）をクリア
+                print(f"tag2クリア")
     #
     # リソースの解放
-    if Tracking_only: Db.csvfile.close() 
+    if Tracking_only: 
+        Db.csvfile.close()
+    Db.close() 
     cap.release()
     cv2.destroyAllWindows()
 
