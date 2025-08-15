@@ -836,32 +836,41 @@ def section_completed(section_no, myResult):
     
     # 5-Hiki-wake        
     elif section_no == 5:  
-        _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
         xy_shouderR = keyPoints.xy('right_shoulder')                # 右腰の座標
-        mylog.log(INFO, f">>>   y_nose={int(xy_nose[1])}, y_wristR={int(xy_wristR[1])}, y_shoulR={int(xy_shouderR[1])}, angER={angER:.1f}°")
-        mylog.log(INFO, f">>>   [ (xy_wristR[1] > xy_nose[1]) and (xy_wristR[1] < xy_shouderR[1]) ]")
+        mylog.log(INFO, f">>>   y_nose={int(xy_nose[1])}, y_wristR={int(xy_wristR[1])}, y_shoulR={int(xy_shouderR[1])}")
 
-        if ( xy_wristR[1] > xy_nose[1] ) and ( xy_wristR[1] < xy_shouderR[1] ) :
-            # （右手首が鼻より低い位置で停止）
-            if Step_counter < 20: Step_counter += 10
+        mylog.log(INFO, f">>>   [ y_wristR < y_nose ]")
+        if  xy_wristR[1] < xy_nose[1]  :
+            # 右手首が鼻より高い位置（Y軸は下方が正）
+            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
+            if Step_counter < 10:   # 「打越し」から「大三」への移行
+                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} ]")
+                if normL < thsd(PRM[0]):  Step_counter += 1
+                if Step_counter > PRM[1]: Step_counter = 10
+            else:  # 「大三」から「引き分け」完了への移行
+                mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
+                if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
+                else:
+                    mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
+                    if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
+            
+        elif  xy_wristR[1] < xy_shouderR[1] :
+            # （右手首が右肩より高い位置で停止）
+            if Step_counter < 20: Step_counter = 20
             mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
                           + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normEL):.3f})")
-            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
+            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[3]))} and normL < {int(thsd(PRM[4]))}) and (normER < {int(thsd(PRM[5]))} and normEL < {int(thsd(PRM[6]))}) ]")
 
-            if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
+            if (normR < thsd(PRM[3]) and normL < thsd(PRM[4])) and (normER < thsd(PRM[5]) and normEL < thsd(PRM[6])) :
                 # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
                 Step_counter = Step_counter + 1
-                if (Step_counter%10) == PRM[4]:  completed = True
+                if (Step_counter%10) == PRM[7]:  completed = True
             else:
                 # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
-                mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[5]} and (normR > {int(thsd(PRM[6]))}) ]")
-                if (Step_counter%10) > PRM[5] and normR > thsd(PRM[6]):
+                mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[8]} and (normR > {int(thsd(PRM[9]))}) ]")
+                if (Step_counter%10) > PRM[8] and normR > thsd(PRM[9]):
                     Alart_id = Alart_KaiNasi
                     Step_error = True
-        elif Step_counter < 21:     # 一度でも静止状態をたもった場合は、Step_counterを10にしない
-            # 右手首と左手首が鼻より高い
-            Step_counter = 10
-
     # 6-Kai            
     elif section_no == 6:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
@@ -999,7 +1008,31 @@ def draw_text(imag, message, point, color ):
     x, y = point
     draw.text( (x, y - h), message, font_color, font )
     return np.array( img_pil )
+#
+# 表示セクション名と色を返す関数 
+def edit_section_name(no, counter):
+    # セクション名を編集する
+    name = Section_names[no]    
+    if counter > 0:                     # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
+        if no == 5 and counter == 10:
+            name += f"（{Step_names[1]}）"      # 大三
+        elif no == 5 and counter == 11:
+            name += f"（{Step_names[2]}）"      # 押し
+        elif no == 5 and counter == 12:
+            name += f"（{Step_names[3]}）"      # 引き
+        else: name += f"（{counter}）" 
     
+    # セクションの色を設定    
+    if Step_error or Section_color == RED: 
+        if Section_no > Alart_section + 1:
+            # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
+            color = YELLOW
+        else:  color = RED                      # 不正な動作のセクションの色（赤色）BGR
+    else:
+        color =  YELLOW                         # セクションの色（黄色）BGR
+        if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
+
+    return name, color  
 #
 # 検出結果をフレームに描画する関数
 #
@@ -1102,28 +1135,18 @@ def plot(myResult, annotated_frame=None):
         # セクション情報をフレームに描画
         if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
         if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
-
-        if Step_error or Section_color == RED: 
-            if Section_no > Alart_section + 1:
-                # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
-                Section_color = YELLOW
-                #Alart_message = ''  
-            else:  Section_color = RED                     # 不正な動作のセクションの色（赤色）BGR
-        else:
-            Section_color =  YELLOW                 # セクションの色（黄色）BGR
-            if Completed: Section_color = GREEN     # 完了したセクションの色（緑色）BGR
-        others_color =  WHITE                       # その他の色（白）
    
-        section_name = Section_names[Section_no]    # セクション名を取得
-        if Step_counter > 0:                        # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
-            #section_name += f"({Step_counter})"     
-            section_name += f"（{Step_counter}）"     
+        # セクション名を変種
+        section_name, Section_color = edit_section_name(Section_no, Step_counter)   
+        others_color =  WHITE                       # その他の色（白）
+
         if Alart_id > 0: 
             #Alart_message = Alart_msg[Alart_id]
             Alart_message = Alart_msg[Alart_id*10]
             print(f"{Alart_msg[Alart_id*10]}")
             mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
-                   
+            
+        # テキストの描画           
         cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
         #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
         annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
