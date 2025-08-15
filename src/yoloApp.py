@@ -836,40 +836,41 @@ def section_completed(section_no, myResult):
     
     # 5-Hiki-wake        
     elif section_no == 5:  
-        _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
         xy_shouderR = keyPoints.xy('right_shoulder')                # 右腰の座標
-        mylog.log(INFO, f">>>   y_nose={int(xy_nose[1])}, y_wristR={int(xy_wristR[1])}, y_shoulR={int(xy_shouderR[1])}, angER={angER:.1f}°")
-        mylog.log(INFO, f">>>   [ (xy_wristR[1] > xy_nose[1]) and (xy_wristR[1] < xy_shouderR[1]) ]")
+        mylog.log(INFO, f">>>   y_nose={int(xy_nose[1])}, y_wristR={int(xy_wristR[1])}, y_shoulR={int(xy_shouderR[1])}")
 
-        if ( xy_wristR[1] > xy_nose[1] ) and ( xy_wristR[1] < xy_shouderR[1] ) :
-            # （右手首が鼻より低い位置で停止）
-            if Step_counter < 20: Step_counter += 10
+        mylog.log(INFO, f">>>   [ y_wristR < y_nose ]")
+        if  xy_wristR[1] < xy_nose[1]  :
+            # 右手首が鼻より高い位置（Y軸は下方が正）
+            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
+            if Step_counter < 10:   # 「打越し」から「大三」への移行
+                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} ]")
+                if normL < thsd(PRM[0]):  Step_counter += 1
+                if Step_counter > PRM[1]: Step_counter = 10
+            else:  # 「大三」から「引き分け」完了への移行
+                mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
+                if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
+                else:
+                    mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
+                    if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
+            
+        elif  xy_wristR[1] < xy_shouderR[1] :
+            # （右手首が右肩より高い位置で停止）
+            if Step_counter < 20: Step_counter = 20
             mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
                           + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normEL):.3f})")
-            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
+            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[3]))} and normL < {int(thsd(PRM[4]))}) and (normER < {int(thsd(PRM[5]))} and normEL < {int(thsd(PRM[6]))}) ]")
 
-            if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
+            if (normR < thsd(PRM[3]) and normL < thsd(PRM[4])) and (normER < thsd(PRM[5]) and normEL < thsd(PRM[6])) :
                 # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
                 Step_counter = Step_counter + 1
-                if (Step_counter%10) == PRM[4]:  completed = True
+                if (Step_counter%10) == PRM[7]:  completed = True
             else:
                 # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
-                mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[5]} and (normR > {int(thsd(PRM[6]))}) ]")
-                if (Step_counter%10) > PRM[5] and normR > thsd(PRM[6]):
+                mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[8]} and (normR > {int(thsd(PRM[9]))}) ]")
+                if (Step_counter%10) > PRM[8] and normR > thsd(PRM[9]):
                     Alart_id = Alart_KaiNasi
                     Step_error = True
-        elif Step_counter < 21:     # 一度でも静止状態をたもった場合は、Step_counterを10にしない
-            # 右手首と左手首が鼻より高い
-            if Step_counter < 10: 
-                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[7]))} ]")
-                if normL < thsd(PRM[7]):  Step_counter += 1
-                if Step_counter > PRM[8]: Step_counter = 10
-            elif Step_counter < 12:
-                mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[9]))} ]")
-                if normL > thsd(PRM[9]):  Step_counter = 11
-                else:
-                    mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[9]))} ]")
-                    if normR > thsd(PRM[9]):  Step_counter = 12
     # 6-Kai            
     elif section_no == 6:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\

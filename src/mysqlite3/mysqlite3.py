@@ -6,6 +6,8 @@ import sqlite3
 import pandas
 import time
 from datetime import datetime
+# local modules
+from  env import * 
 #
 # Private API Class for sqlite3from env import *
 #
@@ -270,7 +272,7 @@ class MyDb:
         act = act_param_tbl['act']
 
         for sect in range(11):
-            raw_vals = [None]*10
+            raw_vals = [None]*Param_max
             sql = f"select * from act_param where "\
                 + f"frame={frame} and lag={lag} and model='{model}' and step={step} and act={act} and sect={sect}"\
                 + f" order by idx asc"
