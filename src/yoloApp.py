@@ -72,7 +72,7 @@ def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-r ]|[-m|[-t|-u] <case_name>] [-f'<frame_count>[.<lag>]'] [-W<window_size>]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-l<step-no>] [-V8{s|n}] [-w]\n"\
-        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-i] [--]")
+        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-i ['<param_name>']] [--]")
     print(" --- option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
@@ -648,6 +648,16 @@ def section_started(section_no, myResult):
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
             # 右手首の移動ベクトルの長さが10以上の場合（離れ）
             started = True
+        elif normR > thsd(PRM[0]):
+            Step_counter += 1
+            if Step_counter > PRM[2]:
+                # 左手首（弓手）の押しタイミングズレ
+                Alart_id = Alart_Hanare
+                Step_error = True
+                started = True
+        elif Step_counter > 0: 
+            # 左手首（弓手）の動き検知なし
+            started = True
     
     # 7-Hanare  ->  8-Zan-shin        
     elif section_no == 7:  
@@ -847,13 +857,14 @@ def section_completed(section_no, myResult):
                 mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} ]")
                 if normL < thsd(PRM[0]):  Step_counter += 1
                 if Step_counter > PRM[1]: Step_counter = 10
-            else:  # 「大三」から「引き分け」完了への移行
+            elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
                 mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
                 if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
                 else:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
                     if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
-            
+            else: Step_counter = 13
+
         elif  xy_wristR[1] < xy_shouderR[1] :
             # （右手首が右肩より高い位置で停止）
             if Step_counter < 20: Step_counter = 20
@@ -1094,7 +1105,8 @@ def plot(myResult, annotated_frame=None):
                             # セクション内の動作が不正な場合
                             Alart_section = Section_no
                             mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                            if Alart_id == Alart_KaiNasi: Section_no = 7    # 会なしで離れた場合
+                            if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
+                                Section_no = Section_no + 1                     # セクション番号をインクリメント
                             Step_counter = 0
                             Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
                     #
@@ -1143,7 +1155,7 @@ def plot(myResult, annotated_frame=None):
         if Alart_id > 0: 
             #Alart_message = Alart_msg[Alart_id]
             Alart_message = Alart_msg[Alart_id*10]
-            print(f"{Alart_msg[Alart_id*10]}")
+            print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
             mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
             
         # テキストの描画           
@@ -1295,7 +1307,13 @@ def main():
         return
     
     if '-i' in opts:            # 動作開始解析パラメータの初期登録
-        for nm in InitAction_param_nms:
+        param_nms = []
+        i = args.index('-i')
+        if i + 1 < len(args) and (not args[i + 1].startswith('-')):
+            param_nms.append( args[i + 1] )  # ケース名を取得
+        else:
+            param_nms = list(InitAction_param_nms)
+        for nm in param_nms:
             _,tbl = get_action_param(CompleteAction_params, nm)
             Db.insert_act_param(tbl)
             print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
@@ -1338,7 +1356,7 @@ def main():
             print("ケース名の指定がありません")
             return
 #
-    # YOLOv8モデルファイル指定
+    # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
         V8_model = 'v8n' # YOLOv8nモデルを使用 
 
@@ -1365,17 +1383,18 @@ def main():
     else:               
         param_nm = f"{Sample_frames}-{V8_model[-1:]}"
     
-    # 動作解析パラメータをDBからロードする
-    CompleteAction_param['frame'] = param_nm
-    CompleteAction_param['step'] = step_no
-    if Db.load_act_param(CompleteAction_param) == 0:    
-        print(f"{param_nm}の動作完了解析パラメータが登録されていません")
-        return
-    StartAction_param['frame'] = param_nm
-    StartAction_param['step'] = step_no
-    if Db.load_act_param(StartAction_param) == 0:    
-        print(f"{param_nm}の動作開始解析パラメータが登録されていません")
-        return
+    if manual_plot:
+        # 動作解析パラメータをDBからロードする
+        CompleteAction_param['frame'] = param_nm
+        CompleteAction_param['step'] = step_no
+        if Db.load_act_param(CompleteAction_param) == 0:    
+            print(f"{param_nm}の動作完了解析パラメータが登録されていません")
+            return
+        StartAction_param['frame'] = param_nm
+        StartAction_param['step'] = step_no
+        if Db.load_act_param(StartAction_param) == 0:    
+            print(f"{param_nm}の動作開始解析パラメータが登録されていません")
+            return
 
     # 異常動作解析をスキップするパラメータを無効化するためのパラメータ変更オプションに変換する
     opt_vals  = [opt for opt in opts if opt.startswith('-S')]
@@ -1581,7 +1600,7 @@ def main():
         #
         print(f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLOv8 ログレベル={mylog_level}")
-        print(f"解析パラメータ={param_nm}")
+        print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}")
         
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
