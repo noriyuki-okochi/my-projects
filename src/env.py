@@ -46,7 +46,7 @@ StartAction_param = {'frame': '',
 #
 # 初期登録用動作完了解析パラメータ
 #
-InitAction_param_nms = ['8-n', '8-s2', '1.7-s']
+InitAction_param_nms = ['8-n', '8-s', '1.7-s']
 #
 CompleteAction_params = [
     {'frame': '18-n',   #約1.0秒
