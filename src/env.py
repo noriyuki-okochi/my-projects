@@ -28,7 +28,7 @@ Sample_lag:int = 7
 
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
-#WMA_weights = np.arange(1, Window_size + 1)
+WMA_weights = np.arange(1, Window_size + 1)
 Param_max = 10    # パラメータの最大個数
 # 動作完了解析パラメータ（act = 0）
 CompleteAction_param = {'frame': '',      # <frame>-<model>
