@@ -5,6 +5,7 @@ import ultralytics
 import tkinter.filedialog as filedialog
 import sys
 import os
+import time
 from datetime import datetime
 from copy import copy 
 from PIL import Image, ImageFont, ImageDraw
@@ -71,8 +72,8 @@ V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-r ]|[-m|[-t|-u] <case_name>] [-f'<frame_count>[.<lag>]'] [-W<window_size>]\n"\
-        + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-l<step-no>] [-V8{s|n}] [-w]\n"\
-        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-i] [--]")
+        + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>] [-V8{s|n}] [-w]\n"\
+        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-I ['<param_name>']] [--]")
     print(" --- option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
@@ -87,12 +88,12 @@ def help():
     print(" -S(kip illegal-action-check")
     print(" -W(window-size::ring-buffer-size: default=8)")
     print(" -V(8-pose model-file):default=v8s")
-    print(" -l(evel):step-no default=1")
+    print(" -s(tep):step-no default=1")
     print(" -h(elp)")
+    print(" -I(nitial entry to act_table)")
     print(" -g(uidance)<color>::[Y|G|B|W]: yellow, green(default), black, white")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-2>")
-    print(" -i(nitial entry to act_table)")
     print(" --(auto-pouse imidiately after start)")
     print(" --- key operation ---")
     print(" s :スナップショットファイルの作成")
@@ -101,13 +102,14 @@ def help():
     print(" b :トラッキング動作完了のタグ更新（'-u'時、有効）")
     print(" n :トラッキング動作開始（節移行）のタグ更新（'-u'時、有効）")
     print(" a :ログファイルへのアテンションメッセージ出力")
-    print(" i :動作解析パラメータのDB登録")
+    print(" I :アクティブな動作解析パラメータのDB登録（'-m'時、有効）")
+    print(" i :数値データ入力開始")
     print(" r :繰り返し再生開始／停止（'-r'時、有効）")
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
     print(" c :警告メッセージのクリア")
-    print(" k :再生速度アップ")
-    print(" l :再生速度ダウン")
+    print(" k(K) :再生速度アップ")
+    print(" l(L) :再生速度ダウン")
     print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
@@ -169,7 +171,7 @@ def get_max_box(result):
     area = np.array([])
     for i in range(len(boxes)):        #バウンディングボックスの面積をareaに格納
         if result.boxes.conf[i].item() < 0.3: 
-            mylog.log(DEBUG, f"[get_max_box]: boxid={i}, conf={result.boxes.conf[i].item():.2f}  skip....")
+            mylog.log(DEBUG, f"[get_max_box]: boxid={i}, conf={result.boxes.conf[i].item():.3f}  skip....")
             continue  # 信頼度が低いボックスは無視
         _, _, w, h = map(int, boxes.xywh[i])
         area = np.append(area, w * h)                   # 面積を計算して追加
@@ -180,7 +182,7 @@ def get_max_box(result):
         # インデックスは0から始まるため、1を加算
         conf = result.boxes.conf[max_box_no].item()  # 最大ボックスの信頼度を取得    
         max_box_no += 1  
-        mylog.log(DEBUG, f"[get_max_box]: max_box_no={max_box_no}, conf={conf}:.2f, area:{area}, xywh:{boxes.xywh[max_box_no-1]}")             
+        mylog.log(DEBUG, f"[get_max_box]: max_box_no={max_box_no}, conf={conf:.3f}, area:{area}, xywh:{boxes.xywh[max_box_no-1]}")             
     return max_box_no
 #
 # カメラの位置を取得する関数
@@ -648,6 +650,16 @@ def section_started(section_no, myResult):
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
             # 右手首の移動ベクトルの長さが10以上の場合（離れ）
             started = True
+        elif normR > thsd(PRM[0]):
+            Step_counter += 1
+            if Step_counter > PRM[2]:
+                # 左手首（弓手）の押しタイミングズレ
+                Alart_id = Alart_Hanare
+                Step_error = True
+                started = True
+        elif Step_counter > 0: 
+            # 左手首（弓手）の動き検知なし
+            started = True
     
     # 7-Hanare  ->  8-Zan-shin        
     elif section_no == 7:  
@@ -847,13 +859,14 @@ def section_completed(section_no, myResult):
                 mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} ]")
                 if normL < thsd(PRM[0]):  Step_counter += 1
                 if Step_counter > PRM[1]: Step_counter = 10
-            else:  # 「大三」から「引き分け」完了への移行
+            elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
                 mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
                 if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
                 else:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
                     if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
-            
+            else: Step_counter = 13
+
         elif  xy_wristR[1] < xy_shouderR[1] :
             # （右手首が右肩より高い位置で停止）
             if Step_counter < 20: Step_counter = 20
@@ -1094,7 +1107,8 @@ def plot(myResult, annotated_frame=None):
                             # セクション内の動作が不正な場合
                             Alart_section = Section_no
                             mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                            if Alart_id == Alart_KaiNasi: Section_no = 7    # 会なしで離れた場合
+                            if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
+                                Section_no = Section_no + 1                     # セクション番号をインクリメント
                             Step_counter = 0
                             Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
                     #
@@ -1143,7 +1157,7 @@ def plot(myResult, annotated_frame=None):
         if Alart_id > 0: 
             #Alart_message = Alart_msg[Alart_id]
             Alart_message = Alart_msg[Alart_id*10]
-            print(f"{Alart_msg[Alart_id*10]}")
+            print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
             mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
             
         # テキストの描画           
@@ -1172,7 +1186,7 @@ def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, c
 #
 def edit_key_ope(out_file, raw_video, clip_video):
  
-        ope_str = '(q)uit:(p)ause:(>)skip:(<)rewind:(u)p-speed:(d)own:(s)nap'
+        ope_str = '(q)uit:(p)ause:(>)skip:(<)rewind:(k)up-speed:(l)ow:(s)nap'
         if out_file != '':  ope_str += ':(w)rite-video'
         if Tracking_only:   ope_str += ':(t)racking'
         if Update_tracking: ope_str += ':(u)pdate-tracking'
@@ -1183,18 +1197,44 @@ def edit_key_ope(out_file, raw_video, clip_video):
 #
 def mosaic_area( src, y, x, height, width, ratio=0.1):
     #print(f"[mosice_area]:({y}, {x}), height={height}, width={width}")
+    if y <= 0 or (y + height) >= src.shape[0]: return src
+    x = 0 if x < 0 else x
+    x = src.shape[1] if (x + width) >= src.shape[1] else x
+    
     dst_area = src[y:y + height, x:x + width]
     small = cv2.resize(dst_area, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
     zoom = cv2.resize(small, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
     src[y:y + height, x:x + width] = zoom
     return src
 #
+# モザイク処理エリアを取得する関数
+#
+def get_mosaic_areas(myResult):
+    areas = []
+    boxes = myResult.boxes              # 検出されたバウンディングボックスの取得
+    keypoints = myResult.keypoints      # 検出されたキーポイントの取得
+    max_box_no = myResult.boxid         # 対象ボックスの番号
+    
+    # 対象ボックス以外の顔エリアの矩形を求める
+    for i in range(len(boxes.xywh)):        
+        if i == max_box_no: continue 
+        _, _, w, _ = map(int, boxes.xywh[i])                                # ボックスの幅を取得
+        x, y = map(int, keypoints.xy[i][Kn2idx['nose']]) 
+        x1, _ = map(int, keypoints.xy[i][Kn2idx['left_eye']]) 
+        x2,_ = map(int, keypoints.xy[i][Kn2idx['right_eye']]) 
+        if x == 0: x = x1 if x1 > 0 else x2
+        #conf = keypoints.conf[i][Kn2idx['nose']].item()
+        #mylog.log(DEBUG, f"[get_mosaic_areas]:{i}:({y}, {x}, {conf:.3f}, {x1}, {x2}, {w})")
+        mylog.log(DEBUG, f"[get_mosaic_areas]:{i}:({y}, {x}, {x1}, {x2}, {w})")
+        areas.append( [int(y - w/4), int(x - w/3), int(w/1.5), int(w/1.5)] )    # 矩形情報を追加
+    return areas
+#
 # マウスドラッグ・イベント関数
 #
 class Rect:
-    def __init__(self):
-        self.start = None
-        self.end = None
+    def __init__(self, start=None, end=None):
+        self.start = start
+        self.end = end
         self.drawing = False
         self.roi_set = False
         self.x = [None, None]
@@ -1236,6 +1276,225 @@ def draw_rectangle(event, x, y, flags, param):
         Rect_area.drawing = False
         if Rect_area.length() > 100: Rect_area.roi_set = True
 #
+# キー入力操作関数
+def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
+    global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start
+    global Step_counter, Nop_counter, Step_error, Section_color, Alart_message
+    global Tracking_enabled, Update_enabled
+    
+    if ctl['key_inter'] != 0 and (int(time.time()) - ctl['key_inter']) > ctl['key_wait']: 
+        # キー入力の間隔が1秒経過したとき、連打タイマーをクリア
+        ctl['key_inter'] = 0  
+    #
+    if key == ord('q'):
+        # 'q'キーで終了
+        return False
+    
+    elif key == ord('p'):
+        # 'p'キーで一時停止/再開
+        ctl['iwait'] = 0 if ctl['iwait'] > 0 else ctl['iwait_init']  
+        if ctl['iwait'] == 0: print("一時停止しました")
+        else: print(f"再開しました: {ctl['iwait']}ミリ秒")
+    
+    elif key == ord('k') or key == ord('K'):            
+        # 'k'キーでウィンドウの更新間隔を短くする
+        step = 32 if key == ord('k') else 16         
+        ctl['iwait'] = ctl['iwait'] - step if ctl['iwait'] > step else ctl['iwait']
+        print(f"動画の再生間隔を短くしました（早送り再生）: {ctl['iwait']}ミリ秒")
+        
+    elif key == ord('l') or key == ord('L'):
+        # 'l'キーでウィンドウの更新間隔を長くする
+        step = 32 if key == ord('k') else 16         
+        ctl['iwait'] = ctl['iwait'] + step if ctl['iwait'] < (1000 - step) else ctl['iwait']  
+        print(f"動画の再生間隔を長くしました（スロー再生）: {ctl['iwait']}ミリ秒")
+        
+    elif key == ord('t') and Tracking_only:
+        # 't'キーで一開始／停止
+        Tracking_enabled = True if Tracking_enabled is False else False  
+        if Tracking_enabled: 
+            print(f"トラッキングを開始します: {Db.csvpath}")
+            Db.update_frame_info('start_frame', Frame_counter)  # 開始フレーム番号
+            mylog.log(INFO, f">> Trucking start: {Db.csvpath}")
+        else: 
+            print("トラッキングを停止します")
+            Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
+            mylog.log(INFO, ">> Trucking pause")
+
+    elif key == ord('u') and Update_tracking:
+        # 'u'キーで一開始／停止
+        Update_enabled = True if Update_enabled is False else False  
+        if Update_enabled: 
+            print(f"トラッキングDB更新を開始します")
+            mylog.log(INFO, f">> Update-Trucking start")
+        else: 
+            print("トラッキングDB更新を停止します")
+            mylog.log(INFO, ">> Update-Trucking pause")
+    
+    elif key == ord('s'):
+        # スクリーンショットを保存
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        screenshot_path = f"{idir}screenshot_{timestamp}.png"
+        cv2.imwrite(screenshot_path, annotated_frame)
+        print(f"スクリーンショットを保存しました: {screenshot_path}")
+    
+    elif key == ord('w') and out_file != '':
+        # 'w'キーで一開始／停止
+        ctl['videoWrite'] = True if ctl['videoWrite'] is False else False  
+        if ctl['videoWrite']: 
+            print(f"出力ファイルに書き込みを開始します: {out_file}")
+            mylog.log(INFO, ">> video write start")
+        else: 
+            print(f"出力ファイルに書き込みを停止します: {out_file}")
+            mylog.log(INFO, ">> video write pause")
+
+    elif key == ord('r') and (raw_video and not clip_video):
+        if ctl['key_inter'] > 0:
+            if ctl['repeat'] : ctl['start_frame'] = Frame_counter       # 繰り返し再生の開始フレームを設定
+            else: ctl['stop_frame'] = Frame_counter                     # 繰り返し再生の終了フレームを設定
+        else:
+            # 'r'キーで一開始／停止
+            ctl['repeat'] = True if ctl['repeat'] is False else False  
+            if ctl['repeat']: 
+                print("繰り返し再生を開始します")
+                mylog.log(INFO, ">> repeat play-mode start")
+            else: 
+                print("繰り返し再生を終了します")
+                mylog.log(INFO, ">> repeat play-mode pause")
+            #
+            ctl['key_inter'] = int(time.time())  
+
+    elif key >= ord('0') and key <= ord('8') and len(ctl['key_data']) == 0:
+        # セクション番号を設定  
+        Section_no = key - ord('0')
+        if Section_no == 0: print(f"姿勢解析を開始します")
+        else:  print(f"セクション番号を設定: {Section_no}")
+        Completed = False
+        Split_sec = 0
+        Split_start = 0
+        Step_counter = 0                    # セクション内の動作カウンターをリセット
+        Nop_counter = 0                     # セクション内の動作カウンターをリセット
+        Step_error = False                  # 不正な動作フラグ
+        Section_color =  YELLOW             # セクションの色（黄色）BGR
+        Alart_message = ''                  # アラートメッセージをリセット
+        ctl['tag1_section'] = Section_no
+        ctl['tag2_section'] = Section_no
+        if Section_no == 0:
+            Lap_start = Frame_counter       # ラップ開始時間を記録
+            Lap_sec = 0
+            ctl['tag1_section'] = 0         # tag登録用セクション番号
+            ctl['tag2_section'] = 0         # tag登録用セクション番号
+        else: 
+            Split_start = Frame_counter
+            if Lap_start == 0: Lap_start = Frame_counter
+            if Section_no == 2 and ctl['key_inter'] != 0: 
+                # セクション2の連打は動作カウンターを20に設定
+                Step_counter = 20
+        #
+        if ctl['key_inter'] == 0: ctl['key_inter'] = int(time.time())  
+
+    elif key == ord('9') and len(ctl['key_data']) == 0:
+        print(f"姿勢解析を停止します。")
+        Lap_start = 0                       # ラップ開始時間をリセット 
+        Split_start = 0                     # スプリット開始時間をリセット 
+        Step_counter = 0                    # セクション内の動作カウンターをリセット              
+    
+    elif key == ord('.'):                   # (.) フレームカウンターを2秒
+        Frame_counter += int(Fps)*2     
+        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+        print(f"フレーム={Frame_counter}")
+    elif key == ord('>'):                   # (>) nフレーム進める
+        if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
+            # キー入力データの2文字目以降をフレーム数として設定
+            ctl['skip_frames'] = int(ctl['key_data'][1:])
+            ctl['key_data'] = ''            # キー入力データをクリア
+        Frame_counter += ctl['skip_frames'] 
+        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+        print(f"フレーム={Frame_counter}")
+    
+    elif key == ord(','):                   
+        # (,) フレームカウンターを2秒戻す
+        if Frame_counter > int(Fps)*2 :Frame_counter -= int(Fps)*2  
+        else: Frame_counter = 1
+        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+        print(f"フレーム={Frame_counter}")
+    elif key == ord('<'):                   
+        # (<) nフレーム戻す
+        if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
+            # キー入力データの2文字目以降をフレーム数として設定
+            ctl['skip_frames'] = int(ctl['key_data'][1:])
+            ctl['key_data'] = ''            # キー入力データをクリア
+        if Frame_counter > ctl['skip_frames'] :Frame_counter -= ctl['skip_frames']  
+        else: Frame_counter = 1
+        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+        print(f"フレーム={Frame_counter}")
+
+    elif key == ord('n') and Update_tracking:
+        # 節の動作開始（次の節へ移行）を更新
+        ctl['tag2_section'] += 1 
+        Db.update_tracking_tag( 'tag2', ctl['tag2_section'] )  
+        print(f"tag2登録(n): value={ctl['tag2_section']}")
+
+    elif key == ord('b') and Update_tracking:
+        # 節の動作完了を登録
+        Db.update_tracking_tag( 'tag1', ctl['tag1_section'] )  
+        print(f"tag1登録(b): value={ctl['tag1_section']}")
+        ctl['tag1_section'] += 1 
+        
+    elif key == ord('a'):
+        ctl['attention'] += 1
+        mylog.log(INFO, f"!!Attention({ctl['attention']}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
+        print(f"アテンション({ctl['attention']}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
+
+    elif key == ord('I'):
+        step = None
+        if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
+            # キー入力データの1文字目をステップ番号として設定
+            step = int(ctl['key_data'][1:])
+            ctl['key_data'] = ''
+
+        tbl = CompleteAction_param
+        if step is not None: tbl['step'] = step
+        Db.insert_act_param(tbl)
+        print(f"パラメータ:{tbl['frame']} step={tbl['step']},act={tbl['act']} テーブル登録完了")
+        tbl = StartAction_param
+        if step is not None: tbl['step'] = step
+        Db.insert_act_param(tbl)
+        print(f"パラメータ:{tbl['frame']} step={tbl['step']},act={tbl['act']} テーブル登録完了")
+        
+    elif key == ord('i'): 
+        # 連打キー入力の開始
+        if ctl['key_inter'] == 0:
+            ctl['key_data'] = 'i'
+            ctl['key_inter'] = int(time.time())  
+
+    elif key >= ord('0') and key <= ord('9') and len(ctl['key_data']) > 0 and ctl['key_inter'] != 0:
+        # キー（数字）入力データに追加
+        ikey_num = key - ord('0')
+        ctl['key_data'] += str(ikey_num)
+        print(f"キー入力データ={ctl['key_data']}")
+        
+    elif key == ord('c'):
+        if Alart_message != '':
+            Section_color =  YELLOW             # セクションの色（黄色）BGR
+            Alart_message = ''                  # アラートメッセージをリセット
+        if Update_tracking and ctl['tag1_section'] > 0:
+            Db.clear_tracking_tag('tag1')       # 節の動作完了をクリア
+            print(f"tag1クリア")
+        if Update_tracking and ctl['tag2_section'] > 0:
+            Db.clear_tracking_tag('tag2')       # 節の動作開始（次の節へ移行）をクリア
+            print(f"tag2クリア")
+        if len(ctl['key_data']) > 0:
+            ctl['key_data'] = ''                # キー入力データをクリア
+            print(f"キー入力データクリア")
+        if ctl['stop_frame'] != 0:              # 繰り返し再生の終了フレームをリセット
+            ctl['stop_frame'] = 0
+            print(f"繰り返し再生の終了フレームをリセット")
+        #
+        print(f"{ctl}")
+    #
+    return True
+    
+#
 # Main process to play video with form-analize by YOLOv8
 #
 def main(): 
@@ -1253,13 +1512,11 @@ def main():
     raw_video = False                               # 生画像を表示するオプション
     clip_video = False                              # 生画像をクリップしてファイルを作成
     manual_plot = False                             # 手動でプロットするオプション
-    repeat_mode = False                             # '-r'再生の繰り返し
     guidance = False                                # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
     filetypes = f"WIN_{timestamp}_*.mp4"            #'*WIN_YYYYmmdd_10_46_55_Pro.mp4'  # 動画ファイル名
-    iwait = 1                                       # ウィンドウの更新間隔（ミリ秒）
     file_name = None
     prePointsBuffer = RingBuffer(Window_size)       # 検出結果を保存するリングバッファ                           
     preResult = RingBuffer(2)                       # 前回の検出結果（補整済）を保存するリングバッファ                           
@@ -1267,9 +1524,22 @@ def main():
     #
     case_name = None                                # ケース名（デフォルト：動画ファイル名）
     #
-    tag1_section = 0
-    tag2_section = 0
-    attention = 0
+    # キー操作制御パラメータ
+    keyCtl = {
+        'iwait': 1,                                 # ウィンドウの更新間隔（ミリ秒）
+        'iwait_init': 1,                            # ウィンドウの更新間隔初期値（ミリ秒）
+        'key_inter': 0,                             # 連打キー入力の経過時間（秒）
+        'key_wait': 3,                              # 連打キー入力の有効期間（秒）
+        'key_data':'',                              # キー入力データ（文字列）
+        'tag1_section': 0,                          # タグ1のセクションカウンター 
+        'tag2_section': 0,                          # タグ2のセクションカウンター
+        'attention': 0,                             # アテンション出力カウンター
+        'skip_frames': 8,                           # 早送り、巻き戻しフレーム数
+        'videoWrite': False,                        # 動画ファイルへの書き込みフラグ
+        'repeat': False,                            # 繰り返し再生フラグ
+        'start_frame': 0,                           # 繰り返し再生開始フレーム
+        'stop_frame': 0                             # 繰り返し再生終了フレーム
+        }
     # print command line(arguments)
     args = sys.argv
     # コマンドライン引数を辞書に変換
@@ -1294,8 +1564,14 @@ def main():
         help()
         return
     
-    if '-i' in opts:            # 動作開始解析パラメータの初期登録
-        for nm in InitAction_param_nms:
+    if '-I' in opts:            # 動作開始解析パラメータの初期登録
+        param_nms = []
+        i = args.index('-I')
+        if i + 1 < len(args) and (not args[i + 1].startswith('-')):
+            param_nms.append( args[i + 1] )  # ケース名を取得
+        else:
+            param_nms = list(InitAction_param_nms)
+        for nm in param_nms:
             _,tbl = get_action_param(CompleteAction_params, nm)
             Db.insert_act_param(tbl)
             print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
@@ -1338,13 +1614,13 @@ def main():
             print("ケース名の指定がありません")
             return
 #
-    # YOLOv8モデルファイル指定
+    # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
         V8_model = 'v8n' # YOLOv8nモデルを使用 
 
-    # レベル(step)を取得
+    # 段レベル(step)を取得
     step_no = 1
-    opt_val  = [opt for opt in opts if opt.startswith('-l')]
+    opt_val  = [opt for opt in opts if opt.startswith('-s')]
     if len(opt_val) > 0:
         if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
             step_no = int(opt_val[0][2:])
@@ -1365,17 +1641,18 @@ def main():
     else:               
         param_nm = f"{Sample_frames}-{V8_model[-1:]}"
     
-    # 動作解析パラメータをDBからロードする
-    CompleteAction_param['frame'] = param_nm
-    CompleteAction_param['step'] = step_no
-    if Db.load_act_param(CompleteAction_param) == 0:    
-        print(f"{param_nm}の動作完了解析パラメータが登録されていません")
-        return
-    StartAction_param['frame'] = param_nm
-    StartAction_param['step'] = step_no
-    if Db.load_act_param(StartAction_param) == 0:    
-        print(f"{param_nm}の動作開始解析パラメータが登録されていません")
-        return
+    if manual_plot:
+        # 動作解析パラメータをDBからロードする
+        CompleteAction_param['frame'] = param_nm
+        CompleteAction_param['step'] = step_no
+        if Db.load_act_param(CompleteAction_param) == 0:    
+            print(f"{param_nm}の動作完了解析パラメータが登録されていません")
+            return
+        StartAction_param['frame'] = param_nm
+        StartAction_param['step'] = step_no
+        if Db.load_act_param(StartAction_param) == 0:    
+            print(f"{param_nm}の動作開始解析パラメータが登録されていません")
+            return
 
     # 異常動作解析をスキップするパラメータを無効化するためのパラメータ変更オプションに変換する
     opt_vals  = [opt for opt in opts if opt.startswith('-S')]
@@ -1507,7 +1784,7 @@ def main():
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) 
     Fps = cap.get(cv2.CAP_PROP_FPS)       
-    videoWriteEnabled = False
+    keyCtl['videoWrite'] = False
     
     #---------------------------------------------------------------------  
     # クリッピング領域
@@ -1558,7 +1835,7 @@ def main():
         frame_width, frame_height = rect.width_height()
         frame_x = rect.x[0]
         frame_y = rect.y[0]
-        #videoWriteEnabled = True
+        #keyCtl['videoWrite'] = True
     #------------------------------------------------------------------------
     #
     # 映像出力ファイルの設定
@@ -1581,7 +1858,7 @@ def main():
         #
         print(f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLOv8 ログレベル={mylog_level}")
-        print(f"解析パラメータ={param_nm}")
+        print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}")
         
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
@@ -1604,20 +1881,21 @@ def main():
     #   
     Frame_counter = 1                   # フレームカウンターの初期化
     if raw_video is True:
-        iwait_init = int(1/Fps * 1000)  # 生画像を表示する場合、FPS値からキー入力待ち時間を設定
+        keyCtl['iwait_init'] = int(1/Fps * 1000)  # 生画像を表示する場合、FPS値からキー入力待ち時間を設定
     else: 
-        iwait_init = 1
+        keyCtl['iwait_init'] = 1
     # ウィンドウの更新間隔を設定
     if '--' in opts:
         # '--'オプションが指定されている場合、ウィンドウの更新間隔を0に設定（起動直後にPAUSE状態にする）
-        iwait = 0
+        keyCtl['iwait'] = 0
     else:
-        iwait = iwait_init        
-    print(f"[main]:iwait={iwait}")
-    mylog.log(INFO, f"[main]:iwait={iwait}")
-
-    print_param(CompleteAction_param)
-    print_param(StartAction_param)
+        keyCtl['iwait'] = keyCtl['iwait_init']
+    #        
+    print(f"[main]:iwait={keyCtl['iwait']}")
+    mylog.log(INFO, f"[main]:iwait={keyCtl['iwait']}")
+    if manual_plot:
+        print_param(CompleteAction_param)
+        print_param(StartAction_param)
     #
     # メインのループ処理
     #
@@ -1625,7 +1903,7 @@ def main():
         # 次のフレームの読み込み
         ret, frame = cap.read()
         if not ret:
-            if repeat_mode:
+            if keyCtl['repeat']:
                 cap.release()
                 cap = cv2.VideoCapture(file_name)  # 動画ファイルのパスを指定
                 Frame_counter = 0
@@ -1694,24 +1972,32 @@ def main():
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
+                        else:
+                            # モザイク処理
+                            areas = get_mosaic_areas(myResult)
+                            for rect in areas:
+                                annotated_frame = mosaic_area( annotated_frame, \
+                                                    rect[0], rect[1], rect[2], rect[3] )
+
                 else:
                     # YOLOのplot関数を使用してフレームに描画
                     annotated_frame = plot( myResult )
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
-        if videoWriteEnabled:
+        if keyCtl['videoWrite']:
             # 出力ファイルに書き込み
             cv2Video.write(annotated_frame)
         
         # ウィンドウに表示
         if guidance is True:
             # キー操作モードを表示
-            pos, str = edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, clip_video, repeat_mode)
+            pos, str = edit_key_mode(frame_height, keyCtl['iwait'], out_file, keyCtl['videoWrite'], raw_video, clip_video, keyCtl['repeat'])
             str = f"mode  : {str}"
             x, y = pos
             size, base = cv2.getTextSize(str,cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2 )
             w, h = size
-            cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
+            model_color = GRAY if keyCtl['key_inter'] > 0 else YELLOW
+            cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, model_color, 2)
             # キー操作ガイダンスを表示
             str = edit_key_ope(out_file, raw_video, clip_video)
             pos = (x + w + 100, y)
@@ -1720,146 +2006,22 @@ def main():
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         
         #キー入力をチェックするする
-        key = cv2.waitKey(iwait) & 0xFF
+        key = cv2.waitKey(keyCtl['iwait']) & 0xFF
         if key == -1: 
             # キー入力がない場合は次のフレームへ
-            continue
+            continue        
         #
         # キー入力に応じて処理を実行
         #
-        if key == ord('q'):
-            # 'q'キーで終了
+        if key_ope(key, keyCtl, annotated_frame, cap, idir, out_file, raw_video, clip_video) == False:
+            # キー操作が終了した場合、ループを抜ける
             break
-        
-        elif key == ord('p'):
-            iwait = 0 if iwait > 0 else iwait_init  # 'p'キーで一時停止/再開
-            if iwait == 0: print("一時停止しました")
-            else: print(f"再開しました: {iwait}ミリ秒")
-        
-        elif key == ord('k'):
-            iwait = iwait - 5 if iwait > 5 else iwait   # 'k'キーでウィンドウの更新間隔を短くする
-            print(f"動画の再生間隔を短くしました（早送り再生）: {iwait}ミリ秒")
-            
-        elif key == ord('l'):
-            iwait = iwait + 5 if iwait < (1000 - 5) else iwait  # 'l'キーでウィンドウの更新間隔を長くする
-            print(f"動画の再生間隔を長くしました（スロー再生）: {iwait}ミリ秒")
-            
-        elif key == ord('t') and Tracking_only:
-            Tracking_enabled = True if Tracking_enabled is False else False  # 't'キーで一開始／停止
-            if Tracking_enabled: 
-                print(f"トラッキングを開始します: {Db.csvpath}")
-                Db.update_frame_info('start_frame', Frame_counter)  # 開始フレーム番号
-                mylog.log(INFO, f">> Trucking start: {Db.csvpath}")
-            else: 
-                print("トラッキングを停止します")
-                Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
-                mylog.log(INFO, ">> Trucking pause")
-
-        elif key == ord('u') and Update_tracking:
-            Update_enabled = True if Update_enabled is False else False  # 't'キーで一開始／停止
-            if Update_enabled: 
-                print(f"トラッキングDB更新を開始します")
-                mylog.log(INFO, f">> Update-Trucking start")
-            else: 
-                print("トラッキングDB更新を停止します")
-                mylog.log(INFO, ">> Update-Trucking pause")
-        
-        elif key == ord('s'):
-            # スクリーンショットを保存
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            screenshot_path = f"{idir}screenshot_{timestamp}.png"
-            cv2.imwrite(screenshot_path, annotated_frame)
-            print(f"スクリーンショットを保存しました: {screenshot_path}")
-        
-        elif key == ord('w') and out_file != '':
-            videoWriteEnabled = True if videoWriteEnabled is False else False  # 't'キーで一開始／停止
-            if videoWriteEnabled: 
-                print(f"出力ファイルに書き込みを開始します: {out_file}")
-                mylog.log(INFO, ">> video write start")
-            else: 
-                print(f"出力ファイルに書き込みを停止します: {out_file}")
-                mylog.log(INFO, ">> video write pause")
-
-        elif key == ord('r') and (raw_video and not clip_video):
-            repeat_mode = True if repeat_mode is False else False  # 'r'キーで一開始／停止
-            if repeat_mode: 
-                print("繰り返し再生を開始します")
-                mylog.log(INFO, ">> repeat play-mode start")
-            else: 
-                print("繰り返し再生を終了します")
-                mylog.log(INFO, ">> repeat play-mode pause")
-
-        elif key >= ord('0') and key <= ord('8'):
-            # セクション番号を設定
-            Section_no = key - ord('0')
-            if Section_no == 0: print(f"姿勢解析を開始します")
-            else:  print(f"セクション番号を設定: {Section_no}")
-            Completed = False
-            Split_sec = 0
-            Split_start = 0
-            Step_counter = 0                    # セクション内の動作カウンターをリセット
-            Nop_counter = 0                     # セクション内の動作カウンターをリセット
-            Step_error = False                  # 不正な動作フラグ
-            Section_color =  YELLOW             # セクションの色（黄色）BGR
-            Alart_message = ''                  # アラートメッセージをリセット
-            tag1_section = Section_no
-            tag2_section = Section_no
-            if Section_no == 0:
-                Lap_start = Frame_counter       # ラップ開始時間を記録
-                Lap_sec = 0
-                tag_section = 0                 # tag登録用セクション番号
-            else: 
-                Split_start = Frame_counter
-                if Lap_start == 0: Lap_start = Frame_counter
-
-        elif key == ord('9'):
-            print(f"姿勢解析を停止します。")
-            Lap_start = 0                       # ラップ開始時間をリセット 
-            Split_start = 0                     # スプリット開始時間をリセット 
-            Step_counter = 0                    # セクション内の動作カウンターをリセット              
-        
-        elif key == ord('.'):                   # (>) 進める
-            Frame_counter += int(Fps)*2         # フレームカウンターを2秒進める
+        #
+        # 繰り返し再生の処理
+        if keyCtl['repeat'] and keyCtl['stop_frame'] != 0 and Frame_counter >= keyCtl['stop_frame']:
+            # 繰り返し再生の開始フレームに戻す
+            Frame_counter = keyCtl['start_frame'] - 1           
             cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
-            print(f"フレーム={Frame_counter}")
-        
-        elif key == ord(','):                   # (<) 戻す
-            if Frame_counter > int(Fps)*2 :Frame_counter -= int(Fps)*2  
-                                                # フレームカウンターを2秒戻す
-            else: Frame_counter = 1
-            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
-            print(f"フレーム={Frame_counter}")
- 
-        elif key == ord('n') and Update_tracking:
-            tag2_section += 1 
-            Db.update_tracking_tag( 'tag2', tag2_section )  # 節の動作開始（次の節へ移行）を更新
-            print(f"tag2登録(n): value={tag2_section}")
-
-        elif key == ord('b') and Update_tracking:
-            Db.update_tracking_tag( 'tag1', tag1_section )  # 節の動作完了を登録
-            print(f"tag1登録(b): value={tag1_section}")
-            tag1_section += 1 
-            
-        elif key == ord('a'):
-            attention += 1
-            mylog.log(INFO, f"!!Attention({attention}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
-            print(f"アテンション({attention}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
-
-        elif key == ord('i'):
-            Db.insert_act_param(CompleteAction_param)
-            Db.insert_act_param(StartAction_param)
-            print(f"パラメータ:{param_nm} テーブル登録完了")
-            
-        elif key == ord('c'):
-            if Alart_message != '':
-                Section_color =  YELLOW             # セクションの色（黄色）BGR
-                Alart_message = ''                  # アラートメッセージをリセット
-            if Update_tracking and tag1_section > 0:
-                Db.clear_tracking_tag('tag1')       # 節の動作完了をクリア
-                print(f"tag1クリア")
-            if Update_tracking and tag2_section > 0:
-                Db.clear_tracking_tag('tag2')       # 節の動作開始（次の節へ移行）をクリア
-                print(f"tag2クリア")
     #
     # リソースの解放
     if Tracking_only: 
