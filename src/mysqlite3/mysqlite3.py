@@ -28,7 +28,7 @@ class MyDb:
     def open_csv(self):
         # CSV出力ファイルの作成
         timestamp = datetime.now().strftime('%Y%m%d')
-        self.csvpath = self.dbpath[:self.dbpath.rfind('/')+1] + f"tracking{timestamp}_{self.case_name}.csv"
+        self.csvpath = self.dbpath[:self.dbpath.rfind('/')+1] + f"track{timestamp}_{self.case_name}.csv"
         self.csvfile = open( self.csvpath, 'w')
         # カラム名を出力
         names ="case_name,frame_no,key_id,key_name,box_id,box_w,box_h,box_conf,x,y,xy_conf,norm,ratio,angle,eyes_span,shds_span,hips_span,"\

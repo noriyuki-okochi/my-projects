@@ -71,31 +71,34 @@ V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-r ]|[-m|[-t|-u] <case_name>] [-f'<frame_count>[.<lag>]'] [-W<window_size>]\n"\
-        + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>] [-V8{s|n}] [-w]\n"\
-        + "                         [-h] [-g<color>] [-v] [-d<debug-level>] [-I ['<param_name>']] [--]")
-    print(" --- option ---")
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name>]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
+        + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
+        + "                         [-I ['<param_name>']] [-h] [-g<color>] [-v] [-d<debug-level>] [--]")
+    print(" --- Option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
     print(" -r(aw-video)")
     print(" -clip(raw-video)")
+    print(" -multi(video-layer display)")
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
+    print(" -f(rame-count) and lag for sampling data: default=1.7")
+    print(" -W(window-size::ring-buffer-size: default=8)")
+    print(" -V(8-pose model-file):default=v8s")
     print(" -w(rite-video-file)")
-    print(" -f(rame-count) and lag for sampling data: default=8,0")
+    print(" -z(:hide the faces by mosaic)")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
-    print(" -W(window-size::ring-buffer-size: default=8)")
-    print(" -V(8-pose model-file):default=v8s")
     print(" -s(tep):step-no default=1")
-    print(" -h(elp)")
     print(" -I(nitial entry to act_table)")
+    print(" -h(elp)")
     print(" -g(uidance)<color>::[Y|G|B|W]: yellow, green(default), black, white")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-2>")
     print(" --(auto-pouse imidiately after start)")
-    print(" --- key operation ---")
+    print(" --- Key Operation ---")
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
     print(" t :トラッキング開始／停止（'0'->'t'の順）")
@@ -104,6 +107,7 @@ def help():
     print(" a :ログファイルへのアテンションメッセージ出力")
     print(" I :アクティブな動作解析パラメータのDB登録（'-m'時、有効）")
     print(" i :数値データ入力開始")
+    print(" j :指定フレームへジャンプ")
     print(" r :繰り返し再生開始／停止（'-r'時、有効）")
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
@@ -1229,6 +1233,18 @@ def get_mosaic_areas(myResult):
         areas.append( [int(y - w/4), int(x - w/3), int(w/1.5), int(w/1.5)] )    # 矩形情報を追加
     return areas
 #
+# 2つのフレームを重ねて表示する関数
+#
+def multi_frame_display(frame1, frame2):
+    h1, w1 = frame1.shape[0:2]
+    h2, w2 = frame2.shape[0:2]
+    h = min(h1, h2)
+    w = min(w1, w2)
+    frame1 = cv2.resize(frame1, (w, h))
+    frame2 = cv2.resize(frame2, (w, h))
+    # 画像を重ねて表示
+    return cv2.addWeighted(frame1, 0.5, frame2, 0.5, 0)  
+#
 # マウスドラッグ・イベント関数
 #
 class Rect:
@@ -1402,6 +1418,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         Frame_counter += int(Fps)*2     
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
+        
     elif key == ord('>'):                   # (>) nフレーム進める
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
             # キー入力データの2文字目以降をフレーム数として設定
@@ -1417,6 +1434,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         else: Frame_counter = 1
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
+    
     elif key == ord('<'):                   
         # (<) nフレーム戻す
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
@@ -1428,6 +1446,17 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
 
+    elif key == ord('j'):
+        # 指定フレームへジャンプ                   
+        if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
+            frame = int(ctl['key_data'][1:])
+            if frame < 1: frame = 1
+            if frame > ctl['frame_count']: frame = ctl['frame_count']
+            Frame_counter = frame 
+            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            ctl['key_data'] = ''            # キー入力データをクリア
+            print(f"フレーム={Frame_counter}")
+                    
     elif key == ord('n') and Update_tracking:
         # 節の動作開始（次の節へ移行）を更新
         ctl['tag2_section'] += 1 
@@ -1512,12 +1541,13 @@ def main():
     raw_video = False                               # 生画像を表示するオプション
     clip_video = False                              # 生画像をクリップしてファイルを作成
     manual_plot = False                             # 手動でプロットするオプション
+    mosaic = False                                  # モザイク処理を行うオプション
     guidance = False                                # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
     filetypes = f"WIN_{timestamp}_*.mp4"            #'*WIN_YYYYmmdd_10_46_55_Pro.mp4'  # 動画ファイル名
-    file_name = None
+    file_name = [None, None]                        # 動画ファイル名
     prePointsBuffer = RingBuffer(Window_size)       # 検出結果を保存するリングバッファ                           
     preResult = RingBuffer(2)                       # 前回の検出結果（補整済）を保存するリングバッファ                           
     preFrame = None                                 # 前回のフレームを保存する変数
@@ -1538,7 +1568,8 @@ def main():
         'videoWrite': False,                        # 動画ファイルへの書き込みフラグ
         'repeat': False,                            # 繰り返し再生フラグ
         'start_frame': 0,                           # 繰り返し再生開始フレーム
-        'stop_frame': 0                             # 繰り返し再生終了フレーム
+        'stop_frame': 0,                            # 繰り返し再生終了フレーム
+        'frame_count': 0                            # 総フレーム数
         }
     # print command line(arguments)
     args = sys.argv
@@ -1579,6 +1610,9 @@ def main():
             Db.insert_act_param(tbl)
             print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
         return
+
+    if '-z' in opts:
+        mosaic = True           # モザイク処理を行うオプション
     #
     if '-r' in opts:
         raw_video = True        # 生画像を表示するオプション
@@ -1587,6 +1621,9 @@ def main():
         clip_video = True
         raw_video = True        # 生画像を表示するオプション
 
+    if '-multi' in opts:
+        multi_frames = True     # 生画像を表示するオプション
+        raw_video = True        # 生画像を表示するオプション
        
     if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロットするオプション
         manual_plot = True
@@ -1613,7 +1650,15 @@ def main():
         else:
             print("ケース名の指定がありません")
             return
-#
+    #
+    # トラッキングデータのケース名を設定
+    if Tracking_only: 
+        fps, x = Db.get_fps()
+        if fps is not None:
+            print(f"> '{case_name}' already registered. Are you sure?[y/n].")
+            ans = input('>>')
+            if ans != 'y': return
+    #
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
         V8_model = 'v8n' # YOLOv8nモデルを使用 
@@ -1710,10 +1755,6 @@ def main():
         if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
             Window_size = int(opt_val[0][2:])  
     
-    # ファイル選択のファイルタイプを設定        
-    if '-a' in opts:
-        filetypes = ALL_TYPES
-        
     # キーオペレーションのガイダンス表示
     color = 'G'
     guid_opt = [opt for opt in opts if opt.startswith('-g')]
@@ -1741,51 +1782,70 @@ def main():
     mylog.setLevel(mylog_level)  
     
     # 映像ソースの選択   
+    if '-a' in opts:
+        # ファイル選択のファイルタイプを設定        
+        filetypes = ALL_TYPES
+    
+    cap = [None, None] 
     if cam_id is not None:
-        # カメラから映像を取得
-        cap = cv2.VideoCapture(cam_id) # カメラIDを指定
+        # カメラから映像を取得  
+        cap[0] = cv2.VideoCapture(cam_id) # カメラIDを指定
     else:
         # 動画ファイルを選択する
-        file_name = filedialog.askopenfilename(
-            title = "動画ファイルを選択してください",
-            filetypes = [("Video files", filetypes)],
-            initialdir = idir
-        )
-        if not file_name:
-            print("動画ファイルの選択がキャンセルされました")
-            return
-        
-        print(f"[main]:入力ファイル：{file_name}")
-        cap = cv2.VideoCapture(file_name)  # 動画ファイルのパスを指定
+        files = 2 if multi_frames else 1
+        for i in range( files ):
+            file_name[i] = filedialog.askopenfilename(
+                title = "動画ファイルを選択してください",
+                filetypes = [("Video files", filetypes)],
+                initialdir = idir
+            )
+            if not file_name[i]:
+                print("動画ファイルの選択がキャンセルされました")
+                if cap[0] is not None: cap[0].release()
+                return
             
-    # トラッキングデータのケース名を設定
-    if Tracking_only: 
-        fps, x = Db.get_fps()
-        if fps is not None:
-            print(f"> '{case_name}' already registered. Are you sure?[y/n].")
-            ans = input('>>')
-            if ans != 'y': return
-        # トラッキングデータの出力先CSVファイルを開く
-        Db.open_csv()
-
+            print(f"[main]:入力ファイル：{file_name[i]}")
+            cap[i] = cv2.VideoCapture(file_name[i])  # 動画ファイルのパスを指定
+            
     # 動画ファイルが開けない場合のエラーハンドリング
-    if not cap.isOpened():
+    if not cap[0].isOpened():
         print("カメラor動画ファイルが見つかりません")
+        if cap[1] is not None: cap[1].release()
         return    
     #
     # 先頭フレームを読み込み
     #
-    ret, frame = cap.read()
+    ret, frame = cap[0].read()
     if not ret:
         print("動画ファイルの読み込みに失敗しました")
-        cap.release()
+        cap[0].release()
+        if cap[1] is not None: cap[1].release()
         return
     # フレームのサイズを取得
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) 
-    Fps = cap.get(cv2.CAP_PROP_FPS)       
-    keyCtl['videoWrite'] = False
-    
+    frame_height = int(cap[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_width = int(cap[0].get(cv2.CAP_PROP_FRAME_WIDTH)) 
+    keyCtl['frame_count'] = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
+    # フレームレートを取得
+    Fps = cap[0].get(cv2.CAP_PROP_FPS)       
+    #
+    if multi_frames:
+        if cap[1].isOpened():
+            # 先頭フレームを読み込み
+            ret, frame1 = cap[1].read()
+            if not ret:
+                print("動画ファイルの読み込みに失敗しました")
+                cap[1].release()
+                cap[1] = None
+        else:
+            print("動画ファイルが見つかりません")
+            cap[1].release()
+            cap[1] = None
+
+    if Tracking_only:
+        # トラッキングデータの出力先CSVファイルを開く
+        Db.open_csv()
+        # トラッキングデータの情報テーブルに登録 
+        Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath] )     
     #---------------------------------------------------------------------  
     # クリッピング領域
     #---------------------------------------------------------------------  
@@ -1835,16 +1895,16 @@ def main():
         frame_width, frame_height = rect.width_height()
         frame_x = rect.x[0]
         frame_y = rect.y[0]
-        #keyCtl['videoWrite'] = True
     #------------------------------------------------------------------------
     #
     # 映像出力ファイルの設定
+    keyCtl['videoWrite'] = False
     out_file = ''
     if ('-w' in opts) or clip_video:
-        if file_name is None:
+        if file_name[0] is None:
             out_file = f"{idir}YOLO_{timestamp}_{datetime.now().strftime('%H%M%S')}.mp4"
         else:
-            base_name = os.path.basename(file_name)
+            base_name = os.path.basename(file_name[0])
             out_file = f"{idir}_{base_name}"
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -1863,17 +1923,13 @@ def main():
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
-    
-    if Tracking_only:
-        # トラッキングデータの情報テーブルに登録 
-        Db.insert_frame_info( [file_name, Fps, frame_height, frame_width, Db.csvpath] ) # DBテーブルに登録
-    
+        
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
     mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
     print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
-    mylog.log(INFO, f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
-    print(f"[main]:フレーム情報: {file_name}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
+    mylog.log(INFO, f"[main]:フレーム情報: {file_name[0]}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
+    print(f"[main]:フレーム情報: {file_name[0]}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
         
     if not raw_video:
         mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.), Lag={Sample_lag}")
@@ -1901,11 +1957,11 @@ def main():
     #
     while True:
         # 次のフレームの読み込み
-        ret, frame = cap.read()
+        ret, frame = cap[0].read()
         if not ret:
             if keyCtl['repeat']:
-                cap.release()
-                cap = cv2.VideoCapture(file_name)  # 動画ファイルのパスを指定
+                cap[0].release()
+                cap[0] = cv2.VideoCapture(file_name[0])  # 動画ファイルのパスを指定
                 Frame_counter = 0
                 continue
             break
@@ -1920,6 +1976,11 @@ def main():
                     annotated_frame = mosaic_area( annotated_frame, \
                                                    (rect.y[0] - frame_y), (rect.x[0] - frame_x), h, w )
             else:
+                if multi_frames and cap[1] is not None:
+                    # 画面を重ねて表示
+                    ret, frame1 = cap[1].read()
+                    if ret is True: 
+                        frame = multi_frame_display(frame, frame1)
                 # 生画像を表示する場合
                 annotated_frame = frame
         else:
@@ -1972,7 +2033,7 @@ def main():
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
-                        else:
+                        elif mosaic:
                             # モザイク処理
                             areas = get_mosaic_areas(myResult)
                             for rect in areas:
@@ -2013,7 +2074,7 @@ def main():
         #
         # キー入力に応じて処理を実行
         #
-        if key_ope(key, keyCtl, annotated_frame, cap, idir, out_file, raw_video, clip_video) == False:
+        if key_ope(key, keyCtl, annotated_frame, cap[0], idir, out_file, raw_video, clip_video) == False:
             # キー操作が終了した場合、ループを抜ける
             break
         #
@@ -2021,13 +2082,14 @@ def main():
         if keyCtl['repeat'] and keyCtl['stop_frame'] != 0 and Frame_counter >= keyCtl['stop_frame']:
             # 繰り返し再生の開始フレームに戻す
             Frame_counter = keyCtl['start_frame'] - 1           
-            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            cap[0].set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
     #
     # リソースの解放
     if Tracking_only: 
         Db.csvfile.close()
     Db.close() 
-    cap.release()
+    cap[0].release()
+    if multi_frames and cap[1] is not None: cap[1].release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
