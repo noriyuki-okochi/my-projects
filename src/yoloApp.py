@@ -109,6 +109,7 @@ def help():
     print(" i :数値データ入力開始")
     print(" j :指定フレームへジャンプ")
     print(" r :繰り返し再生開始／停止（'-r'時、有効）")
+    print(" g :グリッド表示／非表示")
     print(" 0 :ラップ開始")
     print(" 1-8:節の開始")
     print(" c :警告メッセージのクリア")
@@ -1243,7 +1244,25 @@ def multi_frame_display(frame1, frame2):
     frame1 = cv2.resize(frame1, (w, h))
     frame2 = cv2.resize(frame2, (w, h))
     # 画像を重ねて表示
-    return cv2.addWeighted(frame1, 0.5, frame2, 0.5, 0)  
+    return cv2.addWeighted(frame1, 0.5, frame2, 0.5, 0) 
+#
+# グリッド線を描画する関数 
+def draw_grid(img, grid_shape, color=(0, 255, 0), thickness=1):
+    h, w, _ = img.shape
+    rows, cols = grid_shape
+    dy, dx = h / rows, w / cols
+
+    # draw vertical lines
+    for x in np.linspace(start=dx, stop=w-dx, num=cols-1):
+        x = int(round(x))
+        cv2.line(img, (x, 0), (x, h), color=color, thickness=thickness)
+
+    # draw horizontal lines
+    for y in np.linspace(start=dy, stop=h-dy, num=rows-1):
+        y = int(round(y))
+        cv2.line(img, (0, y), (w, y), color=color, thickness=thickness)
+
+    return img
 #
 # マウスドラッグ・イベント関数
 #
@@ -1378,6 +1397,15 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
                 mylog.log(INFO, ">> repeat play-mode pause")
             #
             ctl['key_inter'] = int(time.time())  
+
+    elif key == ord('g'):
+        # グリッドの表示／非表示                   
+        if len(ctl['key_data']) > 2 and ctl['key_data'][1:].isdigit():
+            rows = int(ctl['key_data'][1:2])
+            cols = int(ctl['key_data'][2:3])
+            ctl['grid_shape'] = (rows, cols)
+            ctl['key_data'] = ''            # キー入力データをクリア
+        ctl['grid'] = True if ctl['grid'] is False else False
 
     elif key >= ord('0') and key <= ord('8') and len(ctl['key_data']) == 0:
         # セクション番号を設定  
@@ -1541,6 +1569,7 @@ def main():
     raw_video = False                               # 生画像を表示するオプション
     clip_video = False                              # 生画像をクリップしてファイルを作成
     manual_plot = False                             # 手動でプロットするオプション
+    multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = False                                # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
@@ -1567,9 +1596,11 @@ def main():
         'skip_frames': 8,                           # 早送り、巻き戻しフレーム数
         'videoWrite': False,                        # 動画ファイルへの書き込みフラグ
         'repeat': False,                            # 繰り返し再生フラグ
+        'frame_count': 0,                           # 総フレーム数
         'start_frame': 0,                           # 繰り返し再生開始フレーム
         'stop_frame': 0,                            # 繰り返し再生終了フレーム
-        'frame_count': 0                            # 総フレーム数
+        'grid': False,                              # グリッド表示有無
+        'grid_shape': (6, 6)                        # グリッド表示行列
         }
     # print command line(arguments)
     args = sys.argv
@@ -2063,7 +2094,11 @@ def main():
             str = edit_key_ope(out_file, raw_video, clip_video)
             pos = (x + w + 100, y)
             cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, guid_color, 2)            
-        #        
+        #
+        if keyCtl['grid']:
+            # グリッドを表示        
+            draw_grid(annotated_frame, keyCtl['grid_shape'], GRAY, 1)
+        #       
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         
         #キー入力をチェックするする
