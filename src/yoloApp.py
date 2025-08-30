@@ -101,18 +101,19 @@ def help():
     print(" --- Key Operation ---")
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
-    print(" t :トラッキング開始／停止（'0'->'t'の順）")
+    print(" t :トラッキング開始／停止（姿勢解析開始後、有効）")
     print(" b :トラッキング動作完了のタグ更新（'-u'時、有効）")
     print(" n :トラッキング動作開始（節移行）のタグ更新（'-u'時、有効）")
     print(" a :ログファイルへのアテンションメッセージ出力")
     print(" I :アクティブな動作解析パラメータのDB登録（'-m'時、有効）")
-    print(" i :数値データ入力開始")
-    print(" j :指定フレームへジャンプ")
+    print(" i :数値入力開始")
+    print(" j :指定フレームへジャンプ（ジャンプ先フレームは数値入力キー’i’で指定：：(<フレームカウント>)）")
     print(" r :繰り返し再生開始／停止（'-r'時、有効）")
-    print(" g :グリッド表示／非表示")
-    print(" 0 :ラップ開始")
+    print(" g :グリッド表示／非表示（分割数は数値入力キー’i’で指定：：(0|1)(<分割数>)）")
+    print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(<グリッド幅の分割数>)）")
+    print(" 0 :姿勢解析開始")
     print(" 1-8:節の開始")
-    print(" c :警告メッセージのクリア")
+    print(" c :警告メッセージ、その他、キー設定値のクリア")
     print(" k(K) :再生速度アップ")
     print(" l(L) :再生速度ダウン")
     print(" p :一時停止／再開")
@@ -1247,19 +1248,23 @@ def multi_frame_display(frame1, frame2):
     return cv2.addWeighted(frame1, 0.5, frame2, 0.5, 0) 
 #
 # グリッド線を描画する関数 
-def draw_grid(img, grid_shape, color=(0, 255, 0), thickness=1):
+def draw_grid(img, grid_shape, grid_shift, color=(0, 255, 0), thickness=1):
     h, w, _ = img.shape
     rows, cols = grid_shape
     dy, dx = h / rows, w / cols
+    # グリッド線のシフト
+    sy, sx = grid_shift
+    sy = int(round(dy/sy)) if sy > 0 else 0
+    sx = int(round(dx/sx)) if sx > 0 else 0
 
     # draw vertical lines
     for x in np.linspace(start=dx, stop=w-dx, num=cols-1):
-        x = int(round(x))
+        x = int(round(x)) + sx
         cv2.line(img, (x, 0), (x, h), color=color, thickness=thickness)
 
     # draw horizontal lines
     for y in np.linspace(start=dy, stop=h-dy, num=rows-1):
-        y = int(round(y))
+        y = int(round(y)) + sy
         cv2.line(img, (0, y), (w, y), color=color, thickness=thickness)
 
     return img
@@ -1401,11 +1406,27 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
     elif key == ord('g'):
         # グリッドの表示／非表示                   
         if len(ctl['key_data']) > 2 and ctl['key_data'][1:].isdigit():
-            rows = int(ctl['key_data'][1:2])
-            cols = int(ctl['key_data'][2:3])
+            rows, cols = ctl['grid_shape'] 
+            rowcol = int(ctl['key_data'][1:2])
+            val = int(ctl['key_data'][2:])
+            if rowcol == 0 and val >= 2 : rows = val
+            elif rowcol == 1 and val >= 2 : cols = val
+            else: print("グリッド行数、列数は2以上の整数を指定してください")
             ctl['grid_shape'] = (rows, cols)
             ctl['key_data'] = ''            # キー入力データをクリア
         ctl['grid'] = True if ctl['grid'] is False else False
+
+    elif key == ord('G'):
+        # グリッドをシフトして表示                   
+        if len(ctl['key_data']) > 2 and ctl['key_data'][1:].isdigit():
+            rows, cols = ctl['grid_shift'] 
+            rowcol = int(ctl['key_data'][1:2])
+            val = int(ctl['key_data'][2:])
+            if rowcol == 0 and val >= 2 : rows = val
+            elif rowcol == 1 and val >= 2 : cols = val
+            else: print("グリッドシフト数は2以上の整数を指定してください")
+            ctl['grid_shift'] = (rows, cols)
+            ctl['key_data'] = ''            # キー入力データをクリア
 
     elif key >= ord('0') and key <= ord('8') and len(ctl['key_data']) == 0:
         # セクション番号を設定  
@@ -1546,6 +1567,10 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if ctl['stop_frame'] != 0:              # 繰り返し再生の終了フレームをリセット
             ctl['stop_frame'] = 0
             print(f"繰り返し再生の終了フレームをリセット")
+
+        # グリッド表示をデフォルトにリセット
+        ctl['grid_shape'] = (6, 6)              
+        ctl['grid_shift'] = (0, 0)
         #
         print(f"{ctl}")
     #
@@ -1600,8 +1625,9 @@ def main():
         'start_frame': 0,                           # 繰り返し再生開始フレーム
         'stop_frame': 0,                            # 繰り返し再生終了フレーム
         'grid': False,                              # グリッド表示有無
-        'grid_shape': (6, 6)                        # グリッド表示行列
-        }
+        'grid_shape': (6, 6),                       # グリッド表示行列
+        'grid_shift': (0, 0)                        # グリッド表示シフト量
+    }
     # print command line(arguments)
     args = sys.argv
     # コマンドライン引数を辞書に変換
@@ -2083,7 +2109,8 @@ def main():
         # ウィンドウに表示
         if guidance is True:
             # キー操作モードを表示
-            pos, str = edit_key_mode(frame_height, keyCtl['iwait'], out_file, keyCtl['videoWrite'], raw_video, clip_video, keyCtl['repeat'])
+            pos, str = edit_key_mode(frame_height, keyCtl['iwait'], out_file, keyCtl['videoWrite'],\
+                                        raw_video, clip_video, keyCtl['repeat'])
             str = f"mode  : {str}"
             x, y = pos
             size, base = cv2.getTextSize(str,cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2 )
@@ -2097,7 +2124,7 @@ def main():
         #
         if keyCtl['grid']:
             # グリッドを表示        
-            draw_grid(annotated_frame, keyCtl['grid_shape'], GRAY, 1)
+            draw_grid(annotated_frame, keyCtl['grid_shape'], keyCtl['grid_shift'], GRAY, 1)
         #       
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         
