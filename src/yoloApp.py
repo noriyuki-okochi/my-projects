@@ -109,8 +109,8 @@ def help():
     print(" i :数値入力開始")
     print(" j :指定フレームへジャンプ（ジャンプ先フレームは数値入力キー’i’で指定：：(<フレームカウント>)）")
     print(" r :繰り返し再生開始／停止（'-r'時、有効）")
-    print(" g :グリッド表示／非表示（分割数は数値入力キー’i’で指定：：(0|1)(<分割数>)）")
-    print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(<グリッド幅の分割数>)）")
+    print(" g :グリッド表示・非表示（分割数は数値入力キー’i’で指定：：(0|1)(<分割数>)）")
+    print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(グリッド幅の割合<分子><分母>)）")
     print(" 0 :姿勢解析開始")
     print(" 1-8:節の開始")
     print(" c :警告メッセージ、その他、キー設定値のクリア")
@@ -1254,8 +1254,8 @@ def draw_grid(img, grid_shape, grid_shift, color=(0, 255, 0), thickness=1):
     dy, dx = h / rows, w / cols
     # グリッド線のシフト
     sy, sx = grid_shift
-    sy = int(round(dy/sy)) if sy > 0 else 0
-    sx = int(round(dx/sx)) if sx > 0 else 0
+    sy = int(round(dy*sy)) if sy > 0 else 0
+    sx = int(round(dx*sx)) if sx > 0 else 0
 
     # draw vertical lines
     for x in np.linspace(start=dx, stop=w-dx, num=cols-1):
@@ -1418,13 +1418,13 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 
     elif key == ord('G'):
         # グリッドをシフトして表示                   
-        if len(ctl['key_data']) > 2 and ctl['key_data'][1:].isdigit():
+        if len(ctl['key_data']) > 3 and ctl['key_data'][1:].isdigit():
             rows, cols = ctl['grid_shift'] 
             rowcol = int(ctl['key_data'][1:2])
-            val = int(ctl['key_data'][2:])
-            if rowcol == 0 and val >= 2 : rows = val
-            elif rowcol == 1 and val >= 2 : cols = val
-            else: print("グリッドシフト数は2以上の整数を指定してください")
+            val = int(ctl['key_data'][2:3])/int(ctl['key_data'][3:])
+            if rowcol == 0 and val < 1.0 : rows = val
+            elif rowcol == 1 and val < 1.0 : cols = val
+            else: print("グリッドシフト割合は1.0以下の分数で指定してください")
             ctl['grid_shift'] = (rows, cols)
             ctl['key_data'] = ''            # キー入力データをクリア
 
