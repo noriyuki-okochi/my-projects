@@ -390,6 +390,7 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = irow, 
                                 col = icol   
                             )
+            '''
             # < shds_span >
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                         name="shoulders-span",
@@ -398,6 +399,7 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = irow, 
                                 col = icol   
                             )
+            '''
             # < hips_span >
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                         name="hips-span",

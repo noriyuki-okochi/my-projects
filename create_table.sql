@@ -36,12 +36,14 @@ create table if not exists tracking_data( case_name text NOT NULL,
                                     eyes_span real NOT NULL, 
                                     shds_span real NOT NULL, 
                                     hips_span real NOT NULL, 
-                                    inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
-                                    time_epoch integer,
+                                    hw_ratio real NOT NULL, 
+                                    hw_angle real NOT NULL, 
                                     section int DEFAULT(0),
                                     completed int DEFAULT(0),  
                                     tag1 int DEFAULT(NULL),
                                     tag2 int DEFAULT(NULL),                               
+                                    inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
+                                    time_epoch integer,
                                     PRIMARY KEY(case_name, frame_no, key_id)
                                 );
 --drop table if exists act_param;

@@ -31,8 +31,9 @@ class MyDb:
         self.csvpath = self.dbpath[:self.dbpath.rfind('/')+1] + f"track{timestamp}_{self.case_name}.csv"
         self.csvfile = open( self.csvpath, 'w')
         # カラム名を出力
-        names ="case_name,frame_no,key_id,key_name,box_id,box_w,box_h,box_conf,x,y,xy_conf,norm,ratio,angle,eyes_span,shds_span,hips_span,"\
-            + "inserted_at,time_epoch,section,completed\n"
+        names ="case_name,frame_no,key_id,key_name,box_id,box_w,box_h,box_conf,x,y,xy_conf,norm,ratio,angle,"\
+            + "eyes_span,shds_span,hips_span,hw_ratio,hw_angle,"\
+            + "section,completed,inserted_at,time_epoch\n"
         self.csvfile.write(names)
         self.csvfile.flush()
             
@@ -123,7 +124,7 @@ class MyDb:
             else:
                 values += f"{value:.3f},"
             
-        values += f"'{timestamp}',{time_epoc},{self.section},{self.completed}"
+        values += f"{self.section},{self.completed},'{timestamp}',{time_epoc}"
             
         if self.mode == 'csv':
             self.csvfile.write(f"{values}\n")
@@ -131,7 +132,8 @@ class MyDb:
             sql = "insert into tracking_data"\
                 + "(case_name, frame_no, key_id,"\
                 + " key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle,"\
-                + " eyes_span, shds_span, hips_span, inserted_at, time_epoch, section, completed)"\
+                + " eyes_span, shds_span, hips_span, hw_ratio, hw_angle,"\
+                + " inserted_at, time_epoch, section, completed)"\
                 + f" values({values})"
             self.cur.execute(sql)
 #

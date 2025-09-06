@@ -514,9 +514,11 @@ def tracking_result( myResult):
     box_conf = boxes.conf[box_id].item()                # 解析対象の信頼度
 
     keyPoints = myResult                                # キーポイントのデータ解析インスタンス
-    eyes_span, x = keyPoints.norm('right_eye', 'left_eye')              # 右目と左目のベクトルの長さと角度を計算       
-    shds_span, x = keyPoints.norm('right_shoulder', 'left_shoulder')    # 右肩と左肩のベクトルの長さと角度を計算       
-    hips_span, x = keyPoints.norm('right_hip', 'left_hip')              # 右腰と左腰のベクトルの長さと角度を計算       
+    eyes_span, _ = keyPoints.norm('right_eye', 'left_eye')              # 右目と左目のベクトルの長さと角度を計算       
+    shds_span, _ = keyPoints.norm('right_shoulder', 'left_shoulder')    # 右肩と左肩のベクトルの長さと角度を計算       
+    hips_span, _ = keyPoints.norm('right_hip', 'left_hip')              # 右腰と左腰のベクトルの長さと角度を計算       
+    hw_norm, hw_angle = keyPoints.norm('right_hip','right_wrist')       # 右手首と右腰のベクトルの長さと角度を計算
+    hw_ratio = hw_norm/box_w       
     
     for name, idx in Kn2idx.items():
         key_id = idx
@@ -529,7 +531,8 @@ def tracking_result( myResult):
         norm, angle = arrow[idx]                        # 移動ベクトルの長さと角度
         ratio = norm/box_h                              # ボックスの高さに対する比率
                 
-        data_list = [key_id, key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle, eyes_span, shds_span, hips_span]
+        data_list = [key_id, key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle,\
+                     eyes_span, shds_span, hips_span, hw_ratio, hw_angle]
         
         Db.insert_tracking_data( data_list )  # データベースに挿入
     
@@ -581,7 +584,6 @@ def section_started(section_no, myResult):
         mylog.log(INFO, f">>>   lenS={int(lenS)}({thsd.ratio(lenS):.3f}), normS={(int(normS))}({thsd.ratio(normS):.3f})")
         mylog.log(INFO, f">>>   [ lenS < {int(thsd(PRM[0]))} and normS > {int(thsd(PRM[1]))} ]")
 
-#        if lenS < thsd(0.120) and  normS > thsd(0.14):
         if lenS < thsd(PRM[0]) and  normS > thsd(PRM[1]):
             # 右肩と左肩のベクトルの長さが80未満、右肩の移動ベクトルの長さが50以上の場合（射位へ移動）
             started = True
@@ -601,22 +603,23 @@ def section_started(section_no, myResult):
         mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f})")
         mylog.log(INFO, f">>>   [ lenY > {int(thsd(PRM[0]))} and normR > {int(thsd(PRM[1]))} ]")
 
+        if Step_counter == 0: Step_counter = 40 # 初期化（弦調べ）
         if lenY > thsd(PRM[0]) and normR > thsd(PRM[1]):
             # 右手首の移動ベクトルの長さが10以上の場合（取りかけ動作開始）
             Step_counter += 1
-#            if Step_counter == 4: started = True
-            if Step_counter == PRM[2]: started = True
-        else: Step_counter = 0
+            if (Step_counter%10) == PRM[2]: started = True
+        else: Step_counter = 40
     
     # 3-Yu-gamae  ->  4-Uti-okosshi        
     elif section_no == 3:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
 
+        if Step_counter == 0: Step_counter = 11 # 初期化（物見が定まる）
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
             # 右手首と左手首の移動ベクトルの長さが10以上の場合（打起し動作開始）
             Step_counter += 1
-            if Step_counter == PRM[2]:   started = True
+            if (Step_counter%10) == PRM[2]:   started = True
     
     # 4-Uti-okosshi  ->  5-Hiki-wake        
     elif section_no == 4:  
@@ -781,6 +784,8 @@ def section_completed(section_no, myResult):
     
     # 2-Dou-zukuri            
     elif section_no == 2:  
+        if Step_counter == 0: Step_counter = 1  # 初期化（矢番え動作開始）
+        
         if Step_counter == 10:
             mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[4]))} ]")
             
@@ -801,13 +806,12 @@ def section_completed(section_no, myResult):
                         # 右手首と左手首の移動ベクトルの長さが10未満の場合（矢つがえ動作完了）
                         Step_counter += 1
                         if (Step_counter%10) == PRM[3]: Step_counter = 10        #２回保持
-                        #if (Step_counter%10) == 1: Step_counter = 10        #１回保持
                     elif Step_counter >= 20:
                         # 右手首と左手首の移動ベクトルの長さが10未満の場合（胴作り完了）
                         Step_counter += 1
                         if (Step_counter%10) == PRM[5]: completed = True         #５回保持
             else:
-                Step_counter = int(Step_counter/10)*10  # 連続回数をリセット
+                Step_counter = int(Step_counter/10)*10 + 1 # 連続回数をリセット
                         
     # 3-Yu-gamae            
     elif section_no == 3:  
@@ -929,7 +933,8 @@ def section_completed(section_no, myResult):
         normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
         mylog.log(INFO, f">>>   angER= {angER:.1f}°, normSR={int(normS)}({thsd.ratio(normS):.3f})")
         mylog.log(INFO, f">>>   [ angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f} ]")
-
+        
+        if Step_counter == 0: Step_counter = 1
         if ( angER > PRM[0] and angER < PRM[1] ):
             # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
             mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[2]))} ]")
@@ -1033,14 +1038,12 @@ def edit_section_name(no, counter):
     # セクション名を編集する
     name = Section_names[no]    
     if counter > 0:                     # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
-        if no == 5 and counter == 10:
-            name += f"（{Step_names[1]}）"      # 大三
-        elif no == 5 and counter == 11:
-            name += f"（{Step_names[2]}）"      # 押し
-        elif no == 5 and counter == 12:
-            name += f"（{Step_names[3]}）"      # 引き
-        else: name += f"（{counter}）" 
-    
+        stepKey = no*100 + counter
+        #print(f"stepKey={stepKey}")
+        if stepKey in Step_names:
+            name += f"（{Step_names[stepKey]}）"      # 大三
+        #else :
+        #    name += f"（{counter}）"                   # その他   
     # セクションの色を設定    
     if Step_error or Section_color == RED: 
         if Section_no > Alart_section + 1:
@@ -1102,9 +1105,9 @@ def plot(myResult, annotated_frame=None):
                                 Split_sec = 0
                                 Split_start = 0
                             else:                                           # 乙矢の矢つがえ動作開始
-                                # セクション番号を2にリセット、動作カウンターを20に設定
+                                # セクション番号を2にリセット、動作カウンターを30に設定
                                 Section_no = 2
-                                Step_counter = 20
+                                Step_counter = 30
                                 mylog.log(INFO, f"[plot]:Next {Section_names[Section_no]} Sction_no={Section_no}, Step_counter={Step_counter}") 
                         #
                     else:

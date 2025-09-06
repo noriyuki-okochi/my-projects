@@ -11,7 +11,10 @@ PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/'
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
-Step_names = [' ', '大三', '押し', '引き']  # ステップ名
+Step_names = { 201: '矢番え', 221: '取矢', 231: '矢番え', 240: '弦調べ・箆調べ',\
+               310: '取掛け・手の内', 311: '物見',\
+               510: '大三', 511: '押し', 512: '引き',\
+               901: '弓倒し', 922: '退場'}          # ステップ名
   
 # キーポイントのインデックスを定義
 Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4, 
@@ -20,7 +23,7 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
         'left_knee':13, 'right_knee':14, 'left_ankle':15, 'right_ankle':16}  # キーポイント名
 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
-Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle'] 
+Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle', 'hw_angle', 'hw_ratio'] 
 
 # 動作解析起点データのサンプリング間隔（フレーム数）
 Sample_frames:int = 1
