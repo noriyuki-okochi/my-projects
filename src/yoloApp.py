@@ -772,7 +772,7 @@ def section_completed(section_no, myResult):
             normHR, _ = arrow[Kn2idx['right_hip']]                  # 左腰の移動ベクトルの長さと角度
             normHL, _ = arrow[Kn2idx['left_hip']]                   # 左腰の移動ベクトルの長さと角度
             mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), normN={int(normN)}({thsd.ratio(normN):.3f}), "\
-                            + f" normHR={int(normHR)}({thsd.ratio(normHR):.3f}), normHR={int(normHL)}({thsd.ratio(normHL):.3f})") 
+                            + f" normHR={int(normHR)}({thsd.ratio(normHR):.3f}), normHL={int(normHL)}({thsd.ratio(normHL):.3f})") 
 
             mylog.log(INFO, f">>>   [ (normR <= {int(thsd(PRM[2]))} and normL <= {int(thsd(PRM[3]))}) and"\
                         + f" (normHR <= {int(thsd(PRM[4]))}) and (normHL <= {int(thsd(PRM[5]))}) and (normN <= {int(thsd(PRM[6]))}) ]")
@@ -900,6 +900,7 @@ def section_completed(section_no, myResult):
                       + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normEL)}({thsd.ratio(normEL):.3f}) ")
         mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
 
+        if Step_counter == 0: Step_counter = 1  # 初期化（口割）
         if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
             # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
             Step_counter = Step_counter + 1
