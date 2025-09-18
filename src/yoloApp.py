@@ -641,16 +641,23 @@ def section_started(section_no, myResult):
                         + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
 
-        if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
-            # 右手首の移動ベクトルの長さが10以上の場合（引分けの完了）
-            Step_counter = Step_counter + 1
-            if Step_counter == PRM[4]: started = True    #  停止状態の５回保持で完了
-        else:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
-            if normR > thsd(PRM[5]):
-                # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
+        if Step_counter > 90 :  # 離れアラート設定（仮）
+            _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
+            mylog.log(INFO, f">>>   angER={angER:.1f}°")
+            if angER > 145 or angER < -145: 
                 Alart_id = Alart_KaiNasi
                 Step_error = True
+            else: Step_counter = Step_counter%10
+        else:    
+            if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
+                # 右手首の移動ベクトルの長さが10以上の場合（引分けの完了）
+                Step_counter = Step_counter + 1
+                if Step_counter == PRM[4]: started = True    #  停止状態の５回保持で完了
+            else:
+                mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
+                if normR > thsd(PRM[5]):
+                    # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
+                    Step_counter += 90              # 離れアラート設定（仮）
     
     # 6-Kai  ->  7-Hanare        
     elif section_no == 6:  
@@ -894,16 +901,23 @@ def section_completed(section_no, myResult):
                           + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normEL):.3f})")
             mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[3]))} and normL < {int(thsd(PRM[4]))}) and (normER < {int(thsd(PRM[5]))} and normEL < {int(thsd(PRM[6]))}) ]")
 
-            if (normR < thsd(PRM[3]) and normL < thsd(PRM[4])) and (normER < thsd(PRM[5]) and normEL < thsd(PRM[6])) :
-                # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
-                Step_counter = Step_counter + 1
-                if (Step_counter%10) == PRM[7]:  completed = True
-            else:
-                # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
-                mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[8]} and (normR > {int(thsd(PRM[9]))}) ]")
-                if (Step_counter%10) > PRM[8] and normR > thsd(PRM[9]):
+            if Step_counter > 90 :  # 離れアラート設定（仮）
+                _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
+                mylog.log(INFO, f">>>   angER={angER:.1f}°")
+                if angER > 145 or angER < -145: 
                     Alart_id = Alart_KaiNasi
                     Step_error = True
+                else: Step_counter = 20 + Step_counter%10
+            else:    
+                if (normR < thsd(PRM[3]) and normL < thsd(PRM[4])) and (normER < thsd(PRM[5]) and normEL < thsd(PRM[6])) :
+                    # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
+                    Step_counter = Step_counter + 1
+                    if (Step_counter%10) == PRM[7]:  completed = True
+                else:
+                    # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
+                    mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[8]} and (normR > {int(thsd(PRM[9]))}) ]")
+                    if (Step_counter%10) > PRM[8] and normR > thsd(PRM[9]):
+                        Step_counter = 90 + Step_counter%10         # 離れアラート設定（仮）
     # 6-Kai            
     elif section_no == 6:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
@@ -925,6 +939,10 @@ def section_completed(section_no, myResult):
     
     # 7-Hanare        
     elif section_no == 7:  
+        _, angER = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
+        _, angSL = keyPoints.norm('left_elbow', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
+        mylog.log(INFO, f">>>   angR-ELWR={angER:.1f}°, angL-SHWR={angSL:.1f}°")
+        
         Step_counter = Step_counter + 1
         if Step_counter > PRM[0]: completed = True
     
@@ -1129,7 +1147,8 @@ def plot(myResult, annotated_frame=None):
                             Alart_section = Section_no
                             mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
                             if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
-                                Section_no = Section_no + 1                     # セクション番号をインクリメント
+                                Section_no += 1                             # セクション番号をインクリメント
+                            if Alart_id == Alart_KaiNasi: Section_no += 1   # 会なしで離れた場合
                             Step_counter = 0
                             Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
                     #
