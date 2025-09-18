@@ -13,7 +13,8 @@ import numpy as np
 import math
 
 # local package
-from  env import * 
+from  kyudo.env import * 
+from  kyudo.param import * 
 from mysqlite3.mysqlite3 import MyDb
 
 # Ultralytics YOLOv8とアプリ専用のロガー設定
@@ -31,8 +32,8 @@ filehandler = logging.FileHandler('yoloApp.log', mode='w')  # ログファイル
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
 mylog.addHandler(filehandler)  # ログハンドラを追加
-
 #　アプリケーションのグローバル変数の定義
+Debug_opt:int = 0           # デバッグレベル
 Frame_counter:int = 0       # フレームカウンター
 Fps:float = 30              # フレームレート
 Section_no:int = 0          # セクション番号
@@ -92,11 +93,11 @@ def help():
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
     print(" -s(tep):step-no default=1")
-    print(" -I(nitial entry to act_table)")
+    print(" -I(nitial entry to act_table from Actin_param)")
     print(" -h(elp)")
     print(" -g(uidance)<color>::[Y|G|B|W]: yellow, green(default), black, white")
     print(" -v(erborse)")
-    print(" -d(ebug-level)<0-2>")
+    print(" -d(ebug-level)<0-3>: 0:none, 1:info, 2:debug, 3:more-debug")
     print(" --(auto-pouse imidiately after start)")
     print(" --- Key Operation ---")
     print(" s :スナップショットファイルの作成")
@@ -135,11 +136,11 @@ def print_param(tbl):
     for sect, raw_vals in enumerate(tbl['param']):
         mylog.log(INFO, f"({sect:2d}): {raw_vals}") 
 #
-def get_action_param(action_param_tbls, param_nm):
+def get_action_param(action_param_tbls, param_nm, step_no):
     for tbl in action_param_tbls:
-        if param_nm == tbl['frame']:
+        if param_nm == tbl['frame'] and step_no == tbl['step']:
             return tbl['param'], tbl
-    return None
+    return None, None
 #
 # ベクトルの長さ、角度を計算する関数
 #    vectの座標 [x, y]ndarray
@@ -781,7 +782,16 @@ def section_completed(section_no, myResult):
                 # 右手首と左手首、右腰骨と左腰骨の移動ベクトルの長さが10未満、鼻の移動ベクトルの長さが10未満、
                 Step_counter += 1
                 if (Step_counter%10) == PRM[7]: completed = True
-    
+                
+        if not completed and CameraPos == 'Front-side':
+            xy_hipL = keyPoints.xy('left_hip')                         # 右腰の座標
+            mylog.log(INFO, f">>>   x_wristR={int(xy_wristR[0])}, x_hipL={int(xy_hipL[0])}")
+            mylog.log(INFO, f">>>   int(x_wristR) > int(x_hipL")
+            if int(xy_wristR[0]) > int(xy_hipL[0]):
+                # 右手首が左腰の前にある（足踏み完了なしで矢番え動作（胴作り）へ）
+                Alart_id = Alart_Asibumi
+                Step_error = True
+            
     # 2-Dou-zukuri            
     elif section_no == 2:  
         if Step_counter == 0: Step_counter = 1  # 初期化（矢番え動作開始）
@@ -1042,9 +1052,10 @@ def edit_section_name(no, counter):
         stepKey = no*100 + counter
         #print(f"stepKey={stepKey}")
         if stepKey in Step_names:
-            name += f"（{Step_names[stepKey]}）"      # 大三
-        #else :
-        #    name += f"（{counter}）"                   # その他   
+            name += f"（{Step_names[stepKey]}）"            # 大三
+        else :
+            if Debug_opt > 1 : name += f"（{counter}）"     # その他
+            else : pass   
     # セクションの色を設定    
     if Step_error or Section_color == RED: 
         if Section_no > Alart_section + 1:
@@ -1138,6 +1149,7 @@ def plot(myResult, annotated_frame=None):
                             # セクション内の動作が不正な場合
                             Alart_section = Section_no
                             mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
+                            if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
                             if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
                             if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
                             if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
@@ -1206,10 +1218,11 @@ def edit_key_ope(out_file, raw_video, clip_video):
 # モザイク処理
 #
 def mosaic_area( src, y, x, height, width, ratio=0.1):
-    #print(f"[mosice_area]:({y}, {x}), height={height}, width={width}")
+    #print(f"[mosice_area]:({y}, {x}), height={height}, width={width}, shape={src.shape}")
     if y <= 0 or (y + height) >= src.shape[0]: return src
     x = 0 if x < 0 else x
-    x = src.shape[1] if (x + width) >= src.shape[1] else x
+    x = src.shape[1] - width if (x + width) >= src.shape[1] else x
+    #print(f"[mosice_area]:({y}, {x})")
     
     dst_area = src[y:y + height, x:x + width]
     small = cv2.resize(dst_area, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
@@ -1587,7 +1600,7 @@ def main():
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
     global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled
-    global Window_size, Sample_frames, Sample_lag, V8_model
+    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt
     global StartAction_param, CompleteAction_param
     global Rect_area
 
@@ -1656,6 +1669,13 @@ def main():
         help()
         return
     
+    # 段レベル(step)を取得
+    step_no = 1
+    opt_val  = [opt for opt in opts if opt.startswith('-s')]
+    if len(opt_val) > 0:
+        if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
+            step_no = int(opt_val[0][2:])
+
     if '-I' in opts:            # 動作開始解析パラメータの初期登録
         param_nms = []
         i = args.index('-I')
@@ -1664,10 +1684,13 @@ def main():
         else:
             param_nms = list(InitAction_param_nms)
         for nm in param_nms:
-            _,tbl = get_action_param(CompleteAction_params, nm)
+            _,tbl = get_action_param(CompleteAction_params, nm, step_no)
+            if tbl is None:
+                print(f"パラメータ名:{nm},ステップ:{step_no} は不正です")
+                continue
             Db.insert_act_param(tbl)
             print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
-            _,tbl = get_action_param(StartAction_params, nm)
+            _,tbl = get_action_param(StartAction_params, nm, step_no)
             Db.insert_act_param(tbl)
             print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
         return
@@ -1723,13 +1746,6 @@ def main():
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
         V8_model = 'v8n' # YOLOv8nモデルを使用 
-
-    # 段レベル(step)を取得
-    step_no = 1
-    opt_val  = [opt for opt in opts if opt.startswith('-s')]
-    if len(opt_val) > 0:
-        if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
-            step_no = int(opt_val[0][2:])
 
     # サンプリングフレーム数を取得
     opt_val  = [opt for opt in opts if opt.startswith('-f')]
@@ -1833,13 +1849,12 @@ def main():
         logger.disabled = False  # ログ出力を有効化
     
     # ログファイル出力のログレベルを設定
-    debug_opt = 0
     dbg_opt = [opt for opt in opts if opt.startswith('-d')]
-    if len(dbg_opt) > 0 and dbg_opt[0][2:].isnumeric(): debug_opt = int(dbg_opt[0][2:])
+    if len(dbg_opt) > 0 and dbg_opt[0][2:].isnumeric(): Debug_opt = int(dbg_opt[0][2:])
     
     mylog_level = ERROR  # デフォルトはERROR
-    if debug_opt != 0: 
-        mylog_level = INFO if debug_opt == 1 else DEBUG 
+    if Debug_opt != 0: 
+        mylog_level = INFO if Debug_opt < 3 else DEBUG 
     mylog.setLevel(mylog_level)  
     
     # 映像ソースの選択   
@@ -2106,6 +2121,11 @@ def main():
                     annotated_frame = plot( myResult )
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
+        #
+        if keyCtl['grid']:
+            # グリッドを表示        
+            draw_grid(annotated_frame, keyCtl['grid_shape'], keyCtl['grid_shift'], GRAY, 1)
+        #
         if keyCtl['videoWrite']:
             # 出力ファイルに書き込み
             cv2Video.write(annotated_frame)
@@ -2125,10 +2145,6 @@ def main():
             str = edit_key_ope(out_file, raw_video, clip_video)
             pos = (x + w + 100, y)
             cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, guid_color, 2)            
-        #
-        if keyCtl['grid']:
-            # グリッドを表示        
-            draw_grid(annotated_frame, keyCtl['grid_shape'], keyCtl['grid_shift'], GRAY, 1)
         #       
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         

@@ -36,6 +36,7 @@ Param_max = 10    # パラメータの最大個数
 #
 # アラートID、メッセージの定義
 #
+Alart_Asibumi= 1     # 「正対不完全」のアラートID
 Alart_Monomi = 3     # 「物見を定まらず」のアラートID
 Alart_KaiNasi = 5    # 「会なし離れ」のアラートID
 Alart_KaiFusoku = 6  # 「会不十分な離れ」のアラートID
@@ -43,6 +44,8 @@ Alart_Hanare = 7     # 「離れタイミングずれ」のアラートID
 #
 Alart_msg = {
    0:'',
+   1:'Warning:Detected illegal action in section-1.(SEITAI fukanzen)',
+   10:'<警告>：「正対不完全」を検知しました。',
    3:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
    30:'<警告>：「物見定まらず」を検知しました。',
    5:'Warning:Detected illegal action in section-5.(KAI nasi)',
