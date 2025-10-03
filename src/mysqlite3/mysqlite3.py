@@ -7,7 +7,7 @@ import pandas
 import time
 from datetime import datetime
 # local modules
-from  env import * 
+from  kyudo.env import * 
 #
 # Private API Class for sqlite3from env import *
 #
@@ -20,21 +20,39 @@ class MyDb:
         self.mode = ''
         self.case_name = 'none'
         self.frame_no = 0
+        self._section = 0
+        self._completed = 0
         self.section = 0
         self.completed = 0
-        self.csvpath = ''
-        self.csvfile = None
+        self.csvpath1 = ''        # trcking_data用CSV出力ファイルパス
+        self.csvfile1 = None
+        self.csvpath2 = ''        # kyudo_data用CSV出力ファイルパス
+        self.csvfile2 = None
         
     def open_csv(self):
         # CSV出力ファイルの作成
         timestamp = datetime.now().strftime('%Y%m%d')
-        self.csvpath = self.dbpath[:self.dbpath.rfind('/')+1] + f"tracking{timestamp}_{self.case_name}.csv"
-        self.csvfile = open( self.csvpath, 'w')
+        self.csvpath1 = self.dbpath[:self.dbpath.rfind('/')+1] + f"track{timestamp}_{self.case_name}.csv"
+        self.csvfile1 = open( self.csvpath1, 'w')
         # カラム名を出力
-        names ="case_name,frame_no,key_id,key_name,box_id,box_w,box_h,box_conf,x,y,xy_conf,norm,ratio,angle,eyes_span,shds_span,hips_span,"\
-            + "inserted_at,time_epoch,section,completed\n"
-        self.csvfile.write(names)
-        self.csvfile.flush()
+        names ="case_name,frame_no,key_id,key_name,"\
+            +  "box_id,box_w,box_h,"\
+            +  "x,y,xy_conf,norm,ratio,angle,"\
+            +  "inserted_at,time_epoch\n"
+        self.csvfile1.write(names)
+        self.csvfile1.flush()
+
+        self.csvpath2 = self.dbpath[:self.dbpath.rfind('/')+1] + f"kyudo{timestamp}_{self.case_name}.csv"
+        self.csvfile2 = open( self.csvpath2, 'w')
+        # カラム名を出力
+        names ="case_name,frame_no,"\
+            +  "box_id,box_conf,box_w,box_h,"\
+            +  "rw_norm,lw_norm,"\
+            +  "rl_norm,rl_angle,hr_norm,hr_angle,"\
+            +  "er_angle,sl_angle,eyes_norm,hips_norm,"\
+            +  "section,completed,label,inserted_at,time_epoch\n"
+        self.csvfile2.write(names)
+        self.csvfile2.flush()
             
 
     def rollback(self):
@@ -100,7 +118,7 @@ class MyDb:
             ret = True
         return ret
  
-# insert samplling rates logs.
+# insert tracking-data.(db or csv)
 #
     def insert_tracking_data(self, data_list):
         
@@ -109,29 +127,29 @@ class MyDb:
         time_epoc = int(time.mktime(d.timetuple()))
         
         if self.mode == '':
-            values = f"'{self.case_name}',{self.frame_no},"
+            values = f"'{self.case_name}',{self.frame_no},"     # case_name, frame_no
         else:
             values = f"{self.case_name},{self.frame_no},"
             
         
         for i, value in enumerate(data_list):
-            if i == 0 or i == 2:                            # key_id or box_id
+            if i == 0 or i == 2:                                # key_id or box_id
                 values += f"{value},"
-            elif i == 1:                                    # key_name
+            elif i == 1:                                        # key_name
                 if self.mode == '':  values += f"'{value}'," 
                 else:  values += f"{value},"
             else:
                 values += f"{value:.3f},"
             
-        values += f"'{timestamp}',{time_epoc},{self.section},{self.completed}"
+        values += f"'{timestamp}',{time_epoc}"
             
         if self.mode == 'csv':
-            self.csvfile.write(f"{values}\n")
+            self.csvfile1.write(f"{values}\n")
         else:
             sql = "insert into tracking_data"\
                 + "(case_name, frame_no, key_id,"\
-                + " key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle,"\
-                + " eyes_span, shds_span, hips_span, inserted_at, time_epoch, section, completed)"\
+                + " key_name, box_id, box_w, box_h, x, y, xy_conf, norm, ratio, angle,"\
+                + " inserted_at, time_epoch)"\
                 + f" values({values})"
             self.cur.execute(sql)
 #
@@ -145,7 +163,7 @@ class MyDb:
 #
 #
     def update_tracking_section(self):
-        sql = "update tracking_data set "\
+        sql = "update kyudo_data set "\
             + f"section={self.section},"\
             + f"completed={self.completed}"\
             + f" where case_name='{self.case_name}' and frame_no={self.frame_no}"
@@ -154,7 +172,7 @@ class MyDb:
 #
 #
     def update_tracking_tag(self, tag_name, tag_value):
-        sql = "update tracking_data set "\
+        sql = "update kyudo_data set "\
             + f"{tag_name}={tag_value}"\
             + f" where case_name='{self.case_name}' and frame_no={self.frame_no}"
         #print(f"update_tracking_tag: {sql}")
@@ -162,13 +180,66 @@ class MyDb:
         self.conn.commit()
 #
     def clear_tracking_tag(self, tag_name):
-        sql = "update tracking_data set "\
+        sql = "update kyudo_data set "\
             + f"{tag_name}=NULL"\
             + f" where case_name='{self.case_name}' and {tag_name} IS NOT NULL"
         #print(f"update_tracking_tag: {sql}")
         self.cur.execute(sql)
         self.conn.commit()                   
 #
+# delete kyudo_data table
+    def delete_kyudo_data(self):
+        sql = f"delete from kyudo_data where case_name = '{self.case_name}'"
+        try:
+            self.cur.execute(sql)
+        except:
+            print("[delete_kyudo_data]:no records.")
+#
+# insert kyudo-data.( csv only)
+#
+    def insert_kyudo_data(self, data_list):
+        
+        d = datetime.now()
+        timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
+        time_epoc = int(time.mktime(d.timetuple()))
+        
+        values = f"{self.case_name},{self.frame_no},"                   # case_name, frame_no
+                   
+        for i, value in enumerate(data_list): 
+            if i == 0:                                                  # box_id
+                values += f"{value},"
+            else:
+                values += f"{value:.6f},"
+        
+        label = 0
+        if self.section != self._section:
+            label = 2
+            self._section = self.section
+            self._completed = 0
+        elif self.completed != self._completed:
+            label = 1
+            self._completed = self.completed
+          
+        values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"
+            
+        self.csvfile2.write(f"{values}\n")
+#
+# convert tracking_data to kyudo_data
+# （未使用：旧スキーマ）
+    def conv_tracking2kyudo(self):
+        sql = f"insert into kyudo_data( case_name, frame_no, HW_ratio, HW_angle, RW_ratio, RW_angle, LW_ratio, LW_angle, Eyes_span, Hips_span, label, tag1, tag2, inserted_at, time_epoch)"\
+            + f" select R.case_name, R.frame_no, R.hw_ratio, R.hw_angle, R.ratio, R.angle, L.ratio, L.angle, R.eyes_span, R.hips_span, (R.section*2-1+R.completed), R.tag1, R.tag2, R.inserted_at,R.time_epoch"\
+            + f" from "\
+            + f" (select * from tracking_data where case_name = '{self.case_name}' and key_name ='right_wrist') as R"\
+            + f" left join "\
+            + f" (select * from tracking_data where case_name = '{self.case_name}' and key_name ='left_wrist') as L"\
+            + f" on R.frame_no = L.frame_no order by R.frame_no asc"
+        try:
+            self.cur.execute(sql)
+            self.conn.commit()
+        except Exception as e:
+            print(f"[conv_tracking2kyudo]:error:{e}")
+        
 # select FPS from balance-table
 #
     def get_fps(self, case_name=None):
@@ -215,7 +286,21 @@ class MyDb:
         
         sql = f"select * from tracking_data where key_id={key_id} and case_name='{self.case_name}'"
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
+#
+#   read kyudo_data(return pandas-DataFrame)
+#       
+    def pandas_read_kyudo(self, cols=None):
         
+        if cols is None: 
+            sql = "select *"
+        else: 
+            sql = 'select frame_no,' +  ','.join(cols)
+                                
+        sql += f" from kyudo_data where case_name='{self.case_name}'"
+        return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
+#
+#   read frame_info(return pandas-DataFrame)
+#       
     def pandas_read_frame(self, name=None):
         
         sql = 'select * from frame_info'

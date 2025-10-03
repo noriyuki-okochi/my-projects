@@ -12,7 +12,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # local package
-from  env import * 
+from  kyudo.env import * 
+from  kyudo.param import * 
 from mysqlite3.mysqlite3 import MyDb
 
 #print(http.__file__)
@@ -127,6 +128,20 @@ if '-import' in cmds:
     # インポート実行回数更新
     count += 1
     db.update_frame_info('import', count)
+    
+    # 姿勢解析データをkyudo_dataテーブルへ変換登録
+    csvfile = csvfile.replace('track','kyudo')
+    if csvfile == '' or os.path.isfile(csvfile) == False:
+        # ファイルが存在しないとき終了
+        print(f"[chart]error: csv-file({csvfile}) not found.")
+        exit(0)    
+    # CSVファイルを読み込む
+    df = pd.read_csv(csvfile)
+    print(f"[chart]:read_csv:{df.shape}")
+    
+    db.delete_kyudo_data()         # 登録済データの削除
+    df.to_sql('kyudo_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
+    print(f"[chart]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
 #
 if count == 0:
     print(f"[chart]error:No tracking data. you must import csv-file.")
@@ -303,21 +318,22 @@ for icount, key in enumerate(selkeys, start=1):
         #
         db.case_name = case_name
         df = db.pandas_read_tracking( Kn2idx[key] )
-        print(f"[chart]info:{df.shape}")
+        dfk = db.pandas_read_kyudo()
+        print(f"[chart]info: df.shape={df.shape}, dfk.shape={dfk.shape}")
+        
         start_frame_no = df.index[0]
         last_frame_no = df.index[-1]
         frame_length = last_frame_no - start_frame_no + 1
-        print(f"[chart]info:frame_no = [{start_frame_no} -> {last_frame_no}]")
+        print(f"[chart]info: df.index = [{start_frame_no} -> {last_frame_no}]")
         #
         # データの作成、編集
         #
         if span_visible:
-            df['eyes_ratio'] = df["eyes_span"]/df["box_h"]                       # バウンダリーボックスの高さに対する比率に変換
-            df['eyes_ratio'] = df['eyes_ratio'].where(df['eyes_ratio'] < 0.5)   #  0.5以上は欠測地(NaN)に置換する
-            df['eyes_ratio'].ffill()                                            # 欠測値を直前の値に置換する
+            dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_h"]                       # バウンダリーボックスの高さに対する比率に変換
+            dfk['eyes_ratio'] = dfk['eyes_ratio'].where(dfk['eyes_ratio'] < 0.5)    # 0.5以上は欠測地(NaN)に置換する
+            dfk['eyes_ratio'].ffill()                                               # 欠測値を直前の値に置換する
             
-            df['shds_ratio'] = df["shds_span"]/df["box_h"]
-            df['hips_ratio'] = df["hips_span"]/df["box_h"]
+            dfk['hips_ratio'] = dfk["hips_norm"]/dfk["box_h"]
 
         if sma_visible:        
             # 単純移動平均
@@ -341,10 +357,12 @@ for icount, key in enumerate(selkeys, start=1):
                 
         #
         mdf = df.tail(mlast[icase])
+        mdfk = dfk.tail(mlast[icase])
         if mlast[icase] > last:
             mdf = mdf.head(last)
-        print(f"[chart]info:{mdf.shape}")
-        print(f"[chart]info:frame_no = [{mdf.index[0]} -> {mdf.index[-1]}]")
+            mdfk = mdfk.head(last)
+        print(f"[chart]info: mdf.shape={mdf.shape}")
+        print(f"[chart]info: mdf.index=[{mdf.index[0]} -> {mdf.index[-1]}]")
         #
         # データのプロット
         # < ratio >
@@ -383,25 +401,17 @@ for icount, key in enumerate(selkeys, start=1):
             
         if span_visible:
             # < eyes_span >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="eyes-span",
-                                        y=mdf["eyes_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            # < shds_span >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
-                                        name="shoulders-span",
-                                        y=mdf["shds_ratio"], 
+                                        y=mdfk["eyes_ratio"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
             # < hips_span >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="hips-span",
-                                        y=mdf["hips_ratio"], 
+                                        y=mdfk["hips_ratio"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
@@ -428,27 +438,27 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1   
                         )
             # < section >
-            fig = fig.add_trace( go.Bar(x=mdf.index, 
+            fig = fig.add_trace( go.Bar(x=mdfk.index, 
                                     name="section",
-                                    y=mdf["section"],
+                                    y=mdfk["section"],
                                     marker_color='grey'),
                             row = 2, 
                             col = 1,
                             secondary_y=True
                         )
             # < completed >
-            fig = fig.add_trace( go.Bar(x=mdf.index, 
+            fig = fig.add_trace( go.Bar(x=mdfk.index, 
                                     name="completed",
-                                    y=mdf["completed"],
+                                    y=mdfk["completed"],
                                     marker_color='black'),
                             row = 2, 
                             col = 1,
                             secondary_y=True
                         )
             # < tag1(completed) >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                     name="tag1",
-                                    y=mdf["tag1"],
+                                    y=mdfk["tag1"],
                                     marker_color= 'cyan',
                                     mode="markers"),
                             row = 2, 
@@ -456,9 +466,9 @@ for icount, key in enumerate(selkeys, start=1):
                             secondary_y=True
                         )
             # < tag2(started) >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                     name="tag2",
-                                    y=mdf["tag2"],
+                                    y=mdfk["tag2"],
                                     marker_color= 'blue',
                                     mode="markers"),
                             row = 2, 
