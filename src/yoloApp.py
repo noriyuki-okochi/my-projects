@@ -32,6 +32,7 @@ filehandler = logging.FileHandler('yoloApp.log', mode='w')  # ログファイル
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
 mylog.addHandler(filehandler)  # ログハンドラを追加
+
 #　アプリケーションのグローバル変数の定義
 Debug_opt:int = 0           # デバッグレベル
 Frame_counter:int = 0       # フレームカウンター
@@ -49,6 +50,9 @@ Alart_section:int = 0       # アラート発生セクション番号
 Alart_id:int = 0            # アラート番号
 Alart_message:str = ''      # アラートメッセージ
 Section_color:list = YELLOW # セクションの色（黄色）BGR
+RL_angle:float = 0.0        # 右手首ー＞左手首の角度
+SL_angle:float = 0.0        # 左腕の角度
+ER_angle:float = 0.0        # 右肘ー＞右手首の角度
 
 # カメラの位置を定義
 Camera_position:int = 0     # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
@@ -514,13 +518,8 @@ def tracking_result( myResult):
     box_w = boxes.xywh[box_id][2].item()                # 解析対象のボックスの幅
     box_conf = boxes.conf[box_id].item()                # 解析対象の信頼度
 
-    keyPoints = myResult                                # キーポイントのデータ解析インスタンス
-    eyes_span, _ = keyPoints.norm('right_eye', 'left_eye')              # 右目と左目のベクトルの長さと角度を計算       
-    shds_span, _ = keyPoints.norm('right_shoulder', 'left_shoulder')    # 右肩と左肩のベクトルの長さと角度を計算       
-    hips_span, _ = keyPoints.norm('right_hip', 'left_hip')              # 右腰と左腰のベクトルの長さと角度を計算       
-    hw_norm, hw_angle = keyPoints.norm('right_hip','right_wrist')       # 右手首と右腰のベクトルの長さと角度を計算
-    hw_ratio = hw_norm/box_w       
-    
+    keyPoints = myResult                                # キーポイントのデータ解析インスタンス    
+    # トラッキングデータ
     for name, idx in Kn2idx.items():
         key_id = idx
         if idx > 12: continue
@@ -532,12 +531,29 @@ def tracking_result( myResult):
         norm, angle = arrow[idx]                        # 移動ベクトルの長さと角度
         ratio = norm/box_h                              # ボックスの高さに対する比率
                 
-        data_list = [key_id, key_name, box_id, box_w, box_h, box_conf, x, y, xy_conf, norm, ratio, angle,\
-                     eyes_span, shds_span, hips_span, hw_ratio, hw_angle]
+        data_list = [key_id, key_name, box_id, box_w, box_h, x, y, xy_conf, norm, ratio, angle]
         
-        Db.insert_tracking_data( data_list )  # データベースに挿入
+        Db.insert_tracking_data( data_list )  # データベースに挿入、またはCSVファイルに書き込み
     
-    if Db.mode == 'csv': Db.csvfile.flush()
+    # 姿勢解析データ
+    rw_norm, _ = arrow[Kn2idx['right_wrist']]                       # 右手首移動ベクトルの長さと角度
+    lw_norm, _ = arrow[Kn2idx['left_wrist']]                        # 左手首移動ベクトルの長さと角度
+    rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')  # 右手首と左手首のベクトルの長さと角度を計算
+    hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')   # 右腰と右手首のベクトルの長さと角度を計算
+    _, er_angle = keyPoints.norm('right_elbow','right_wrist')       # 右肘と右手首のベクトルの長さと角度を計算
+    _, sl_angle = keyPoints.norm('left_shoulder','left_wrist')      # 左肩と左手首のベクトルの長さと角度を計算
+    eyes_norm, _ = keyPoints.norm('right_eye','left_eye')           # 右目と左目のベクトルの長さと角度を計算
+    hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算
+    
+    data_list = [box_id, box_conf, box_w, box_h,\
+                 rw_norm, lw_norm, rl_norm, rl_angle, hr_norm, hr_angle,\
+                 er_angle, sl_angle, eyes_norm, hips_norm]
+    
+    Db.insert_kyudo_data( data_list )  # CSVファイルに書き込み
+    
+    if Db.mode == 'csv': 
+        Db.csvfile1.flush()
+        Db.csvfile2.flush()
     else:    Db.commit()
     
     return
@@ -559,6 +575,7 @@ def section_started(section_no, myResult):
     normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
     normS, _ = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
     xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
+    _, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
     
     started = False
     # 共通の開始条件を取得
@@ -573,7 +590,7 @@ def section_started(section_no, myResult):
 
     mylog.log(INFO, f"started ({section_no}):フレーム={Frame_counter}\n"\
             + f"    boxid={ibox}, H={int(thsd.block_height)}:  wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
-            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, conf={conf:.2f}, counter={Step_counter}")
+            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglRL={int(RL_angle)}°, conf={conf:.2f}, counter={Step_counter}")
     #
     # 次の節への移行条件を判定
     #
@@ -724,6 +741,7 @@ def section_started(section_no, myResult):
 #
 def section_completed(section_no, myResult):
     global Step_counter, Step_error, Alart_id
+    global RL_angle, SL_angle, ER_angle
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -743,7 +761,8 @@ def section_completed(section_no, myResult):
     xy_nose = keyPoints.xy('nose')                                  # 鼻の座標
 
     lenY, _ = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
-    
+    _, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
+        
     completed = False
     # 共通の開始条件を取得
     PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
@@ -757,7 +776,7 @@ def section_completed(section_no, myResult):
 
     mylog.log(INFO, f"completed({section_no}):フレーム={Frame_counter}\n"\
             + f"    boxid={ibox}, H={int(thsd.block_height)}, wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
-            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, conf={conf:.2f}, counter={Step_counter}")
+            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglRL={int(RL_angle)}°, conf={conf:.2f}, counter={Step_counter}")
     
     #
     # 節の動作完了（次節への移行体制）条件を判定
@@ -889,6 +908,7 @@ def section_completed(section_no, myResult):
             elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
                 mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
                 if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
+                    # 「押し」を優先的に判定する
                 else:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
                     if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
@@ -939,9 +959,9 @@ def section_completed(section_no, myResult):
     
     # 7-Hanare        
     elif section_no == 7:  
-        _, angER = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
-        _, angSL = keyPoints.norm('left_elbow', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
-        mylog.log(INFO, f">>>   angR-ELWR={angER:.1f}°, angL-SHWR={angSL:.1f}°")
+        _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
+        _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
+        mylog.log(INFO, f">>>   angR-ELWR={ER_angle:.1f}°, angL-SHWR={SL_angle:.1f}°")
         
         Step_counter = Step_counter + 1
         if Step_counter > PRM[0]: completed = True
@@ -1191,7 +1211,7 @@ def plot(myResult, annotated_frame=None):
         if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
         if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
    
-        # セクション名を変種
+        # セクション名を編集
         section_name, Section_color = edit_section_name(Section_no, Step_counter)   
         others_color =  WHITE                       # その他の色（白）
 
@@ -1207,7 +1227,11 @@ def plot(myResult, annotated_frame=None):
         annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
         cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-        #cv2.putText(annotated_frame, Alart_message, (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, RED, 2)
+        if Section_no == 4 or Section_no == 5 or Section_no == 6:
+            cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        if Section_no == 7 or Section_no == 8:
+            cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        # 警告メッセージの描画
         annotated_frame = draw_text(annotated_frame, Alart_message, (10, 110), RED)
     #
     return annotated_frame
@@ -1227,7 +1251,7 @@ def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, c
 #
 def edit_key_ope(out_file, raw_video, clip_video):
  
-        ope_str = '(q)uit:(p)ause:(>)skip:(<)rewind:(k)up-speed:(l)ow:(s)nap'
+        ope_str = '(q)uit:(p)ause:(<)back:(>)forward:(k)fast:(l)slow:(s)nap'
         if out_file != '':  ope_str += ':(w)rite-video'
         if Tracking_only:   ope_str += ':(t)racking'
         if Update_tracking: ope_str += ':(u)pdate-tracking'
@@ -1353,6 +1377,7 @@ def draw_rectangle(event, x, y, flags, param):
         if Rect_area.length() > 100: Rect_area.roi_set = True
 #
 # キー入力操作関数
+#
 def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start
     global Step_counter, Nop_counter, Step_error, Section_color, Alart_message
@@ -1374,13 +1399,21 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
     
     elif key == ord('k') or key == ord('K'):            
         # 'k'キーでウィンドウの更新間隔を短くする
-        step = 32 if key == ord('k') else 16         
+        if key == ord('K') and len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
+            # キー入力データの2文字目以降をステップミリ秒として設定
+            ctl['istep'] = int(ctl['key_data'][1:])
+            ctl['key_data'] = ''            # キー入力データをクリア
+        step = ctl['istep_init'] if key == ord('k') else ctl['istep']         
         ctl['iwait'] = ctl['iwait'] - step if ctl['iwait'] > step else ctl['iwait']
         print(f"動画の再生間隔を短くしました（早送り再生）: {ctl['iwait']}ミリ秒")
         
     elif key == ord('l') or key == ord('L'):
         # 'l'キーでウィンドウの更新間隔を長くする
-        step = 32 if key == ord('k') else 16         
+        if key == ord('L') and len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
+            # キー入力データの2文字目以降をステップミリ秒として設定
+            ctl['istep'] = int(ctl['key_data'][1:])
+            ctl['key_data'] = ''            # キー入力データをクリア
+        step = ctl['istep_init'] if key == ord('k') else ctl['istep']         
         ctl['iwait'] = ctl['iwait'] + step if ctl['iwait'] < (1000 - step) else ctl['iwait']  
         print(f"動画の再生間隔を長くしました（スロー再生）: {ctl['iwait']}ミリ秒")
         
@@ -1388,9 +1421,9 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # 't'キーで一開始／停止
         Tracking_enabled = True if Tracking_enabled is False else False  
         if Tracking_enabled: 
-            print(f"トラッキングを開始します: {Db.csvpath}")
+            print(f"トラッキングを開始します: {Db.csvpath1}")
             Db.update_frame_info('start_frame', Frame_counter)  # 開始フレーム番号
-            mylog.log(INFO, f">> Trucking start: {Db.csvpath}")
+            mylog.log(INFO, f">> Trucking start: {Db.csvpath1}")
         else: 
             print("トラッキングを停止します")
             Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
@@ -1607,6 +1640,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # グリッド表示をデフォルトにリセット
         ctl['grid_shape'] = (6, 6)              
         ctl['grid_shift'] = (0, 0)
+        # フレーム間インターバルをデフォルトにリセット
+        ctl['iwait'] = ctl['iwait_init']
         #
         print(f"{ctl}")
     #
@@ -1648,6 +1683,8 @@ def main():
     keyCtl = {
         'iwait': 1,                                 # ウィンドウの更新間隔（ミリ秒）
         'iwait_init': 1,                            # ウィンドウの更新間隔初期値（ミリ秒）
+        'istep': 16,                                # ステップカウント（ミリ秒）
+        'istep_init': 32,                           # ステップカウント初期値（ミリ秒）
         'key_inter': 0,                             # 連打キー入力の経過時間（秒）
         'key_wait': 3,                              # 連打キー入力の有効期間（秒）
         'key_data':'',                              # キー入力データ（文字列）
@@ -1937,12 +1974,12 @@ def main():
             cap[1] = None
 
     if Tracking_only:
-        # トラッキングデータの出力先CSVファイルを開く
+        # トラッキングデータ、姿勢解析データの出力先CSVファイルを開く
         Db.open_csv()
         # トラッキングデータの情報テーブルに登録 
-        Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath] )     
+        Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1] )     
     #---------------------------------------------------------------------  
-    # クリッピング領域
+    # クリッピング領域指定
     #---------------------------------------------------------------------  
     rectAreas = []
     if clip_video: 
@@ -2162,8 +2199,12 @@ def main():
             cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, model_color, 2)
             # キー操作ガイダンスを表示
             str = edit_key_ope(out_file, raw_video, clip_video)
-            pos = (x + w + 100, y)
+            pos = (x + w + 40, y)
             cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, guid_color, 2)            
+            # フレーム数
+            pos = (x, y - 20)
+            str = f"frame :{Frame_counter:4d}   interval : {keyCtl['iwait']}ms."
+            cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)            
         #       
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         
@@ -2187,7 +2228,8 @@ def main():
     #
     # リソースの解放
     if Tracking_only: 
-        Db.csvfile.close()
+        Db.csvfile1.close()
+        Db.csvfile2.close()
     Db.close() 
     cap[0].release()
     if multi_frames and cap[1] is not None: cap[1].release()
