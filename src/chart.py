@@ -23,6 +23,7 @@ from mysqlite3.mysqlite3 import MyDb
 #
 verbose:bool = False         # debug write
 m_flg:bool = False           # not display section/conf
+slider:bool = False          # display slider
 #
 # connect db
 db = MyDb(DB_PATH)
@@ -45,7 +46,7 @@ if '-h' in opts:        #debug write
     print("chart.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
          + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
-         + "        [-m(ulti)] [-b(ottom)] [-h(elp)] [-d(ebug)]")
+         + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
@@ -255,6 +256,9 @@ if '-b' in opts:        #凡例の表示位置
     legend_dict = dict(x=0.01,y=0.01,xanchor='left',yanchor='bottom',orientation='h')
 else:
     legend_dict = dict(x=0.01,y=0.99,xanchor='left',yanchor='top',orientation='h')
+#
+if '-s' in opts:        #display slider
+    slider = True   
 #
 if '-d' in opts:        #debug write
     verbose = True   
@@ -522,7 +526,8 @@ else:
                             secondary_y=True, showgrid=False,
                             row=1, col=1)
     if m_flg == True :
-        fig.update(layout_xaxis2_rangeslider_visible=True)
+        if slider:
+            fig.update(layout_xaxis2_rangeslider_visible=True)
         fig.update(layout_xaxis2_showticklabels = True)
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
