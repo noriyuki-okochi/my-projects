@@ -1,0 +1,162 @@
+import torch
+import torch.nn as nn
+from torch import optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+import matplotlib.pyplot as plt
+
+import logging
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+ERROR = logging.ERROR
+ulog = logging.getLogger(__name__)
+filehandler = logging.FileHandler('kyudoUtil.log', mode='a')  # ログファイルの設定
+#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
+formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
+filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
+ulog.addHandler(filehandler)  # ログハンドラを追加
+ulog.setLevel(DEBUG)  # ログレベルの設定
+
+# モデル保存用のファイル名
+MODEL_NAME = 'kyudo_model'
+
+# GPUチェック
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#
+# ログ出力関数
+# fmtmsg: フォーマット済みメッセージ
+# ログは標準出力とログファイルへ出力する
+def log_write(fmtmsg):
+    print(fmtmsg)
+    ulog.info(fmtmsg)
+#    
+# デバイスの取得
+# 戻り値: device
+def get_device():
+    print(f"[get_device]:device={device}")
+    return device
+#  
+# GRUモデルの学習を実行する関数
+# model: GRUモデル
+# np_x: 入力データ (input_frames, input_size)
+# np_yact: 正解データ (input_frames,)
+# s_frames: 1セットのフレーム数 
+def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth=None):
+  
+  input_frames, input_size = np_x.shape
+  log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")   
+  # 訓練データ
+  #
+  # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
+  #input_frames -= s_frames
+  x_zeros = np.zeros( (s_frames, input_size) )
+  y_zeros = np.zeros( (s_frames, 1) )
+  x = np.vstack( [x_zeros, np_x] )
+  y_act = np.vstack( [y_zeros, np_yact] )
+  log_write(f"[train_Kyudo]:x={x.shape}, y_act={y_act.shape}")   
+  #
+  x_data = np.zeros( (input_frames, s_frames, input_size) )
+  y_data = np.zeros( (input_frames, 1) )  
+  for i in range(input_frames):
+    x_data[i] = x[i:i + s_frames].reshape(-1, input_size)
+    y_data[i] = y_act[i + s_frames]
+  #
+  x_data = torch.tensor(x_data, dtype=torch.float32).to(device )
+  y_data = torch.tensor(y_data, dtype=torch.int64).to(device )
+  log_write(f"[train_Kyudo]:x_data={x_data.shape}")
+  log_write(f"[train_Kyudo]:y_data={y_data.shape}")
+  
+  dataset = TensorDataset(x_data, y_data)
+  loader = DataLoader(dataset, batch_size, shuffle=False)
+
+  # 損失関数と最適化手法の定義
+  criterion = nn.CrossEntropyLoss()
+  optimaizer = optim.Adam(model.parameters(), lr=0.001 )
+  record_loss_train = []  # list to record loss value
+  # 学習ループ
+  for i in range(n_epoch):
+    model.train()
+    loss_train = 0
+    for j, (x, t) in enumerate(loader):
+      # 勾配の初期化
+      optimaizer.zero_grad()
+      # 順伝搬、損失計算、逆伝搬、パラメータ更新
+      y = model(x)                        # y: (batch, output_size)
+      loss = criterion( y, t.squeeze() )  # t: (batch, 1) -> (batch,)
+      loss_train += loss.item()
+      # 
+      loss.backward()
+      optimaizer.step()
+    #  
+    # calculate average loss
+    #loss_train /= (j + 1)                 
+    record_loss_train.append(loss_train)  # record loss to list
+    
+    # 20エポックごとに学習過程を表示
+    if i%20 == 0:
+      #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f}')
+      log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},predicted={y[0]}, actual={t[0].item():.4f}')
+      
+  #  学習結果のモデルを保存する
+  model_pth = pth if pth is not None else f"./{MODEL_NAME}{input_size}.pt"
+  torch.save(model.state_dict(), model_pth)
+  #
+  ulog.debug(model.state_dict())
+  log_write(f"[train_Kyudo]:model saved as {model_pth}")
+#  
+# GRUモデルを使って予測を実行する関数
+# np_x: 入力データ (input_frames, input_size)
+# s_frames: 1セットのフレーム数
+# 戻り値: 予測データ (input_frames,)
+#
+def predict_Kyudo( model, np_x, s_frames):
+  # 予測データ
+  input_frames, input_size = np_x.shape
+  log_write(f"[predict_Kyudo]:np_x={np_x.shape}")     
+
+  # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
+  #input_frames -= s_frames
+  x_zeros = np.zeros( (s_frames, input_size) )
+  x = np.vstack( [x_zeros, np_x] )
+  log_write(f"[predict_Kyudo]:x={x.shape}")     
+  #
+  x_data = np.zeros( (input_frames, s_frames, input_size) )
+  for i in range(input_frames):
+    x_data[i] = x[i:i + s_frames].reshape(-1, input_size)
+
+  x_data = torch.tensor(x_data, dtype=torch.float32).to(device )
+  log_write(f"[predict_Kyudo]:x_data={x_data.shape}")
+  
+  y_data = np.zeros( (input_frames, 1) )
+  print(y_data.shape)  
+  section = 0
+  completed = 0
+  
+  model.eval()
+  for t in range(input_frames):
+      x = x_data[t].reshape(1, s_frames, input_size)
+      with torch.no_grad():
+          y_pred = model(x)
+          action = torch.argmax( y_pred, dim=1).item()
+      #
+      y_data[t] = action
+      if action == 1:       # 動作完了
+          completed = 1
+      elif action == 2:     # 動作開始
+          section = min(section + 1, 9) 
+          completed = 0
+          
+      # 状態を次の入力データに埋め込む
+      if t < input_frames - s_frames:
+        for k in range(1, s_frames - 1):
+          x_data[t + k:,-k,-2] = float(section)
+          x_data[t + k:,-k,-1] = float(completed)
+      ulog.debug(f"[predict_Kyudo]:x[{t}]={x}")
+        
+  y_data = y_data.reshape(-1)  
+  log_write(f"[predict_Kyudo]:y_pred={y_data.shape}")   
+  return y_data 
+  
+  
+
