@@ -25,6 +25,7 @@ from kyudo.kyudoUtils import *
 #
 verbose:bool = False         # debug write
 m_flg:bool = False           # not display section/conf
+slider:bool = False          # display slider
 #
 # connect db
 db = MyDb(DB_PATH)
@@ -44,12 +45,18 @@ args_dict = {arg: idx for idx, arg in enumerate(args)}
 ulog.info(f"[kyudoApp]info:args={args_dict}")
 
 key_names:str = [name for name in Kn2idx]
+feature_names = ['box_conf', 'box_w', 'box_h',\
+                 'rw_norm', 'lw_norm',\
+                 'rl_norm', 'rl_angle', 'hr_norm', 'hr_angle',\
+                 'er_angle', 'sl_angle',\
+                 'eyes_norm', 'hips_norm']
+key_names.extend(feature_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
-         + "        {<key_name1>|[ <key_name2>...]|*}  [-m(ulti)]  [-b(ottom)]\n"\
-         + "        [-span] [-second <col_name>] [-range '<min>[,<max>']]\n"\
+         + "        {<key_name1>|[ <key_name2>...]|*} [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
+         + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
          + "        [-train|-predict] [-model '<model-path>'] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
          + "        [-h(elp)] [-d(ebug)]")
@@ -232,7 +239,9 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
 #
 selkeys:str = [key for key in args if key in key_names]
 selnum:int = len(selkeys)
-if selnum == 0: selnum = 1
+if selnum == 0: 
+    selnum = 1
+    selkeys.append('all')         # all keys
     #for key in key_names[7:11]:
     #    selkeys.append(key)         # all keys
     #selnum = 4   
@@ -265,12 +274,6 @@ if '-second' in args:
             print(f"[kyudoApp]error:'{second_name}' not found. following names variable.")
             print(Col_names)
             exit()
-#
-# spanデータの表示を指定するコマンドオプションの解析
-#
-span_visible:bool = False
-if '-span' in args:
-    span_visible = True
 #
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
@@ -314,6 +317,9 @@ if '-b' in opts:        #凡例の表示位置
 else:
     legend_dict = dict(x=0.01,y=0.99,xanchor='left',yanchor='top',orientation='h')
 #
+if '-s' in opts:        #display slider
+    slider = True   
+#
 if '-d' in opts:        #debug write
     verbose = True   
 #
@@ -335,7 +341,7 @@ if selnum == 4:
                         subplot_titles=[key for key in selkeys])
 elif selnum == 1:
     if m_flg == True :
-        if len(selkeys) > 0:
+        if len(selkeys) > 0 and selkeys[0] != 'all':
             fig = make_subplots(rows=2, cols=1, vertical_spacing=0.2,
                             subplot_titles=[selkeys[0],'xy_conf'],
                             shared_xaxes=True,
@@ -349,7 +355,7 @@ elif selnum == 1:
         fig = make_subplots(rows=2, cols=1, vertical_spacing=0.1,
                             subplot_titles=[key for key in case_names])
     else:
-        if len(selkeys) > 0:
+        if len(selkeys) > 0 and selkeys[0] != 'all':
             fig = make_subplots(rows=1, cols=1, 
                             subplot_titles=[selkeys[0]],
                             specs=[[{"secondary_y": True}]])
@@ -383,15 +389,18 @@ for icount, key in enumerate(selkeys, start=1):
             irow = icount + icase
             icol = 1
         #
-        # 'tracking-data'テーブルからのデータ読み込み
+        # 'kyudo-data'テーブルからのデータ読み込み
         #
         db.case_name = case_name
-        df = db.pandas_read_tracking( Kn2idx[key] )
+        #    df = db.pandas_read_tracking( Kn2idx[key] )
         dfk = db.pandas_read_kyudo()
-        print(f"[kyudoApp]info:{df.shape}, {dfk.shape}")
-        
-        start_frame_no = df.index[0]
-        last_frame_no = df.index[-1]
+        print(f"[kyudoApp]info:{dfk.shape}")
+        for col in dfk.columns:
+            if '_norm' in col :
+                dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])      # box_w以上は欠測地(NaN)に置換する
+                dfk[col].ffill()                                        # 欠測値を直前の値に置換する
+        start_frame_no = dfk.index[0]
+        last_frame_no = dfk.index[-1]
         frame_length = last_frame_no - start_frame_no + 1
         print(f"[kyudoApp]info:frame_no = [{start_frame_no} -> {last_frame_no}]")
         #
@@ -406,20 +415,21 @@ for icount, key in enumerate(selkeys, start=1):
             print(f"[kyudoApp]info: mlast[{icase}]={mlast[icase]}, last={last}")                
                 
         #
-        mdf = df.tail(mlast[icase])
+        #mdf = df.tail(mlast[icase])
         mdfk = dfk.tail(mlast[icase])
         if mlast[icase] > last:
-            mdf = mdf.head(last)
+            #mdf = mdf.head(last)
             mdfk = mdfk.head(last)
-        print(f"[kyudoApp]info:{mdf.shape}")
-        print(f"[kyudoApp]info:frame_no = [{mdf.index[0]} -> {mdf.index[-1]}]")
+        print(f"[kyudoApp]info:{mdfk.shape}")
+        print(f"[kyudoApp]info:frame_no = [{mdfk.index[0]} -> {mdfk.index[-1]}]")
         #
         # データのプロット
-        if len(selkeys) > 0:
+        #
+        if key != 'all':
             # < ratio >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
-                                        name="ratio",
-                                        y=mdf["ratio"], 
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name=key,
+                                        y=mdfk[key], 
                                         mode="lines"),
                                         #line_color= 'gray',                                  
                                         #line={'dash':'dot'},
@@ -438,66 +448,63 @@ for icount, key in enumerate(selkeys, start=1):
             # < lw_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="lw_ratio",
-                                        y=mdfk["lw_ratio"], 
+                                        y=mdfk["lw_norm"]/mdfk["box_h"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
-            # < rl_ratio >
+            # < eyes_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="rl_ratio",
-                                        y=mdfk["rl_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            # < rl_deg >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="rl_deg",
-                                        y=mdfk["rl_deg"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            # < hr_ratio >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="hr_ratio",
-                                        y=mdfk["hr_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            # < hr_deg >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="hr_deg",
-                                        y=mdfk["hr_deg"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-        #              
-        if span_visible:
-            # < eyes_span >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="eyes-span",
+                                        name="eyes_ratio",
                                         y=mdfk["eyes_norm"]/mdfk["box_w"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
-            # < hips_span >
+            # < rl_ratio >
+            '''
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="hips-span",
-                                        y=(mdfk["hips_norm"]/mdfk["box_w"]), 
+                                        name="rl_ratio",
+                                        y=mdfk["rl_norm"]/mdfk["box_h"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
+            '''
+            # < hr_ratio >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name="hr_ratio",
+                                        y=mdfk["hr_norm"]/mdfk["box_h"], 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol   
+                            )
+            # < rl_deg >
+            '''
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name="rl_deg",
+                                        y=mdfk["rl_angle"]/180.0, 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol,   
+                                secondary_y=True
+                            )
+            '''
+            # < hr_deg >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name="hr_deg",
+                                        y=mdfk["hr_angle"]/180.0, 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol,   
+                                secondary_y=True
+                            )
+        #              
         # < add secondary column >
         if selnum == 1 and second_name is not None:
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name=second_name,
-                                        y=mdf[second_name], 
+                                        y=mdfk[second_name], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol,   
@@ -505,12 +512,12 @@ for icount, key in enumerate(selkeys, start=1):
                             )
         # < section/conf >
         if m_flg == True:
-            #< conf >
-            fig = fig.add_trace( go.Scatter(x=mdf.index, 
-                                    name="conf",
-                                    y=mdf["xy_conf"], 
-                                    line_color= 'green',
-                                    mode="lines"),
+            #< label >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                    name="label",
+                                    y=mdfk["label"], 
+                                    marker_color= 'red',
+                                    mode="markers"),
                             row = 2, 
                             col = 1   
                         )
@@ -559,7 +566,7 @@ for icount, key in enumerate(selkeys, start=1):
 #
 # レイアウト詳細設定
 #
-main_title = "YOLOv8 - Form-Chart"
+main_title = "GRU - Model-Chart"
 if not case_compare:
     main_title = f"{main_title}({case_names[0]})"
 else:
@@ -599,13 +606,14 @@ else:
                             secondary_y=True, showgrid=False,
                             row=1, col=1)
     if m_flg == True :
-        fig.update(layout_xaxis2_rangeslider_visible=True)
+        if slider:
+            fig.update(layout_xaxis2_rangeslider_visible=True)
         fig.update(layout_xaxis2_showticklabels = True)
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
             xaxis1_title = "Frame count", 
-            yaxis = dict(title='norm/height',range=(range_min, range_max),showgrid=True), 
-            yaxis3= dict(title='conf', side='left', showgrid=True), 
+            #yaxis = dict(title='norm/height',range=(range_min, range_max),showgrid=True), 
+            yaxis3= dict(title='label', side='left', showgrid=True), 
             showlegend = True
         )
         if second_name is not None:
