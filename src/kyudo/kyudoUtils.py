@@ -30,6 +30,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def log_write(fmtmsg):
     print(fmtmsg)
     ulog.info(fmtmsg)
+#
+# デバッグ用CSV出力関数
+# df: 出力するDataFrame
+def debug_csv(df, case_name='none'):
+    out_csv = f"kyudo_debug_{case_name}.csv"
+    df.to_csv(out_csv, mode='a', index=None, float_format='%.4f', na_rep='NaN', sep='\t')
 #    
 # デバイスの取得
 # 戻り値: device
@@ -95,7 +101,6 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
     
     # 20エポックごとに学習過程を表示
     if i%20 == 0:
-      #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f}')
       log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},predicted={y[0]}, actual={t[0].item():.4f}')
       
   #  学習結果のモデルを保存する
@@ -104,6 +109,8 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
   #
   ulog.debug(model.state_dict())
   log_write(f"[train_Kyudo]:model saved as {model_pth}")
+  
+  return record_loss_train
 #  
 # GRUモデルを使って予測を実行する関数
 # np_x: 入力データ (input_frames, input_size)

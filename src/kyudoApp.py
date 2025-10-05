@@ -64,7 +64,9 @@ if '-h' in opts:        #debug write
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
-
+#
+if '-d' in opts:        #debug write
+    verbose = True   
 #
 # 対象ケース名を指定するコマンドオプションの解析
 #
@@ -196,12 +198,13 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     log_write(f"[kyudoApp]:features:{cols}")
 
     df_x = db.pandas_read_kyudo( cols )         # 学習用特徴量
-    '''
+    
     for col in df_x.columns:
-            if '_ratio' in col :
-                df_x[col] = df_x[col].where(df_x[col] < 0.5)            # 0.5以上は欠測地(NaN)に置換する
-                df_x[col].ffill()                                        # 欠測値を直前の値に置換する
-    '''
+        if '_ratio' in col :
+            df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測地(NaN)に置換する
+    df_x.ffill(inplace=True)    # 欠測値を直前の値に置換する
+    df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する    
+    if verbose: debug_csv(df_x, case_names[0])
     
     df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル
     
@@ -239,10 +242,12 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     else:
         # 予測実行
         y_pred = predict_Kyudo( model, x, s_frames )
+        # 入力、ラベル、予測結果データフレームの作成
         df_yp = pd.DataFrame(y_pred, columns=['predicted'])
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
+        
         out_csv = f"kyudo_predict_{case_names[0]}.csv"
-        df_p.to_csv(out_csv, index=None)
+        df_p.to_csv(out_csv, index=None, float_format='%.4f', na_rep='NaN', sep='\t')
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
 #
 # 表示対象のキーポイントを指定するコマンドオプションの解析
@@ -252,9 +257,6 @@ selnum:int = len(selkeys)
 if selnum == 0: 
     selnum = 1
     selkeys.append('all')         # all keys
-    #for key in key_names[7:11]:
-    #    selkeys.append(key)         # all keys
-    #selnum = 4   
 #
 # 1軸のrangeを指定するコマンドオプションの解析
 #
@@ -328,9 +330,6 @@ else:
 #
 if '-s' in opts:        #display slider
     slider = True   
-#
-if '-d' in opts:        #debug write
-    verbose = True   
 #
 # コマンドオプションの合理性判定
 #
@@ -407,16 +406,20 @@ for icount, key in enumerate(selkeys, start=1):
         else:
             dfk = db.pandas_read_kyudo()
             print(f"[kyudoApp]info:{dfk.shape}")
+            # 特異値の補正
             for col in dfk.columns:
                 if '_norm' in col :
-                    dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])  # box_w以上は欠測地(NaN)に置換する
-                    dfk[col].ffill()                                    # 欠測値を直前の値に置換する
+                    # box_w以上は欠測地(NaN)に置換する
+                    dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])
+            dfk.ffill(inplace=True)    # 欠測値を直前の値に置換する
+            dfk.bfill(inplace=True)    # 欠測値を直後の値に置換する
+            # データの正規化
             dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"] 
             dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"] 
             dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
             dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
             dfk['hr_deg'] = dfk["hr_angle"]/180.0
-            
+        # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
         frame_length = last_frame_no - start_frame_no + 1
@@ -430,8 +433,7 @@ for icount, key in enumerate(selkeys, start=1):
                 mlast[icase] = frame_length - mlast[icase]
             if last > mlast[icase] or last == 0: 
                 last = mlast[icase]
-            print(f"[kyudoApp]info: mlast[{icase}]={mlast[icase]}, last={last}")                
-                
+            print(f"[kyudoApp]info: mlast[{icase}]={mlast[icase]}, last={last}")               
         #
         #mdf = df.tail(mlast[icase])
         mdfk = dfk.tail(mlast[icase])
@@ -539,6 +541,16 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
+            #< predict >
+            if predict:
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name="predicted",
+                                        y=mdfk["predicted"], 
+                                        marker_color= 'white',
+                                        mode="markers"),
+                                row = 2, 
+                                col = 1   
+                            )
             '''
             # < tag1(completed) >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
