@@ -35,7 +35,8 @@ def log_write(fmtmsg):
 # df: 出力するDataFrame
 def debug_csv(df, case_name='none'):
     out_csv = f"kyudo_debug_{case_name}.csv"
-    df.to_csv(out_csv, mode='a', index=None, float_format='%.4f', na_rep='NaN', sep='\t')
+    #df.to_csv(out_csv, mode='a', index=None, float_format='%.4f', na_rep='NaN', sep='\t')
+    df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #    
 # デバイスの取得
 # 戻り値: device
@@ -104,7 +105,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
       log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},predicted={y[0]}, actual={t[0].item():.4f}')
       
   #  学習結果のモデルを保存する
-  model_pth = pth if pth is not None else f"./{MODEL_NAME}{input_size}.pt"
+  model_pth = pth if pth is not None else f"./{MODEL_NAME}{input_size}-{s_frames}.pt"
   torch.save(model.state_dict(), model_pth)
   #
   ulog.debug(model.state_dict())

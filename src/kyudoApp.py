@@ -247,7 +247,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
         
         out_csv = f"kyudo_predict_{case_names[0]}.csv"
-        df_p.to_csv(out_csv, index=None, float_format='%.4f', na_rep='NaN', sep='\t')
+        #df_p.to_csv(out_csv, index=None, float_format='%.4f', na_rep='NaN', sep='\t')
+        df_p.to_csv(out_csv, float_format='%.4f', na_rep='NaN', sep='\t')
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
 #
 # 表示対象のキーポイントを指定するコマンドオプションの解析
@@ -403,6 +404,7 @@ for icount, key in enumerate(selkeys, start=1):
         #    df = db.pandas_read_tracking( Kn2idx[key] )
         if predict:
             dfk = df_p
+            debug_csv(dfk)
         else:
             dfk = db.pandas_read_kyudo()
             print(f"[kyudoApp]info:{dfk.shape}")
@@ -419,6 +421,7 @@ for icount, key in enumerate(selkeys, start=1):
             dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
             dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
             dfk['hr_deg'] = dfk["hr_angle"]/180.0
+        dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
         # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
@@ -546,7 +549,7 @@ for icount, key in enumerate(selkeys, start=1):
                 fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="predicted",
                                         y=mdfk["predicted"], 
-                                        marker_color= 'white',
+                                        marker_color= 'black',
                                         mode="markers"),
                                 row = 2, 
                                 col = 1   
