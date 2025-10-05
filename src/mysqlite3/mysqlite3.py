@@ -213,11 +213,13 @@ class MyDb:
         
         label = 0
         if self.section != self._section:
-            label = 2
+            #label = 2
+            label = self.section * 2 - 1
             self._section = self.section
             self._completed = 0
         elif self.completed != self._completed:
-            label = 1
+            #label = 1
+            label = self.section * 2
             self._completed = self.completed
           
         values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"

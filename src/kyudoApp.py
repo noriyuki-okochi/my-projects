@@ -26,6 +26,7 @@ from kyudo.kyudoUtils import *
 verbose:bool = False         # debug write
 m_flg:bool = False           # not display section/conf
 slider:bool = False          # display slider
+predict:bool = False         # predicted data
 #
 # connect db
 db = MyDb(DB_PATH)
@@ -182,19 +183,26 @@ if '-hparam' in cmds:
 df_k = None     # 予測結果データフレーム
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #
-    if '-predict' in cmds and model_pth is None:
+    if '-predict' in cmds: predict = True
+    if predict and model_pth is None:
         print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
         exit(0)
     #  学習用データの読み込み
     cols = ['rw_norm/box_h as rw_ratio','lw_norm/box_h as lw_ratio',\
-            'rl_norm/box_h as rl_ratio','rl_angle/180.0 as rl_deg',\
-            'hr_norm/box_h as hr_ratio','hr_angle/180.0 as hr_deg',\
             'eyes_norm/box_w as eyes_ratio',\
+            'hr_norm/box_h as hr_ratio','hr_angle/180.0 as hr_deg',\
             'section','completed']
     input_dim = len(cols)
     log_write(f"[kyudoApp]:features:{cols}")
 
     df_x = db.pandas_read_kyudo( cols )         # 学習用特徴量
+    '''
+    for col in df_x.columns:
+            if '_ratio' in col :
+                df_x[col] = df_x[col].where(df_x[col] < 0.5)            # 0.5以上は欠測地(NaN)に置換する
+                df_x[col].ffill()                                        # 欠測値を直前の値に置換する
+    '''
+    
     df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル
     
     x = df_x.to_numpy(dtype=np.float32)
@@ -202,7 +210,10 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #
     # GRUモデルの学習を実行する
     #
-    num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
+    #num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
+    num_classes = 19    
+    # 0:完了への移行, 1:動作完了, 2:動作開始
+    # (8セクションx2+2)=0~18
     model = KyudoGRU( input_size = input_dim,
                       output_size = num_classes ).to( get_device() )
     log_write(f"[kyudoApp]:model\n {model}")
@@ -221,19 +232,18 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     s_frames, batch_size, n_epoch = hyper_parameters
     log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")
     log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
-    if '-train' in cmds:      
+    if not predict:      
         # 学習実行
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
         exit(0)
-    elif '-predict' in cmds:
+    else:
         # 予測実行
         y_pred = predict_Kyudo( model, x, s_frames )
         df_yp = pd.DataFrame(y_pred, columns=['predicted'])
-        df_k = pd.concat( [df_x, df_y, df_yp], axis=1 )
+        df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
         out_csv = f"kyudo_predict_{case_names[0]}.csv"
-        df_k.to_csv(out_csv, index=None)
+        df_p.to_csv(out_csv, index=None)
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
-        exit(0)
 #
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
@@ -289,10 +299,9 @@ nums = [int(num) for num in args if num.isnumeric()]
 if len(nums) > 0:               # display frames
     last = int(nums[0])         # frames
 #
-pf_opt = [opt[1:] for opt in opts if opt.startswith('-p') or opt.startswith('-f')]
+pf_opt = [opt[1:] for opt in opts if (opt.startswith('-p') and not opt.startswith('-pred')) or opt.startswith('-f')]
 # '-pxxx'は最後から遡るフレーム数を指定、 '-fxxxx'は開始フレーム数を指定
 #  -f'xxxx,yyyy'はケース比較時の、各ケースに対する開始フレーム数を指定
-
 if len(pf_opt) > 0:
     nums = pf_opt[0].split(',')
     if nums[0][0] == 'f':       
@@ -393,12 +402,21 @@ for icount, key in enumerate(selkeys, start=1):
         #
         db.case_name = case_name
         #    df = db.pandas_read_tracking( Kn2idx[key] )
-        dfk = db.pandas_read_kyudo()
-        print(f"[kyudoApp]info:{dfk.shape}")
-        for col in dfk.columns:
-            if '_norm' in col :
-                dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])      # box_w以上は欠測地(NaN)に置換する
-                dfk[col].ffill()                                        # 欠測値を直前の値に置換する
+        if predict:
+            dfk = df_p
+        else:
+            dfk = db.pandas_read_kyudo()
+            print(f"[kyudoApp]info:{dfk.shape}")
+            for col in dfk.columns:
+                if '_norm' in col :
+                    dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])  # box_w以上は欠測地(NaN)に置換する
+                    dfk[col].ffill()                                    # 欠測値を直前の値に置換する
+            dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"] 
+            dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"] 
+            dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
+            dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
+            dfk['hr_deg'] = dfk["hr_angle"]/180.0
+            
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
         frame_length = last_frame_no - start_frame_no + 1
@@ -440,7 +458,7 @@ for icount, key in enumerate(selkeys, start=1):
             # < rw_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="rw_ratio",
-                                        y=mdfk["rw_norm"]/mdfk["box_h"], 
+                                        y=mdfk["rw_ratio"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
@@ -448,52 +466,34 @@ for icount, key in enumerate(selkeys, start=1):
             # < lw_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="lw_ratio",
-                                        y=mdfk["lw_norm"]/mdfk["box_h"], 
+                                        y=mdfk["lw_ratio"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
             # < eyes_ratio >
+            
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="eyes_ratio",
-                                        y=mdfk["eyes_norm"]/mdfk["box_w"], 
+                                        y=mdfk["eyes_ratio"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
             # < rl_ratio >
-            '''
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="rl_ratio",
-                                        y=mdfk["rl_norm"]/mdfk["box_h"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            '''
             # < hr_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="hr_ratio",
-                                        y=mdfk["hr_norm"]/mdfk["box_h"], 
+                                        y=mdfk["hr_ratio"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol   
                             )
             # < rl_deg >
-            '''
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="rl_deg",
-                                        y=mdfk["rl_angle"]/180.0, 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol,   
-                                secondary_y=True
-                            )
-            '''
             # < hr_deg >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="hr_deg",
-                                        y=mdfk["hr_angle"]/180.0, 
+                                        y=mdfk["hr_deg"], 
                                         mode="lines"),
                                 row = irow, 
                                 col = icol,   
@@ -539,6 +539,7 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
+            '''
             # < tag1(completed) >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                     name="tag1",
@@ -559,6 +560,7 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
+            '''
         #signal
         #next case
     #

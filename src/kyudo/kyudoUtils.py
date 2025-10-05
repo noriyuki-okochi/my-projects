@@ -141,11 +141,21 @@ def predict_Kyudo( model, np_x, s_frames):
           action = torch.argmax( y_pred, dim=1).item()
       #
       y_data[t] = action
+      '''
       if action == 1:       # 動作完了
           completed = 1
       elif action == 2:     # 動作開始
           section = min(section + 1, 9) 
           completed = 0
+      '''
+      if action == 0:         # 完了への移行
+          completed = 0
+      elif action % 2 == 0 :  # 動作完了
+          section = action / 2
+          completed = 1
+      else:                   # 動作開始
+          section = (action + 1) / 2
+          completed = 0        
           
       # 状態を次の入力データに埋め込む
       if t < input_frames - s_frames:
