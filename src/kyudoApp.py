@@ -404,7 +404,8 @@ for icount, key in enumerate(selkeys, start=1):
         #    df = db.pandas_read_tracking( Kn2idx[key] )
         if predict:
             dfk = df_p
-            debug_csv(dfk)
+            debug_csv(dfk, case_name)
+            dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
         else:
             dfk = db.pandas_read_kyudo()
             print(f"[kyudoApp]info:{dfk.shape}")
@@ -421,7 +422,6 @@ for icount, key in enumerate(selkeys, start=1):
             dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
             dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
             dfk['hr_deg'] = dfk["hr_angle"]/180.0
-        dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
         # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
@@ -468,6 +468,7 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = irow, 
                                 col = icol   
                             )
+            '''
             # < lw_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="lw_ratio",
@@ -476,8 +477,8 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = irow, 
                                 col = icol   
                             )
-            # < eyes_ratio >
-            
+            '''
+            # < eyes_ratio >            
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="eyes_ratio",
                                         y=mdfk["eyes_ratio"], 
@@ -492,8 +493,10 @@ for icount, key in enumerate(selkeys, start=1):
                                         y=mdfk["hr_ratio"], 
                                         mode="lines"),
                                 row = irow, 
-                                col = icol   
+                                col = icol,   
+                                secondary_y=True
                             )
+            '''
             # < rl_deg >
             # < hr_deg >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
@@ -504,6 +507,7 @@ for icount, key in enumerate(selkeys, start=1):
                                 col = icol,   
                                 secondary_y=True
                             )
+            '''
         #              
         # < add secondary column >
         if selnum == 1 and second_name is not None:
