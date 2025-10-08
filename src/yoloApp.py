@@ -79,7 +79,7 @@ def help():
     print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name>]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
-        + "                         [-I ['<param_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
+        + "                         [-I ['<frame_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
     print(" --- Option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
@@ -97,7 +97,7 @@ def help():
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
     print(" -s(tep):step-no default=1")
-    print(" -I(nitial entry to act_table from Actin_param)")
+    print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
     print(" -h(elp)")
     print(" -g(uidance)<color><level>::[Y|G|B|W]: yellow, green(default), black, white,[1|2|3]")
     print(" -v(erborse)")
@@ -107,23 +107,28 @@ def help():
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
     print(" t :トラッキング開始／停止（姿勢解析開始後、有効）")
+    print(" u :トラキングデータのDB更新")
     print(" b :トラッキング動作完了のタグ更新（'-u'時、有効）")
     print(" n :トラッキング動作開始（節移行）のタグ更新（'-u'時、有効）")
     print(" a :ログファイルへのアテンションメッセージ出力")
     print(" I :アクティブな動作解析パラメータのDB登録（'-m'時、有効）")
-    print(" i :数値入力開始")
+    print(" f :パラメータ（実数値）入力開始：(0-9.)[,(0-9.)]...:'m'キー押下で終了")
+    print(" m :アクティブな動作解析パラメータの更新（'-m'時、有効）更新データ値は数値入力キー’i’で指定")
+    print(" i :整数値入力開始:(0-9)...:タイマーで終了")
     print(" j :指定フレームへジャンプ（ジャンプ先フレームは数値入力キー’i’で指定：：(<フレームカウント>)）")
-    print(" r :繰り返し再生開始／停止（'-r'時、有効）")
-    print(" g :グリッド表示・非表示（分割数は数値入力キー’i’で指定：：(0|1)(<分割数>)）")
+    print(" r :繰り返し再生開始／停止（'-r'時のみ有効）,’i’キー押下後のとき、停止中は開始、開始中は停止フレームを設定")
+    print(" R :繰り返し再生開始フレームに戻る")
+    print(" g :グリッド表示・非表示（分割数は数値入力キー’i’で指定：：(0|1)(<分割数>)）,'-r'時不可")
     print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(グリッド幅の割合<分子><分母>)）")
     print(" 0 :姿勢解析開始")
     print(" 1-8:節の開始")
-    print(" c :警告メッセージ、その他、キー設定値のクリア")
     print(" k(K) :再生速度アップ")
     print(" l(L) :再生速度ダウン")
     print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
+    print(" c :警告メッセージ、その他、キー設定値のクリア")
+    print(" ? :キー操作制御パラメータの表示")
     print(" q :処理の終了")
     print(" --- example ---")
     print("例)カメラID 1 を指定             : python yoloApp.py 1")  
@@ -145,6 +150,10 @@ class StackActParam:
         if len(self.pars) == 0:
             return None
         return self.pars.pop() if idx is None else self.pars.pop(idx)
+    def get(self, idx):
+        if len(self.pars) == 0 or idx >= len(self.pars):
+            return None
+        return self.pars[idx]
     def clear(self):
         self.pars = []
     def len(self):
@@ -1447,7 +1456,7 @@ def draw_rectangle(event, x, y, flags, param):
 # キー入力操作関数
 #
 def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
-    global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start
+    global Frame_counter, Section_no, Completed, Split_sec, Split_start, Lap_sec, Lap_start
     global Step_counter, Nop_counter, Step_error, Section_color, Alart_message
     global Tracking_enabled, Update_enabled
     
@@ -1526,23 +1535,31 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 
     elif key == ord('r') and (raw_video and not clip_video):
         if ctl['key_inter'] > 0:
-            if ctl['repeat'] : ctl['start_frame'] = Frame_counter       # 繰り返し再生の開始フレームを設定
-            else: ctl['stop_frame'] = Frame_counter                     # 繰り返し再生の終了フレームを設定
+            if not ctl['repeat'] : ctl['start_frame'] = Frame_counter       # 繰り返し再生の開始フレームを設定
+            else: ctl['stop_frame'] = Frame_counter                         # 繰り返し再生の終了フレームを設定
+            print(f"繰り返し再生範囲を設定しました: {ctl['start_frame']} - {ctl['stop_frame']}")
         else:
             # 'r'キーで一開始／停止
             ctl['repeat'] = True if ctl['repeat'] is False else False  
             if ctl['repeat']: 
-                print("繰り返し再生を開始します")
+                print(f"繰り返し再生を開始します: {ctl['start_frame']} - {ctl['stop_frame']}")
                 mylog.log(INFO, ">> repeat play-mode start")
             else: 
-                print("繰り返し再生を終了します")
+                print(f"繰り返し再生を終了します: {ctl['start_frame']} - {ctl['stop_frame']}")
                 mylog.log(INFO, ">> repeat play-mode pause")
             #
             ctl['key_inter'] = int(time.time())  
 
+    elif key == ord('R') and (raw_video and not clip_video):
+            if ctl['start_frame'] > 0:# 'R'キーで再生開始フレームに戻る
+                Frame_counter = ctl['start_frame']
+                cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+                print(f"再生開始フレームに戻りました: {ctl['start_frame']}")
+                
     elif key == ord('g'):
         # グリッドの表示／非表示                   
-        if len(ctl['key_data']) > 2 and ctl['key_data'][1:].isdigit():
+        if len(ctl['key_data']) > 2 and ctl['key_data'][1:].isdigit():  
+            # 'i<0|1><val>' :0=row,1=col
             rows, cols = ctl['grid_shape'] 
             rowcol = int(ctl['key_data'][1:2])
             val = int(ctl['key_data'][2:])
@@ -1556,6 +1573,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
     elif key == ord('G'):
         # グリッドをシフトして表示                   
         if len(ctl['key_data']) > 3 and ctl['key_data'][1:].isdigit():
+            # 'i<0|1><val1><val2>' :0=row,1=col
             rows, cols = ctl['grid_shift'] 
             rowcol = int(ctl['key_data'][1:2])
             val = int(ctl['key_data'][2:3])/int(ctl['key_data'][3:])
@@ -1565,7 +1583,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             ctl['grid_shift'] = (rows, cols)
             ctl['key_data'] = ''            # キー入力データをクリア
 
-    elif key >= ord('0') and key <= ord('8') and len(ctl['key_data']) == 0:
+    elif key >= ord('0') and key <= ord('8') \
+        and (len(ctl['key_data']) == 0 and len(ctl['para_data']) == 0):
         # セクション番号を設定  
         Section_no = key - ord('0')
         if Section_no == 0: print(f"姿勢解析を開始します")
@@ -1594,13 +1613,14 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         #
         if ctl['key_inter'] == 0: ctl['key_inter'] = int(time.time())  
 
-    elif key == ord('9') and len(ctl['key_data']) == 0:
+    elif key == ord('9') and (len(ctl['key_data']) == 0 and len(ctl['para_data']) == 0):
         print(f"姿勢解析を停止します。")
         Lap_start = 0                       # ラップ開始時間をリセット 
         Split_start = 0                     # スプリット開始時間をリセット 
         Step_counter = 0                    # セクション内の動作カウンターをリセット              
     
-    elif key == ord('.'):                   # (.) フレームカウンターを2秒
+    elif key == ord('.') and len(ctl['para_data']) == 0: 
+                                            # (.) フレームカウンターを2秒進める
         Frame_counter += int(Fps)*2     
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
@@ -1614,7 +1634,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
     
-    elif key == ord(','):                   
+    elif key == ord(',') and len(ctl['para_data']) == 0:                   
         # (,) フレームカウンターを2秒戻す
         if Frame_counter > int(Fps)*2 :Frame_counter -= int(Fps)*2  
         else: Frame_counter = 1
@@ -1675,7 +1695,30 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if step is not None: tbl['step'] = step
         Db.insert_act_param(tbl)
         print(f"パラメータ:{tbl['frame']} step={tbl['step']},act={tbl['act']} テーブル登録完了")
-        
+    
+    elif key == ord('f') and len(ctl['para_data']) == 0:
+        ctl['para_data'] = 'f'
+    elif key == ord('.') and len(ctl['para_data']) > 0:
+        ctl['para_data'] += '.'
+    elif key == ord(',') and len(ctl['para_data']) > 0:
+        ctl['para_data'] += ','
+    elif key >= ord('0') and key <= ord('9') and len(ctl['para_data']) > 0:
+        ctl['para_data'] += chr(key)
+
+    elif key == ord('m') and len(ctl['para_data']) > 1:    # 現在使用中の解析パラメータを更新する
+        # key_data='i[<val0>],[<val1>],[<val2>]...[,<valN>]'
+        row = Section_no        
+        tbl = CompleteAction_param if not Completed else StartAction_param  
+        vals = ctl['para_data'][1:].split(',')
+        for i in range(Stkp.len()):
+            idx, _ = Stkp.get(i)
+            if idx < len(vals):
+                value = float(vals[idx]) if '.' in vals[idx] else int(vals[idx])
+                tbl['param'][row][idx] = value
+                print(f"パラメータ更新:[{row},{idx}]={value:.4f}")
+        # キー入力データをクリア
+        ctl['para_data'] = ''            
+    
     elif key == ord('i'): 
         # 連打キー入力の開始
         if ctl['key_inter'] == 0:
@@ -1701,6 +1744,12 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if len(ctl['key_data']) > 0:
             ctl['key_data'] = ''                # キー入力データをクリア
             print(f"キー入力データクリア")
+        if len(ctl['para_data']) > 0:
+            ctl['para_data'] = ''                # キー入力データをクリア
+            print(f"キー入力パラメータクリア")
+        if ctl['start_frame'] != 0:              # 繰り返し再生の終了フレームをリセット
+            ctl['start_frame'] = 0
+            print(f"繰り返し再生の開始フレームをリセット")
         if ctl['stop_frame'] != 0:              # 繰り返し再生の終了フレームをリセット
             ctl['stop_frame'] = 0
             print(f"繰り返し再生の終了フレームをリセット")
@@ -1711,6 +1760,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # フレーム間インターバルをデフォルトにリセット
         ctl['iwait'] = ctl['iwait_init']
         #
+        print(f"{ctl}")
+    elif key == ord('?'):
         print(f"{ctl}")
     #
     return True
@@ -1756,6 +1807,7 @@ def main():
         'key_inter': 0,                             # 連打キー入力の経過時間（秒）
         'key_wait': 3,                              # 連打キー入力の有効期間（秒）
         'key_data':'',                              # キー入力データ（文字列）
+        'para_data':'',                             # パラメータ入力データ（文字列）
         'tag1_section': 0,                          # タグ1のセクションカウンター 
         'tag2_section': 0,                          # タグ2のセクションカウンター
         'attention': 0,                             # アテンション出力カウンター
@@ -1766,8 +1818,8 @@ def main():
         'start_frame': 0,                           # 繰り返し再生開始フレーム
         'stop_frame': 0,                            # 繰り返し再生終了フレーム
         'grid': False,                              # グリッド表示有無
-        'grid_shape': (6, 6),                       # グリッド表示行列
-        'grid_shift': (0, 0)                        # グリッド表示シフト量
+        'grid_shape': (6, 6),                       # グリッド分割数(行,列)
+        'grid_shift': (0, 0)                        # グリッド表示シフト量(行,列)
     }
     # print command line(arguments)
     args = sys.argv
@@ -1804,7 +1856,7 @@ def main():
         param_nms = []
         i = args.index('-I')
         if i + 1 < len(args) and (not args[i + 1].startswith('-')):
-            param_nms.append( args[i + 1] )  # ケース名を取得
+            param_nms.append( args[i + 1] )  # パラメータテーブルframe名を取得
         else:
             param_nms = list(InitAction_param_nms)
         for nm in param_nms:
@@ -1970,8 +2022,8 @@ def main():
         # ガイダンスの表示レベルを取得
         if len(guid_opt[0]) > 3 and guid_opt[0][3:].isalnum():
             guid_option = int(guid_opt[0][3:])
+            if guid_option == 0: guidance = False
         else: guid_option = 2
-
         
     # YOLOV8のログレベルを設定
     if '-v' in opts:
@@ -2282,12 +2334,12 @@ def main():
                 cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)            
             
             # パラメータ情報       
-            if guid_option > 2:
+            if manual_plot and guid_option > 2:
                 pos = (x, y - 45)
                 comp = 1 if Completed else 0
                 str = f"param({Section_no}-{comp}-{Step_counter:2d}) : "
                 for i in  range( Stkp.len() ):
-                    no, val = Stkp.pop(0)
+                    no, val = Stkp.get(i)
                     if i > 0: str += ", "
                     str += f"{no}={val}"
                 cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1)            
