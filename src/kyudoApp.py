@@ -27,6 +27,7 @@ verbose:bool = False         # debug write
 m_flg:bool = False           # not display section/conf
 slider:bool = False          # display slider
 predict:bool = False         # predicted data
+plot_csv:bool = False        # csv-file data
 #
 # connect db
 db = MyDb(DB_PATH)
@@ -56,7 +57,7 @@ key_names.extend(feature_names)
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
-         + "        {<key_name1>|[ <key_name2>...]|*} [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
+         + "        [{<key_name1>|[ <key_name2>...]|*}|{-csv <csv-file-path>}] [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
          + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
          + "        [-train|-predict] [-model '<model-path>'] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
@@ -251,6 +252,25 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df_p.to_csv(out_csv, float_format='%.4f', na_rep='NaN', sep='\t')
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
 #
+# CSVデータのプロットコマンド(-csv)オプションの解析
+#
+if '-csv' in cmds:
+    csvfile = ''
+    i = cmds.index('-csv')
+    if len(cmds) > (i + 1):
+        # トラッキングCSVファイルの切り出し
+        if not cmds[i+1].startswith('-'): csvfile = cmds[i+1]
+    if csvfile == '' or os.path.isfile(csvfile) == False:
+        # ファイルが存在しないとき終了
+        print(f"[kyudoApp]error: csv-file({csvfile}) not found.")
+        exit(0)    
+    # CSVファイルを読み込む     
+    plot_csv = True
+    df = pd.read_csv(csvfile)
+    print(f"[kyudoApp]:read_csv:{df.shape}")
+    key_names.append('csv')
+    args.append('csv')      # key_namesに'csv'を追加
+#
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
 selkeys:str = [key for key in args if key in key_names]
@@ -258,6 +278,10 @@ selnum:int = len(selkeys)
 if selnum == 0: 
     selnum = 1
     selkeys.append('all')         # all keys
+#
+if plot_csv:
+    selkeys[0] = df.columns[1]    # 2列目を対象)
+    print(f"[kyudoApp]:selkeys:{selkeys}, df.columns:{df.columns}")    
 #
 # 1軸のrangeを指定するコマンドオプションの解析
 #
@@ -318,7 +342,7 @@ else:
 # その他、コマンドオプションの解析
 #
 if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
-    if case_compare == True:
+    if case_compare == True or key_names[0] == 'csv':
         print("[chrart]error: 'multi case-name' and '-m' cannot be specified at the same time.")
         exit(0)
     while len(selkeys) > 1: del selkeys[1]      # 先頭キーポイントのみ対象
@@ -399,16 +423,19 @@ for icount, key in enumerate(selkeys, start=1):
             icol = 1
         #
         # 'kyudo-data'テーブルからのデータ読み込み
-        #
+        # (-csvオプション指定時はCSVファイルから読み込み)
         db.case_name = case_name
-        #    df = db.pandas_read_tracking( Kn2idx[key] )
-        if predict:
+        if plot_csv:
+            dfk = df
+        elif predict:
             dfk = df_p
             debug_csv(dfk, case_name)
             dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
+            df = db.pandas_read_kyudo()
+            print(f"[kyudoApp]info:df{df.shape}")
         else:
             dfk = db.pandas_read_kyudo()
-            print(f"[kyudoApp]info:{dfk.shape}")
+            print(f"[kyudoApp]info:dfk{dfk.shape}")
             # 特異値の補正
             for col in dfk.columns:
                 if '_norm' in col :
@@ -436,14 +463,14 @@ for icount, key in enumerate(selkeys, start=1):
                 mlast[icase] = frame_length - mlast[icase]
             if last > mlast[icase] or last == 0: 
                 last = mlast[icase]
-            print(f"[kyudoApp]info: mlast[{icase}]={mlast[icase]}, last={last}")               
+            print(f"[kyudoApp]info:mlast[{icase}]={mlast[icase]}, last={last}")               
         #
-        #mdf = df.tail(mlast[icase])
+        mdf = df.tail(mlast[icase])
         mdfk = dfk.tail(mlast[icase])
         if mlast[icase] > last:
-            #mdf = mdf.head(last)
+            mdf = mdf.head(last)
             mdfk = mdfk.head(last)
-        print(f"[kyudoApp]info:{mdfk.shape}")
+        print(f"[kyudoApp]info:mdfk{mdfk.shape}")
         print(f"[kyudoApp]info:frame_no = [{mdfk.index[0]} -> {mdfk.index[-1]}]")
         #
         # データのプロット
@@ -522,27 +549,27 @@ for icount, key in enumerate(selkeys, start=1):
         # < section/conf >
         if m_flg == True:
             #< label >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                     name="label",
-                                    y=mdfk["label"], 
+                                    y=mdf["label"], 
                                     marker_color= 'red',
                                     mode="markers"),
                             row = 2, 
                             col = 1   
                         )
             # < section >
-            fig = fig.add_trace( go.Bar(x=mdfk.index, 
+            fig = fig.add_trace( go.Bar(x=mdf.index, 
                                     name="section",
-                                    y=mdfk["section"],
+                                    y=mdf["section"],
                                     marker_color='grey'),
                             row = 2, 
                             col = 1,
                             secondary_y=True
                         )
             # < completed >
-            fig = fig.add_trace( go.Bar(x=mdfk.index, 
+            fig = fig.add_trace( go.Bar(x=mdf.index, 
                                     name="completed",
-                                    y=mdfk["completed"],
+                                    y=mdf["completed"],
                                     marker_color='black'),
                             row = 2, 
                             col = 1,
@@ -558,6 +585,17 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = 2, 
                                 col = 1   
                             )
+                # < section >
+                '''
+                fig = fig.add_trace( go.Bar(x=mdfk.index, 
+                                        name="section",
+                                        y=mdfk["section"],
+                                        marker_color='white'),
+                                row = 2, 
+                                col = 1,
+                                secondary_y=True
+                            )
+                '''
             '''
             # < tag1(completed) >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
