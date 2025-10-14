@@ -81,17 +81,19 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
   criterion = nn.CrossEntropyLoss()
   optimaizer = optim.Adam(model.parameters(), lr=0.001 )
   record_loss_train = []  # list to record loss value
+  model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train' )
+  
   # 学習ループ
   for i in range(n_epoch):
     model.train()
     loss_train = 0
     for j, (x, t) in enumerate(loader):
-      # 勾配の初期化
-      optimaizer.zero_grad()
       # 順伝搬、損失計算、逆伝搬、パラメータ更新
       y = model(x)                        # y: (batch, output_size)
       loss = criterion( y, t.squeeze() )  # t: (batch, 1) -> (batch,)
       loss_train += loss.item()
+      # 勾配の初期化
+      optimaizer.zero_grad()
       # 
       loss.backward()
       optimaizer.step()
@@ -101,9 +103,12 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
     record_loss_train.append(loss_train)  # record loss to list
     
     # 20エポックごとに学習過程を表示
+    model.write_csv( [i, loss_train] )
     if i%20 == 0:
-      log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},predicted={y[0]}, actual={t[0].item():.4f}')
+      #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},predicted={y[0]}')
+      log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f}')
       
+  model.close_csv()      
   #  学習結果のモデルを保存する
   model_pth = pth if pth is not None else f"./{MODEL_NAME}{input_size}-{s_frames}.pt"
   torch.save(model.state_dict(), model_pth)
@@ -140,7 +145,6 @@ def predict_Kyudo( model, np_x, s_frames):
   print(y_data.shape)  
   section = 0
   completed = 0
-  
   model.eval()
   for t in range(input_frames):
       x = x_data[t].reshape(1, s_frames, input_size)
