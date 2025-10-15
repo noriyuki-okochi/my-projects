@@ -60,7 +60,7 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-csv <csv-file-path>}] [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
          + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
-         + "        [-train|-predict] [-model '<model-path>'] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
+         + "        [-train|-predict] [{-models|-modelm} '<model-path>'] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
          + "        [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
@@ -170,8 +170,11 @@ if count == 0:
     exit(0)
 #
 model_pth = None
-if '-model' in cmds:
-    i = cmds.index('-model')
+model_opt = None
+if '-models' in cmds: model_opt = '-models'
+if '-modelm' in cmds: model_opt = '-modelm'
+if model_opt is not None:
+    i = cmds.index( model_opt )
     if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' : model_pth = cmds[i +1]
 #
 hyper_parameters = (60, 16, 5)   # s_frames, batch_size, n_epoch 
@@ -198,7 +201,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     input_dim = len(cols)
     log_write(f"[kyudoApp]:features:{cols}")
 
-    df_x = db.pandas_read_kyudo( cols )         # 学習用特徴量
+    df_x = db.pandas_read_kyudo( cols )         # 学習用特徴量(input_frames, input_dim)
+    #debug_csv(df_x, case_names[0])
     
     for col in df_x.columns:
         if '_ratio' in col :
@@ -207,10 +211,10 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する    
     if verbose: debug_csv(df_x, case_names[0])
     
-    df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル
+    df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル(input_frames, 1)
     
-    x = df_x.to_numpy(dtype=np.float32)
-    y = df_y.to_numpy(dtype=np.int64)
+    x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
+    y = df_y.to_numpy(dtype=np.int64)           # (input_frames, 1)
     #
     # GRUモデルの学習を実行する
     #
@@ -218,8 +222,12 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     num_classes = 19    
     # 0:完了への移行, 1:動作完了, 2:動作開始
     # (8セクションx2+2)=0~18
-    model = KyudoGRU( input_size = input_dim,
-                      output_size = num_classes ).to( get_device() )
+    if model_opt == '-models':
+        model = KyudoGRUs( input_size = input_dim,
+                        output_size = num_classes ).to( get_device() )
+    else:
+        model = KyudoGRUm( input_size = input_dim,
+                        output_size = num_classes ).to( get_device() )
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
     

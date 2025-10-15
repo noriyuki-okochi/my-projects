@@ -127,17 +127,20 @@ def predict_Kyudo( model, np_x, s_frames):
   # 予測データ
   input_frames, input_size = np_x.shape
   log_write(f"[predict_Kyudo]:np_x={np_x.shape}")     
-
+  
   # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
   #input_frames -= s_frames
   x_zeros = np.zeros( (s_frames, input_size) )
   x = np.vstack( [x_zeros, np_x] )
   log_write(f"[predict_Kyudo]:x={x.shape}")     
-  #
+  #ulog.debug(f"[predict_Kyudo]:x={x}")
+ #
   x_data = np.zeros( (input_frames, s_frames, input_size) )
   for i in range(input_frames):
     x_data[i] = x[i:i + s_frames].reshape(-1, input_size)
-
+  x_data[1:,:, -2] = 0.0   # section
+  x_data[1:,:, -1] = 0.0   # completed
+  
   x_data = torch.tensor(x_data, dtype=torch.float32).to(device )
   log_write(f"[predict_Kyudo]:x_data={x_data.shape}")
   
@@ -148,10 +151,14 @@ def predict_Kyudo( model, np_x, s_frames):
   model.eval()
   for t in range(input_frames):
       x = x_data[t].reshape(1, s_frames, input_size)
+      ulog.debug(f"[predict_Kyudo]:t={t}:{x}")
       with torch.no_grad():
           y_pred = model(x)
           action = torch.argmax( y_pred, dim=1).item()
       #
+      if action != 0:
+          log_write("[predict_Kyudo]:not zero action!!")    
+      ulog.debug(f"[predict_Kyudo]:action={action}")
       y_data[t] = action
       '''
       if action == 1:       # 動作完了
@@ -167,14 +174,15 @@ def predict_Kyudo( model, np_x, s_frames):
           completed = 1
       else:                   # 動作開始
           section = (action + 1) / 2
-          completed = 0        
+          completed = 0    
+          
+      ulog.debug(f"[predict_Kyudo]:section={section}:completed={completed}")
           
       # 状態を次の入力データに埋め込む
-      if t < input_frames - s_frames:
-        for k in range(1, s_frames - 1):
-          x_data[t + k:,-k,-2] = float(section)
-          x_data[t + k:,-k,-1] = float(completed)
-      ulog.debug(f"[predict_Kyudo]:x[{t}]={x}")
+      for k in range(1, s_frames):
+        if (t + k) < input_frames:
+          x_data[t + k, -k, -2] = float(section)
+          x_data[t + k, -k, -1] = float(completed)
         
   y_data = y_data.reshape(-1)  
   log_write(f"[predict_Kyudo]:y_pred={y_data.shape}")   
