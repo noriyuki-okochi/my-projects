@@ -43,6 +43,9 @@ class KyudoGRU(nn.Module):
     
     self.gru = nn.GRU(input_size, hidden_size, n_layers, batch_first=True)
   
+  def get_class_name(self):
+    return self.__class__.__name__
+  
   def forward(self, x):
     pass
   
@@ -105,7 +108,7 @@ class KyudoGRUs(KyudoGRU):
 #
 # GRU(multi-heads)モデルの定義
 #
-class KyudoGRUm(nn.Module):
+class KyudoGRUm(KyudoGRU):
   def __init__(self, input_size=8, hidden_size=64, output_size=3, n_layers=1):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers) 
     

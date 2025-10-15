@@ -110,7 +110,10 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
       
   model.close_csv()      
   #  学習結果のモデルを保存する
-  model_pth = pth if pth is not None else f"./{MODEL_NAME}{input_size}-{s_frames}.pt"
+  class_name:str = model.get_class_name()
+  log_write(f"[train_Kyudo]:model class={class_name}")
+  model_name = f'{MODEL_NAME}_{class_name[-1]}'
+  model_pth = pth if pth is not None else f"./{model_name}{input_size}-{s_frames}.pt"
   torch.save(model.state_dict(), model_pth)
   #
   ulog.debug(model.state_dict())
