@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 #import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
+from datetime import datetime
 
 # local package
 from kyudo.env import * 
@@ -39,7 +40,8 @@ for arg in args:
     cmdline += f" {arg}"
 #    
 print(os.getcwd())
-log_write('<< kyudoApp start >>')
+timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+log_write(f'<< kyudoApp start at {timestamp} >>')
 log_write(f"[kyudoApp]info:cmdline={cmdline}")
 #print(db)
 # コマンドライン引数を辞書に変換
@@ -60,7 +62,7 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-csv <csv-file-path>}] [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
          + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
-         + "        [-train|-predict] [{-models|-modelm} '<model-path>'] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
+         + "        [<section>=<no>] [-train|-predict] [{-models|-modelm} ['<model-path>']] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
          + "        [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
@@ -185,34 +187,54 @@ if '-hparam' in cmds:
         if len(params) == 3 and \
            (params[0].isnumeric() and params[1].isnumeric() and params[2].isnumeric()):
             hyper_parameters = (int(params[0]), int(params[1]), int(params[2]))
-#
+
+# section=<no>の解析（指定セクションのデータのみ学習、またはプロット）
 df_k = None     # 予測結果データフレーム
+section:int = None
+sect_opts = [opt for opt in args if opt.startswith('section')]
+if len(sect_opts) > 0: 
+    # section=<no>の解析
+    params = sect_opts[0].split('=')
+    if len(params) == 2 and params[1].isnumeric():
+        section = int(params[1])
+#
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #
+    # GRUモデルの学習、または予測を指定するコマンドオプションの解析
     if '-predict' in cmds: predict = True
     if predict and model_pth is None:
+        #  予測実行時は学習済モデルファイルの指定が必須
         print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
         exit(0)
     #  学習用データの読み込み
-    cols = ['rw_norm/box_h as rw_ratio','lw_norm/box_h as lw_ratio',\
+    features = ['rw_norm/box_h as rw_ratio','lw_norm/box_h as lw_ratio',\
             'eyes_norm/box_w as eyes_ratio',\
             'hr_norm/box_h as hr_ratio','hr_angle/180.0 as hr_deg',\
             'section','completed']
-    input_dim = len(cols)
-    log_write(f"[kyudoApp]:features:{cols}")
-
-    df_x = db.pandas_read_kyudo( cols )         # 学習用特徴量(input_frames, input_dim)
-    #debug_csv(df_x, case_names[0])
-    
+    input_dim = len(features)
+    log_write(f"[kyudoApp]:features:{features}")
+    if section is None:
+        # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
+        df_x = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
+    else:
+        # 指定セクションのデータを読み込み（frame_noをインデックスに設定）
+        # section={section,section+1}を選択
+        df_x = db.pandas_read_kyudo_section( features, section )    
+    # 特異値の補正
     for col in df_x.columns:
         if '_ratio' in col :
-            df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測地(NaN)に置換する
+            df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測値(NaN)に置換する
     df_x.ffill(inplace=True)    # 欠測値を直前の値に置換する
     df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する    
-    if verbose: debug_csv(df_x, case_names[0])
+    if verbose: df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
     
-    df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル(input_frames, 1)
+    if section is None:
+        df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル(input_frames, 1)
+    else:    
+        df_y = db.pandas_read_kyudo_section( ['label'], section )  # section={section,section+1}を選択
+    if verbose: df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
     
+    # numpy配列に変換
     x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
     y = df_y.to_numpy(dtype=np.int64)           # (input_frames, 1)
     #
@@ -223,27 +245,28 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # 0:完了への移行, 1:動作完了, 2:動作開始
     # (8セクションx2+2)=0~18
     if model_opt == '-models':
-        model = KyudoGRUs( input_size = input_dim,
-                        output_size = num_classes ).to( get_device() )
+        model = KyudoGRUs( input_size = input_dim, output_size = num_classes )
+        model.to( get_device() )
     else:
-        model = KyudoGRUm( input_size = input_dim,
-                        output_size = num_classes ).to( get_device() )
+        model = KyudoGRUm( input_size = input_dim, output_size = num_classes )
+        model.to( get_device() )
+    # モデル情報の表示
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
     
-    # 事前学習済モデルの読み込み
+    # 学習済モデルの読み込み
     if model_pth is not None:
         if os.path.isfile(model_pth):
             model.load_state_dict(torch.load(model_pth, map_location=get_device()))
             log_write(f"[kyudoApp]:model loaded from {model_pth}")
         else:
             print(f"[kyudoApp]error:model-file({model_pth}) not found.")
-            exit(0) 
             
     # 学習パラメータ
     s_frames, batch_size, n_epoch = hyper_parameters
     log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")
     log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
+    log_write(f"[kyudoApp]:section:{section}")
     if not predict:      
         # 学習実行
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
@@ -256,8 +279,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
         
         out_csv = f"kyudo_predict_{case_names[0]}.csv"
-        #df_p.to_csv(out_csv, index=None, float_format='%.4f', na_rep='NaN', sep='\t')
-        df_p.to_csv(out_csv, float_format='%.4f', na_rep='NaN', sep='\t')
+        df2csv(df_p, title='df_p on predict', file=out_csv)
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
 #
 # CSVデータのプロットコマンド(-csv)オプションの解析
@@ -350,8 +372,8 @@ else:
 # その他、コマンドオプションの解析
 #
 if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
-    if case_compare == True or key_names[0] == 'csv':
-        print("[chrart]error: 'multi case-name' and '-m' cannot be specified at the same time.")
+    if case_compare == True or plot_csv == True:
+        print("[chrart]error: '(multi case-name' or csv plot) and '-m' cannot be specified at the same time.")
         exit(0)
     while len(selkeys) > 1: del selkeys[1]      # 先頭キーポイントのみ対象
     m_flg = True
@@ -437,12 +459,14 @@ for icount, key in enumerate(selkeys, start=1):
             dfk = df
         elif predict:
             dfk = df_p
-            debug_csv(dfk, case_name)
             dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
             df = db.pandas_read_kyudo()
             print(f"[kyudoApp]info:df{df.shape}")
         else:
-            dfk = db.pandas_read_kyudo()
+            if section is not None:
+                dfk = db.pandas_read_kyudo_section(section = section)
+            else:  dfk = db.pandas_read_kyudo()
+            df = dfk
             print(f"[kyudoApp]info:dfk{dfk.shape}")
             # 特異値の補正
             for col in dfk.columns:
