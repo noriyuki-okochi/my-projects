@@ -5,13 +5,14 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 import logging
 DEBUG = logging.DEBUG
 INFO = logging.INFO
 ERROR = logging.ERROR
 ulog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('kyudoUtil.log', mode='a')  # ログファイルの設定
+filehandler = logging.FileHandler('kyudo_util.log', mode='a')  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
@@ -33,9 +34,17 @@ def log_write(fmtmsg):
 #
 # デバッグ用CSV出力関数
 # df: 出力するDataFrame
-def debug_csv(df, case_name='none'):
-    out_csv = f"kyudo_debug_{case_name}.csv"
-    #df.to_csv(out_csv, mode='a', index=None, float_format='%.4f', na_rep='NaN', sep='\t')
+def df2csv(df, case_name='none', title=None, file=None):
+    # CSV出力ファイルの作成
+    if file is not None: out_csv = file
+    else: out_csv = f"kyudo_debug_{case_name}.csv"
+    # CSVファイルのヘッダー出力
+    if title is not None:
+      timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+      f = open(out_csv, 'a')
+      f.write(f"# {title}: {timestamp}\n")
+      f.close()
+    # CSVファイルのデータ出力      
     df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #    
 # デバイスの取得
@@ -80,7 +89,8 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
   # 損失関数と最適化手法の定義
   criterion = nn.CrossEntropyLoss()
   optimaizer = optim.Adam(model.parameters(), lr=0.001 )
-  record_loss_train = []  # list to record loss value
+  
+  #record_loss_train = []  # list to record loss value
   model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train' )
   
   # 学習ループ
@@ -100,26 +110,26 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
     #  
     # calculate average loss
     #loss_train /= (j + 1)                 
-    record_loss_train.append(loss_train)  # record loss to list
+    #record_loss_train.append(loss_train)  # record loss to list
     
-    # 20エポックごとに学習過程を表示
-    model.write_csv( [i, loss_train] )
+    model.write_csv( [i, loss_train] )    # 学習過程をCSVファイルに出力
     if i%20 == 0:
-      #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},predicted={y[0]}')
+      # 20エポックごとに学習過程を表示
+      #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},y={y[0]}')
       log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f}')
       
   model.close_csv()      
   #  学習結果のモデルを保存する
   class_name:str = model.get_class_name()
   log_write(f"[train_Kyudo]:model class={class_name}")
-  model_name = f'{MODEL_NAME}_{class_name[-1]}'
-  model_pth = pth if pth is not None else f"./{model_name}{input_size}-{s_frames}.pt"
+  model_name = f'{MODEL_NAME}{class_name[-1]}'
+  model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}.pt"
   torch.save(model.state_dict(), model_pth)
   #
   ulog.debug(model.state_dict())
   log_write(f"[train_Kyudo]:model saved as {model_pth}")
   
-  return record_loss_train
+  return #record_loss_train
 #  
 # GRUモデルを使って予測を実行する関数
 # np_x: 入力データ (input_frames, input_size)
@@ -160,7 +170,7 @@ def predict_Kyudo( model, np_x, s_frames):
           action = torch.argmax( y_pred, dim=1).item()
       #
       if action != 0:
-          log_write("[predict_Kyudo]:not zero action!!")    
+          log_write(f"[predict_Kyudo]:not zero action={action}, t={t}")    
       ulog.debug(f"[predict_Kyudo]:action={action}")
       y_data[t] = action
       '''
