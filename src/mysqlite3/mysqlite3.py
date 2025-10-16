@@ -289,7 +289,7 @@ class MyDb:
         sql = f"select * from tracking_data where key_id={key_id} and case_name='{self.case_name}'"
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
-#   read kyudo_data(return pandas-DataFrame)
+#   read kyudo_data of each case_name(return pandas-DataFrame)
 #       
     def pandas_read_kyudo(self, cols=None):
         
@@ -299,6 +299,19 @@ class MyDb:
             sql = 'select frame_no,' +  ','.join(cols)
                                 
         sql += f" from kyudo_data where case_name='{self.case_name}'"
+        return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
+#
+#   read kyudo_data on each section(return pandas-DataFrame)
+#       
+    def pandas_read_kyudo_section(self, cols=None, section=0):
+        
+        if cols is None: 
+            sql = "select *"
+        else: 
+            sql = 'select frame_no,' +  ','.join(cols)
+                                
+        sql += f" from kyudo_data where section >= {section} and section <= {section+1} "\
+                " order by case_name,frame_no asc"
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
 #   read frame_info(return pandas-DataFrame)
