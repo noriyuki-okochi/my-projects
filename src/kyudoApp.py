@@ -49,12 +49,7 @@ args_dict = {arg: idx for idx, arg in enumerate(args)}
 ulog.info(f"[kyudoApp]info:args={args_dict}")
 
 key_names:str = [name for name in Kn2idx]
-feature_names = ['box_conf', 'box_w', 'box_h',\
-                 'rw_norm', 'lw_norm',\
-                 'rl_norm', 'rl_angle', 'hr_norm', 'hr_angle',\
-                 'er_angle', 'sl_angle',\
-                 'eyes_norm', 'hips_norm']
-key_names.extend(feature_names)
+key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
@@ -207,10 +202,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
         exit(0)
     #  学習用データの読み込み
-    features = ['rw_norm/box_h as rw_ratio','lw_norm/box_h as lw_ratio',\
-            'eyes_norm/box_w as eyes_ratio',\
-            'hr_norm/box_h as hr_ratio','hr_angle/180.0 as hr_deg',\
-            'section','completed']
+    features = Features_list_1
     input_dim = len(features)
     log_write(f"[kyudoApp]:features:{features}")
     if section is None:
