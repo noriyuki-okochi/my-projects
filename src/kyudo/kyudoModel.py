@@ -31,7 +31,11 @@ class KyudoRNN(nn.Module):
 # GRUモデルの定義
 #
 class KyudoGRU(nn.Module):
-  def __init__(self, input_size, hidden_size, n_layers):
+  def __init__(self, input_size, hidden_size, n_layers,
+               section_vocab_size=10,
+               section_embed_dim=8,
+               completed_vocab_size=2,
+               completed_embed_dim=4):
     super(KyudoGRU, self).__init__() 
     #
     self.csvfile = None
@@ -40,8 +44,12 @@ class KyudoGRU(nn.Module):
     self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     self.n_layers = n_layers
     self.hidden_size = hidden_size
-    
-    self.gru = nn.GRU(input_size, hidden_size, n_layers, batch_first=True)
+    self.section_embed = nn.Embedding(section_vocab_size, section_embed_dim)
+    self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
+
+    # GRU入力サイズ：YOLO解析ベクトル + section埋め込み + completed埋め込み
+    self.gru_input_size = (input_size - 2) + section_embed_dim + completed_embed_dim  
+    self.gru = nn.GRU(self.gru_input_size, hidden_size, n_layers, batch_first=True)
   
   def get_class_name(self):
     return self.__class__.__name__
@@ -52,6 +60,14 @@ class KyudoGRU(nn.Module):
   # 初期隠れ状態の生成
   def init_hidden(self, batch_size):
     return torch.zeros(self.n_layers, batch_size, self.hidden_size).to(self.device)
+  
+  # 出力マスク
+  def mask_output(self, y, section):
+    aloowed = [0, 2*section - 1, 2*section]  # 0:移行中, 1:完了, 2:開始
+    mask = torch.zeros_like(y)
+    mask[:, aloowed] = 1
+    ym = y * mask
+    return ym
   
   # CSVファイルのオープン、書き込み、クローズ
   def open_csv(self, headers='', path="./", fname='model'):
@@ -90,37 +106,77 @@ class KyudoGRUs(KyudoGRU):
     #self.softmax = nn.Softmax(dim=1)
   
   def forward(self, x):
-    batch_size = x.size(0)
+    """
+    x: [batch, seq_len, input_size]
+    - x[:, :, :5] → YOLO解析ベクトル
+    - x[:, :, -2] → section（整数）
+    - x[:, :, -1] → completed（整数）
+    """
+    batch_size, seq_len, featues_size = x.size()
+
+    #section_no = int(x[0, -1, -2])          # section
+    section_ids   = x[:, -1, -2].long()     # [batch]
+    completed_ids = x[:, -1, -1].long()     # [batch]
+
+    # 埋め込み 
+    section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
+    completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
+    # 時系列全体に複製
+    section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
+    completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
+
+    # YOLO解析ベクトルのみ抽出
+    featues_size -= 2
+    yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
+    # 結合してGRUへ
+    x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+    
     inith = self.init_hidden(batch_size)
     #out, _ = self.gru(x, inith)
     #y = self.fc(out[:,-1,:])
-    _, hidden = self.gru( x, inith )
+    _, hidden = self.gru( x_concat, inith )
     y = self.fc( hidden.squeeze(0) )
     return y
-  
-  # 出力マスク
-  def mask_output(self, y, section):
-    aloowed = [0, 2*section - 1, 2*section]  # 0:移行中, 1:完了, 2:開始
-    mask = torch.zeros_like(y)
-    mask[:, aloowed] = 1
-    ym = y * mask
-    return ym
 #
 # GRU(multi-heads)モデルの定義
 #
 class KyudoGRUm(KyudoGRU):
-  def __init__(self, input_size=8, hidden_size=64, output_size=3, n_layers=1):
+  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers) 
     
     self.heads = nn.ModuleList([ nn.Linear(hidden_size, output_size) for _ in range(10) ])
   
   def forward(self, x):
-    batch_size = x.size(0)
-    inith = self.init_hidden(batch_size)
-    section = int(x[0, -1, -2])     # section
+    """
+    x: [batch, seq_len, input_size]
+    - x[:, :, :5] → YOLO解析ベクトル
+    - x[:, :, -2] → section（整数）
+    - x[:, :, -1] → completed（整数）
+    """
+    batch_size, seq_len, featues_size = x.size()
 
-    _, hidden = self.gru( x, inith )
-    y = self.heads[section]( hidden.squeeze(0) )
+    section_no = int(x[0, -1, -2])          # section
+    section_ids   = x[:, -1, -2].long()     # [batch]
+    completed_ids = x[:, -1, -1].long()     # [batch]
+
+    # 埋め込み 
+    section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
+    completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
+    # 時系列全体に複製
+    section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
+    completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
+
+    # YOLO解析ベクトルのみ抽出
+    featues_size -= 2
+    yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
+    # 結合してGRUへ
+    x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+    #
+    inith = self.init_hidden(batch_size)
+    _, hidden = self.gru( x_concat, inith )
+    y = self.heads[section_no]( hidden.squeeze(0) )   
+    #   
+    #y = self.mask_output( y, section )
     return y  
 #
 #eof 
