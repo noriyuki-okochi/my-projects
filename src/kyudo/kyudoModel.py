@@ -100,8 +100,9 @@ class KyudoGRU(nn.Module):
 # GRU(single-head)モデルの定義
 #
 class KyudoGRUs(KyudoGRU):
-  def __init__(self, input_size=8, hidden_size=64, output_size=3, n_layers=1):
+  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1):
     super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers) 
+    self.output_size = output_size
     self.fc = nn.Linear(hidden_size, output_size)
     #self.softmax = nn.Softmax(dim=1)
   
@@ -143,7 +144,8 @@ class KyudoGRUs(KyudoGRU):
 class KyudoGRUm(KyudoGRU):
   def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers) 
-    
+    self.output_size = output_size
+    # 複数の全結合層を用意（section数分）
     self.heads = nn.ModuleList([ nn.Linear(hidden_size, output_size) for _ in range(10) ])
   
   def forward(self, x):

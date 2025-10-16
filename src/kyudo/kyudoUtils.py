@@ -58,7 +58,7 @@ def get_device():
 # np_x: 入力データ (input_frames, input_size)
 # np_yact: 正解データ (input_frames,)
 # s_frames: 1セットのフレーム数 
-def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth=None):
+def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, pth=None):
   
   input_frames, input_size = np_x.shape
   log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")   
@@ -123,7 +123,8 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=8, n_epoch=201, pth
   class_name:str = model.get_class_name()
   log_write(f"[train_Kyudo]:model class={class_name}")
   model_name = f'{MODEL_NAME}{class_name[-1]}'
-  model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}.pt"
+  output_size = model.output_size
+  model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
   torch.save(model.state_dict(), model_pth)
   #
   ulog.debug(model.state_dict())
