@@ -62,8 +62,7 @@ def get_hyper_parameters(cmds, def_parameters):
         if len(params) > 0:
           values = [None] * len(def_parameters)
           for i, p in enumerate(params):
-            if not p.isnumeric(): 
-              if i < 3: values[i] = def_parameters[i]
+            if not p.isnumeric(): values[i] = def_parameters[i]
             else: values[i] = int(p)
           parameters = tuple( values )
     
@@ -74,7 +73,32 @@ def get_hyper_parameters(cmds, def_parameters):
 def get_device():
     print(f"[get_device]:device={device}")
     return device
-#  
+#
+# セクションと完了状態の更新関数
+# action: モデルの出力アクション  
+# section: 現在のセクション
+# completed: 現在の完了状態
+# output_size: モデルの出力サイズ
+# 戻り値: 更新後の(section, completed)  
+def update_section_completed( action, section, completed, output_size):
+  if output_size == 3:
+    if action == 1:       # 動作完了
+      completed = 1
+    elif action == 2:     # 動作開始
+      section = min(section + 1, 9) 
+      completed = 0
+  elif output_size == 19:
+    if action == 0:         # 完了への移行
+        completed = 0
+    elif action % 2 == 0 :  # 動作完了
+        section = action / 2
+        completed = 1
+    else:                   # 動作開始
+        section = (action + 1) / 2
+        completed = 0
+  return section, completed
+      
+
 # GRUモデルの学習を実行する関数
 # model: GRUモデル
 # np_x: 入力データ (input_frames, input_size)
@@ -143,7 +167,6 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
   model.close_csv()      
   #  学習結果のモデルを保存する
   class_name:str = model.get_class_name()
-  log_write(f"[train_Kyudo]:model class={class_name}")
   model_name = f'{MODEL_NAME}{class_name[-1]}'
   output_size = model.output_size
   model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
@@ -196,22 +219,9 @@ def predict_Kyudo( model, np_x, s_frames):
           log_write(f"[predict_Kyudo]:not zero action={action}, t={t}")    
       ulog.debug(f"[predict_Kyudo]:action={action}")
       y_data[t] = action
-      '''
-      if action == 1:       # 動作完了
-          completed = 1
-      elif action == 2:     # 動作開始
-          section = min(section + 1, 9) 
-          completed = 0
-      '''
-      if action == 0:         # 完了への移行
-          completed = 0
-      elif action % 2 == 0 :  # 動作完了
-          section = action / 2
-          completed = 1
-      else:                   # 動作開始
-          section = (action + 1) / 2
-          completed = 0    
-          
+      
+      # セクションと完了状態の更新
+      section, completed = update_section_completed( action, section, completed, model.output_size)
       ulog.debug(f"[predict_Kyudo]:section={section}:completed={completed}")
           
       # 状態を次の入力データに埋め込む
