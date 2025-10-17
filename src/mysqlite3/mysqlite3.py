@@ -197,7 +197,7 @@ class MyDb:
 #
 # insert kyudo-data.( csv only)
 #
-    def insert_kyudo_data(self, data_list):
+    def insert_kyudo_data(self, data_list, num_classes = 3):
         
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
@@ -213,13 +213,11 @@ class MyDb:
         
         label = 0
         if self.section != self._section:
-            #label = 2
-            label = self.section * 2 - 1
+            label = 2 if num_classes == 3 else (self.section * 2 - 1)
             self._section = self.section
             self._completed = 0
         elif self.completed != self._completed:
-            #label = 1
-            label = self.section * 2
+            label = 1 if num_classes == 3 else (self.section * 2)
             self._completed = self.completed
           
         values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"
