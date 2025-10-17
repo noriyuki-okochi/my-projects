@@ -57,7 +57,7 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-csv <csv-file-path>}] [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
          + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
-         + "        [<section>=<no>] [-train|-predict] [{-models|-modelm} ['<model-path>']]\n"\
+         + "        [<section>=<no>] [<classes>=<num>] [-train|-predict] [{-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-h(elp)] [-d(ebug)]")
     exit(0)
@@ -191,6 +191,17 @@ if len(sect_opts) > 0:
     params = sect_opts[0].split('=')
     if len(params) == 2 and params[1].isnumeric():
         section = int(params[1])
+
+# class=<num>の解析(出力クラス数の指定)
+#num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
+#num_classes = 19   # (8セクションx2+2)=0~18 
+num_classes:int = 19
+num_opts = [opt for opt in args if opt.startswith('classes')]
+if len(num_opts) > 0: 
+    # classes=<no>の解析
+    params = num_opts[0].split('=')
+    if len(params) == 2 and params[1].isnumeric():
+        num_classes = int(params[1])
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #
@@ -231,10 +242,6 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #
     # GRUモデルの学習を実行する
     #
-    #num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
-    #num_classes = 19   # (8セクションx2+2)=0~18 
-    # 
-    num_classes = 19    
     # 学習パラメータ
     s_frames, batch_size, n_epoch, section_dim, completed_dim = hyper_parameters
     log_write(f"[kyudoApp]:num_classes:{num_classes}")

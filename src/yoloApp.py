@@ -68,6 +68,8 @@ Update_enabled:bool = False     # DBのトラッキングデータ更新オン
 # データベースのインスタンスを作成
 Db = MyDb(DB_PATH)  
 Db.mode = 'csv'         # 解析結果のトラッキングデータをCSVファイルに出力する
+# GRUモデル
+Num_classes:int = 3     # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 # YOLOv8モデル
 V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 #
@@ -76,7 +78,7 @@ V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name>]\n"\
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name> [classes=<num>]]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
         + "                         [-I ['<frame_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
@@ -96,7 +98,7 @@ def help():
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
-    print(" -s(tep):step-no default=1")
+    print(" -s(kill):skill-level default=1")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
     print(" -h(elp)")
     print(" -g(uidance)<color><level>::[Y|G|B|W]: yellow, green(default), black, white,[1|2|3]")
@@ -576,7 +578,7 @@ def tracking_result( myResult):
                  rw_norm, lw_norm, rl_norm, rl_angle, hr_norm, hr_angle,\
                  er_angle, sl_angle, eyes_norm, hips_norm]
     
-    Db.insert_kyudo_data( data_list )  # CSVファイルに書き込み
+    Db.insert_kyudo_data( data_list, Num_classes )  # CSVファイルに書き込み
     
     if Db.mode == 'csv': 
         Db.csvfile1.flush()
@@ -1772,7 +1774,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 def main(): 
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
-    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled
+    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Num_classes
     global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt
     global StartAction_param, CompleteAction_param
     global Rect_area
@@ -1918,6 +1920,16 @@ def main():
             print(f"> '{case_name}' already registered. Are you sure?[y/n].")
             ans = input('>>')
             if ans != 'y': return
+        # トラッキングデータ出力のケース数を設定
+        num_opts = [opt for opt in args if opt.startswith('classes')]
+        if len(num_opts) > 0: 
+            # classes=<no>の解析
+            params = num_opts[0].split('=')
+            if len(params) == 2 and params[1].isnumeric():
+                Num_classes = int(params[1])
+                if Num_classes != 3 and Num_classes != 19:
+                    print("クラス数は3か19のどちらかで指定してください")
+                    return
     #
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
@@ -2191,6 +2203,9 @@ def main():
     if not raw_video:
         mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.), Lag={Sample_lag}")
         print(f"[main]:サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.), Lag={Sample_lag}")    
+    if Tracking_only or Update_tracking:
+        mylog.log(INFO, f"[main]:出力クラス区分数: {Num_classes}")
+        print(f"[main]:出力クラス区分数: {Num_classes}")    
     #   
     Frame_counter = 1                   # フレームカウンターの初期化
     if raw_video is True:
