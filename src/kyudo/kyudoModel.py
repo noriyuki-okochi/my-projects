@@ -43,12 +43,18 @@ class KyudoGRU(nn.Module):
     # GPUチェック
     self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     self.n_layers = n_layers
-    self.hidden_size = hidden_size
-    self.section_embed = nn.Embedding(section_vocab_size, section_embed_dim)
-    self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
+    self.hidden_size = hidden_size 
+    self.embed = False
+    if section_embed_dim is not None:
+      self.embed = True
+      self.section_embed = nn.Embedding(section_vocab_size, section_embed_dim)
+      self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
 
-    # GRU入力サイズ：YOLO解析ベクトル + section埋め込み + completed埋め込み
-    self.gru_input_size = (input_size - 2) + section_embed_dim + completed_embed_dim  
+      # GRU入力サイズ：YOLO解析ベクトル + section埋め込み + completed埋め込み
+      self.gru_input_size = (input_size - 2) + section_embed_dim + completed_embed_dim
+    else:
+      self.gru_input_size = input_size
+    #    
     self.gru = nn.GRU(self.gru_input_size, hidden_size, n_layers, batch_first=True)
   
   def get_class_name(self):
@@ -100,8 +106,13 @@ class KyudoGRU(nn.Module):
 # GRU(single-head)モデルの定義
 #
 class KyudoGRUs(KyudoGRU):
-  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1):
-    super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers) 
+  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1,
+               section_embed_dim=8,
+               completed_embed_dim=4):
+    super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers,
+                                   section_embed_dim=section_embed_dim,
+                                   completed_embed_dim=completed_embed_dim) 
+    #
     self.output_size = output_size
     self.fc = nn.Linear(hidden_size, output_size)
     #self.softmax = nn.Softmax(dim=1)
@@ -116,22 +127,25 @@ class KyudoGRUs(KyudoGRU):
     batch_size, seq_len, featues_size = x.size()
 
     #section_no = int(x[0, -1, -2])          # section
-    section_ids   = x[:, -1, -2].long()     # [batch]
-    completed_ids = x[:, -1, -1].long()     # [batch]
+    if self.embed is True:
+      section_ids   = x[:, -1, -2].long()     # [batch]
+      completed_ids = x[:, -1, -1].long()     # [batch]
 
-    # 埋め込み 
-    section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
-    completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
-    # 時系列全体に複製
-    section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
-    completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
+      # 埋め込み 
+      section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
+      completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
+      # 時系列全体に複製
+      section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
+      completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
 
-    # YOLO解析ベクトルのみ抽出
-    featues_size -= 2
-    yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
-    # 結合してGRUへ
-    x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
-    
+      # YOLO解析ベクトルのみ抽出
+      featues_size -= 2
+      yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
+      # 結合してGRUへ
+      x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+    else:
+      x_concat = x
+    #
     inith = self.init_hidden(batch_size)
     #out, _ = self.gru(x, inith)
     #y = self.fc(out[:,-1,:])
@@ -142,8 +156,12 @@ class KyudoGRUs(KyudoGRU):
 # GRU(multi-heads)モデルの定義
 #
 class KyudoGRUm(KyudoGRU):
-  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1):
-    super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers) 
+  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1,
+               section_embed_dim=8,
+               completed_embed_dim=4):
+    super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers,
+                                    section_embed_dim=section_embed_dim,
+                                   completed_embed_dim=completed_embed_dim) 
     self.output_size = output_size
     # 複数の全結合層を用意（section数分）
     self.heads = nn.ModuleList([ nn.Linear(hidden_size, output_size) for _ in range(10) ])
@@ -157,22 +175,26 @@ class KyudoGRUm(KyudoGRU):
     """
     batch_size, seq_len, featues_size = x.size()
 
-    section_no = int(x[0, -1, -2])          # section
-    section_ids   = x[:, -1, -2].long()     # [batch]
-    completed_ids = x[:, -1, -1].long()     # [batch]
+    section_no = int(x[0, -1, -2])            # section
+    #
+    if self.embed is True:
+      section_ids   = x[:, -1, -2].long()     # [batch]
+      completed_ids = x[:, -1, -1].long()     # [batch]
 
-    # 埋め込み 
-    section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
-    completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
-    # 時系列全体に複製
-    section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
-    completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
+      # 埋め込み 
+      section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
+      completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
+      # 時系列全体に複製
+      section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
+      completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
 
-    # YOLO解析ベクトルのみ抽出
-    featues_size -= 2
-    yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
-    # 結合してGRUへ
-    x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+      # YOLO解析ベクトルのみ抽出
+      featues_size -= 2
+      yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
+      # 結合してGRUへ
+      x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+    else:
+      x_concat = x   
     #
     inith = self.init_hidden(batch_size)
     _, hidden = self.gru( x_concat, inith )

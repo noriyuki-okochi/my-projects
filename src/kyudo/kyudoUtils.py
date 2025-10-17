@@ -34,6 +34,9 @@ def log_write(fmtmsg):
 #
 # デバッグ用CSV出力関数
 # df: 出力するDataFrame
+# case_name: ケース名
+# title: CSVファイルのタイトル（ヘッダー）
+# file: 出力ファイル名（Noneの場合はデフォルト名）
 def df2csv(df, case_name='none', title=None, file=None):
     # CSV出力ファイルの作成
     if file is not None: out_csv = file
@@ -46,6 +49,25 @@ def df2csv(df, case_name='none', title=None, file=None):
       f.close()
     # CSVファイルのデータ出力      
     df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
+#
+# ハイパーパラメータの取得関数
+# cmds: コマンドライン引数リスト
+# def_parameters: デフォルトのハイパーパラメータタプル
+# 戻り値: ハイパーパラメータタプル
+def get_hyper_parameters(cmds, def_parameters):
+    parameters = def_parameters
+    i = cmds.index('-hparam')
+    if len(cmds) > (i + 1):
+        params = cmds[i+1][1:-1].split(',')   # (1,2,3,4,5)の形式で指定
+        if len(params) > 0:
+          values = [None] * len(def_parameters)
+          for i, p in enumerate(params):
+            if not p.isnumeric(): 
+              if i < 3: values[i] = def_parameters[i]
+            else: values[i] = int(p)
+          parameters = tuple( values )
+    
+    return parameters
 #    
 # デバイスの取得
 # 戻り値: device

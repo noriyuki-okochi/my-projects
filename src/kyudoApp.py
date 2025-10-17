@@ -57,7 +57,8 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-csv <csv-file-path>}] [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
          + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
-         + "        [<section>=<no>] [-train|-predict] [{-models|-modelm} ['<model-path>']] [-hparam '(<s_frame>,<batch_size>,<n_epoc>)']\n"\
+         + "        [<section>=<no>] [-train|-predict] [{-models|-modelm} ['<model-path>']]\n"\
+         + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
@@ -173,15 +174,13 @@ if '-modelm' in cmds: model_opt = '-modelm'
 if model_opt is not None:
     i = cmds.index( model_opt )
     if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' : model_pth = cmds[i +1]
-#
-hyper_parameters = (60, 16, 5)   # s_frames, batch_size, n_epoch 
+
+# ハイパーパラメータの設定
+# (s_frames, batch_size, n_epoch[, section_embed_dim, completed_embed_dim ])
+# (1,2,3)までの指定時は、埋め込みなし
+hyper_parameters = (128, 256, 501, 8, 4)   
 if '-hparam' in cmds:
-    i = cmds.index('-hparam')
-    if len(cmds) > (i + 1):
-        params = cmds[i+1][1:-1].split(',')
-        if len(params) == 3 and \
-           (params[0].isnumeric() and params[1].isnumeric() and params[2].isnumeric()):
-            hyper_parameters = (int(params[0]), int(params[1]), int(params[2]))
+    hyper_parameters = get_hyper_parameters( cmds, hyper_parameters )
 
 # section=<no>の解析（指定セクションのデータのみ学習、またはプロット）
 df_k = None     # 予測結果データフレーム
@@ -233,14 +232,25 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # GRUモデルの学習を実行する
     #
     #num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
+    #num_classes = 19   # (8セクションx2+2)=0~18 
+    # 
     num_classes = 19    
-    # 0:完了への移行, 1:動作完了, 2:動作開始
-    # (8セクションx2+2)=0~18
+    # 学習パラメータ
+    s_frames, batch_size, n_epoch, section_dim, completed_dim = hyper_parameters
+    log_write(f"[kyudoApp]:num_classes:{num_classes}")
+    log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
+    log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
+    log_write(f"[kyudoApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
+    log_write(f"[kyudoApp]:section-option:{section}")
     if model_opt == '-models':
-        model = KyudoGRUs( input_size = input_dim, output_size = num_classes )
+        model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
+                          section_embed_dim = section_dim,
+                          completed_embed_dim = completed_dim )
         model.to( get_device() )
     else:
-        model = KyudoGRUm( input_size = input_dim, output_size = num_classes )
+        model = KyudoGRUm( input_size = input_dim, output_size = num_classes,
+                          section_embed_dim = section_dim,
+                          completed_embed_dim = completed_dim )
         model.to( get_device() )
     # モデル情報の表示
     log_write(f"[kyudoApp]:model\n {model}")
@@ -253,12 +263,6 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
             log_write(f"[kyudoApp]:model loaded from {model_pth}")
         else:
             print(f"[kyudoApp]error:model-file({model_pth}) not found.")
-            
-    # 学習パラメータ
-    s_frames, batch_size, n_epoch = hyper_parameters
-    log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")
-    log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
-    log_write(f"[kyudoApp]:section:{section}")
     if not predict:      
         # 学習実行
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
