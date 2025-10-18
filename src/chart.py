@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 # local package
 from  kyudo.env import * 
 from  kyudo.param import * 
+from  kyudo.appUtil import * 
 from mysqlite3.mysqlite3 import MyDb
 
 #print(http.__file__)
@@ -104,49 +105,9 @@ for name in case_names:
 # CSVデータのインポートを指定するコマンドオプションの解析
 #
 if '-import' in cmds:
-    db.case_name = case_names[0]    # 対象は先頭のケース名に限定
-    csvfile = ''
-    i = cmds.index('-import')
-    if len(cmds) > (i + 1):
-        # トラッキングCSVファイルの切り出し
-        if not cmds[i+1].startswith('-'): csvfile = cmds[i+1]
-    if csvfile == '':
-        # コマンドラインで指定のない時はframe_infoテーブルから取得
-        i, csvfile = db.get_file_path()
-    
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[chart]error: csv-file({csvfile}) not found.")
-        exit(0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[chart]:read_csv:{df.shape}")
-    
-    # DBへトラッキングデータ登録
-    db.delete_tracking_data()      # 登録済データの削除
-    df.to_sql('tracking_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[chart]info:import '{csvfile}' to 'tracking_data'{df.shape}.")
-    # インポート実行回数更新
-    count += 1
-    db.update_frame_info('import', count)
-    
-    # 姿勢解析データをkyudo_dataテーブルへ変換登録
-    csvfile = csvfile.replace('track','kyudo')
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[chart]error: csv-file({csvfile}) not found.")
-        exit(0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[chart]:read_csv:{df.shape}")
-    
-    db.delete_kyudo_data()         # 登録済データの削除
-    df.to_sql('kyudo_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[chart]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
-#
-if count == 0:
-    print(f"[chart]error:No tracking data. you must import csv-file.")
-    exit(0)
+    # 対象は先頭のケース名に限定
+    if import_tracking_data(db, cmds, case_names[0]) is False:
+        exit(0)
 #
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
@@ -297,13 +258,12 @@ else:
                         subplot_titles=[key for key in selkeys if key != ''])
 #
 if verbose:
-    print(f"option:{opts}")             # オプション引数
-    print(f"selkeys:{selkeys}")         # 選択キーポイント名
-    print(f"case_names:{case_names}")
-    print(f"last:{last}")               # 表示フレーム数   
-    print(f"mlast:{mlast}")             # 表示フレーム数   
-    print(f"case_compare={case_compare}, section_conf={m_flg}")   
-    print(f"selnum:{selnum}")           
+    print(f"[chart]info:option:{opts}")                 # オプション引数
+    print(f"[chart]info:selkeys:{selkeys}")             # 選択キーポイント名
+    print(f"[chart]info:case_names:{case_names}")
+    print(f"[chart]info:last:{last}, mlast:{mlast}")    # 表示フレーム数   
+    print(f"[chart]info:case_compare={case_compare}, section_conf={m_flg}")   
+    print(f"[chart]info:selnum:{selnum}")           
     fig.print_grid()
 #
 #  データのプロット実行メイン
@@ -459,16 +419,17 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
-            # < tag1(completed) >
+            # < label >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                    name="tag1",
-                                    y=mdfk["tag1"],
-                                    marker_color= 'cyan',
+                                    name="action",
+                                    y=mdfk["label"],
+                                    marker_color= 'yellow',
                                     mode="markers"),
                             row = 2, 
                             col = 1,
                             secondary_y=True
                         )
+            '''
             # < tag2(started) >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                     name="tag2",
@@ -479,6 +440,7 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
+            '''
         #signal
         #next case
     #
