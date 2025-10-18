@@ -31,12 +31,13 @@ Kyudo_data_names = ['box_conf', 'box_w', 'box_h',\
                 'eyes_norm', 'hips_norm']
 
 # 学習用データの読み込みリスト
-Features_list_1 = ['rw_norm/box_h as rw_ratio',\
-                'lw_norm/box_h as lw_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
-                'hr_norm/box_h as hr_ratio',\
-                'hr_angle/180.0 as hr_deg',\
-                'section','completed']
+Features_list_1 = ['K.rw_norm/K.box_h as rw_ratio',\
+                'T.angle/180.0 as rw_deg',\
+                'K.lw_norm/K.box_h as lw_ratio',\
+                'K.eyes_norm/K.box_w as eyes_ratio',\
+                'K.hr_norm/K.box_h as hr_ratio',\
+                'K.hr_angle/180.0 as hr_deg',\
+                'K.section','K.completed']
 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
 Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle', 'hw_angle', 'hw_ratio'] 

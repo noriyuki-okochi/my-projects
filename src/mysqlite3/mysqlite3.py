@@ -292,11 +292,14 @@ class MyDb:
     def pandas_read_kyudo(self, cols=None):
         
         if cols is None: 
-            sql = "select *"
+            sql = f"select * from kyudo_data where case_name='{self.case_name}' order by frame_no asc"
         else: 
-            sql = 'select frame_no,' +  ','.join(cols)
-                                
-        sql += f" from kyudo_data where case_name='{self.case_name}'"
+            sql = 'select K.frame_no as frame_no,' +  ','.join(cols)                                    
+            sql += f" from (select * from kyudo_data where case_name ='{self.case_name}') as K left join "\
+                   " (select case_name, frame_no, angle from tracking_data "\
+                   f" where case_name ='{self.case_name}' and key_name='right_wrist') as T "\
+                    " on K.frame_no = T.frame_no order by K.frame_no asc"
+        
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
 #   read kyudo_data on each section(return pandas-DataFrame)
@@ -304,12 +307,15 @@ class MyDb:
     def pandas_read_kyudo_section(self, cols=None, section=0):
         
         if cols is None: 
-            sql = "select *"
+            sql = f"select * from kyudo_data where case_name='{self.case_name}' and "\
+                  f" section >= {section} and section <= {section+1} order by frame_no asc"
         else: 
-            sql = 'select frame_no,' +  ','.join(cols)
-                                
-        sql += f" from kyudo_data where section >= {section} and section <= {section+1} "\
-                " order by case_name,frame_no asc"
+            sql = 'select K.frame_no,' +  ','.join(cols)                                
+            sql += f" from (select * from kyudo_data where case_name ='{self.case_name}' and"\
+                   f" K.section >= {section} and K.section <= {section+1}) as K left join "\
+                   " (select case_name, frame_no, angle from tracking_data"\
+                   f" where case_name ='{self.case_name}' and key_name='right_wrist') as T "\
+                   " on K.frame_no = T.frame_no order by K.frame_no asc"
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
 #   read frame_info(return pandas-DataFrame)
