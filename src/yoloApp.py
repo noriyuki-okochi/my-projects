@@ -2187,8 +2187,7 @@ def main():
         #
         print(f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLOv8 ログレベル={mylog_level}")
-        print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}")
-        
+        print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}, 出力クラス区分数: {Num_classes}")        
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
@@ -2205,7 +2204,6 @@ def main():
         print(f"[main]:サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.), Lag={Sample_lag}")    
     if Tracking_only or Update_tracking:
         mylog.log(INFO, f"[main]:出力クラス区分数: {Num_classes}")
-        print(f"[main]:出力クラス区分数: {Num_classes}")    
     #   
     Frame_counter = 1                   # フレームカウンターの初期化
     if raw_video is True:
