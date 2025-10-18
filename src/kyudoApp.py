@@ -18,6 +18,7 @@ from kyudo.param import *
 from mysqlite3.mysqlite3 import MyDb
 from kyudo.kyudoModel import *
 from kyudo.kyudoUtils import *
+from kyudo.appUtil import * 
 
 #print(http.__file__)
 #
@@ -119,53 +120,9 @@ for name in case_names:
 # CSVデータのインポートを指定するコマンドオプションの解析
 #
 if '-import' in cmds and len(case_names) > 0 :
-    db.case_name = case_names[0]    # 対象は先頭のケース名に限定
-    csvfile = ''
-    i = cmds.index('-import')
-    if len(cmds) > (i + 1):
-        # トラッキングCSVファイルの切り出し
-        if not cmds[i+1].startswith('-'): csvfile = cmds[i+1]
-    if csvfile == '':
-        # コマンドラインで指定のない時はframe_infoテーブルから取得
-        i, csvfile = db.get_file_path()
-    
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[kyudoApp]error: csv-file({csvfile}) not found.")
-        exit(0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[kyudoApp]:read_csv:{df.shape}")
-    
-    # DBへトラッキングデータ登録
-    db.delete_tracking_data()      # 登録済データの削除
-    df.to_sql('tracking_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[kyudoApp]info:import '{csvfile}' to 'tracking_data'{df.shape}.")
-    # インポート実行回数更新
-    count += 1
-    db.update_frame_info('import', count)
-    
-    # 姿勢解析データをkyudo_dataテーブルへ変換登録
-    csvfile = csvfile.replace('track','kyudo')
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[chart]error: csv-file({csvfile}) not found.")
-        exit(0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[chart]:read_csv:{df.shape}")
-    
-    db.delete_kyudo_data()         # 登録済データの削除
-    df.to_sql('kyudo_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[chart]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
-    
-    # DBトラッキングデータをkyudo_dataテーブルへ変換登録
-    #db.conv_tracking2kyudo()  # 変換登録
-    #print(f"[chart]info:'conv tracking_data' -> 'kyudo_data'.")
-#
-if count == 0:
-    print(f"[kyudoApp]error:No tracking data. you must import csv-file.")
-    exit(0)
+    # 対象は先頭のケース名に限定
+    if import_tracking_data(db, cmds, case_names[0]) is False:
+        exit(0)
 #
 model_pth = None
 model_opt = None
@@ -231,17 +188,14 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     if verbose: df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
     
     if section is None:
-        df_y = db.pandas_read_kyudo( ['label'] )    # 教師ラベル(input_frames, 1)
+        df_y = db.pandas_read_kyudo( ['K.label as label'] )    # 教師ラベル(input_frames, 1)
     else:    
-        df_y = db.pandas_read_kyudo_section( ['label'], section )  # section={section,section+1}を選択
+        df_y = db.pandas_read_kyudo_section( ['K.label as label'], section )  # section={section,section+1}を選択
     if verbose: df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
     
     # numpy配列に変換
     x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
     y = df_y.to_numpy(dtype=np.int64)           # (input_frames, 1)
-    #
-    # GRUモデルの学習を実行する
-    #
     # 学習パラメータ
     s_frames, batch_size, n_epoch, section_dim, completed_dim = hyper_parameters
     log_write(f"[kyudoApp]:num_classes:{num_classes}")
@@ -249,6 +203,9 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
     log_write(f"[kyudoApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
     log_write(f"[kyudoApp]:section-option:{section}")
+    #
+    # GRUモデルのインスタンスを生成する
+    #
     if model_opt == '-models':
         model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
                           section_embed_dim = section_dim,
