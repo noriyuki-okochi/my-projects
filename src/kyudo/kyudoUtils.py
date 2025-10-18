@@ -81,12 +81,14 @@ def get_device():
 # output_size: モデルの出力サイズ
 # 戻り値: 更新後の(section, completed)  
 def update_section_completed( action, section, completed, output_size):
+  #
   if output_size == 3:
     if action == 1:       # 動作完了
       completed = 1
     elif action == 2:     # 動作開始
       section = min(section + 1, 9) 
       completed = 0
+  #
   elif output_size == 19:
     if action == 0:         # 完了への移行
         completed = 0
@@ -167,7 +169,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
   model.close_csv()      
   #  学習結果のモデルを保存する
   class_name:str = model.get_class_name()
-  model_name = f'{MODEL_NAME}{class_name[-1]}'
+  model_name = f'{MODEL_NAME}{class_name[-1]}' + 'e' if model.embed else 'n'
   output_size = model.output_size
   model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
   torch.save(model.state_dict(), model_pth)
