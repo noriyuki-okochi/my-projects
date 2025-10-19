@@ -100,6 +100,9 @@ for name in case_names:
     if FPS is None:
         print(f"[chart]error:'{names} not found in frame_info table.")
         exit(0)
+    if count == 0 and '-import' not in cmds:
+        print(f"[chart]error:'{names} import count is zero.")
+        exit(0)
 #print(f"[chart]info:FPS={FPS:.3f}, import_count={count}")
 #
 # CSVデータのインポートを指定するコマンドオプションの解析
@@ -142,9 +145,9 @@ if '-second' in args:
     i = args.index('-second')
     if len(args) > (i + 1):
         second_name = args[i+1]
-        if second_name not in Col_names:
+        if second_name not in Second_names:
             print(f"[chart]error:'{second_name}' not found. following names variable.")
-            print(Col_names)
+            print(Second_names)
             exit()
 #
 # spanデータの表示を指定するコマンドオプションの解析
@@ -179,7 +182,7 @@ if '-WMA' in args:
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
-LAST_FRAMES = 500               # display frames(default is 500 frames)
+LAST_FRAMES = 0                 # display frames(default is 0:all frames)
 last:int = int(LAST_FRAMES)     # 表示フレーム数      
 mlast:int = [None, None]
 p_option:bool = True            # '-p'オプションは遡って表示するフレーム数を指定  
@@ -261,7 +264,7 @@ if verbose:
     print(f"[chart]info:option:{opts}")                 # オプション引数
     print(f"[chart]info:selkeys:{selkeys}")             # 選択キーポイント名
     print(f"[chart]info:case_names:{case_names}")
-    print(f"[chart]info:last:{last}, mlast:{mlast}")    # 表示フレーム数   
+    print(f"[chart]info:mlast:{mlast}, last:{last}")    # 表示フレーム数   
     print(f"[chart]info:case_compare={case_compare}, section_conf={m_flg}")   
     print(f"[chart]info:selnum:{selnum}")           
     fig.print_grid()
@@ -322,9 +325,10 @@ for icount, key in enumerate(selkeys, start=1):
         #
         mdf = df.tail(mlast[icase])
         mdfk = dfk.tail(mlast[icase])
-        if mlast[icase] > last:
-            mdf = mdf.head(last)
-            mdfk = mdfk.head(last)
+        if mlast[icase] < last:
+            last = mlast[icase]
+        mdf = mdf.head(last)
+        mdfk = mdfk.head(last)
         print(f"[chart]info: mdf.shape={mdf.shape}")
         print(f"[chart]info: mdf.index=[{mdf.index[0]} -> {mdf.index[-1]}]")
         #

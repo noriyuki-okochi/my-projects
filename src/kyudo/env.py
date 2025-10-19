@@ -40,7 +40,7 @@ Features_list_1 = ['K.rw_norm/K.box_h as rw_ratio',\
                 'K.section','K.completed']
 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
-Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle', 'hw_angle', 'hw_ratio'] 
+Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle'] 
 
 # 動作解析起点データのサンプリング間隔（フレーム数）
 Sample_frames:int = 1
