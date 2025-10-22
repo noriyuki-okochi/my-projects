@@ -28,8 +28,9 @@ from kyudo.appUtil import *
 verbose:bool = False         # debug write
 m_flg:bool = False           # not display section/conf
 slider:bool = False          # display slider
-predict:bool = False         # predicted data
-plot_csv:bool = False        # csv-file data
+predict:bool = False         # predict mode
+plot_loss:bool = False       # loss-file data
+plot_pred:bool = False       # predicted-file data
 #
 # connect db
 db = MyDb(DB_PATH)
@@ -55,9 +56,9 @@ key_names.extend(Kyudo_data_names)
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
-         + "        [{<key_name1>|[ <key_name2>...]|*}|{-csv <csv-file-path>}] [-m(ulti)] [-b(ottom)] [-s(lider)]\n"\
-         + "        [-second <col_name>] [-range '<min>[,<max>']]\n"\
-         + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
+         + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
+         + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name>] [-range '<min>[,<max>']]\n"\
+         + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [<section>=<no>] [<classes>=<num>] [-train|-predict] [{-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-h(elp)] [-d(ebug)]")
@@ -67,6 +68,31 @@ cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()
 #
 if '-d' in opts:        #debug write
     verbose = True   
+#
+# 表示範囲のindexを指定するコマンドオプションの解析
+#
+LAST_FRAMES = 501                   # display frames(default is 501)
+last:int = 0                        # {-f|-p}指定時のデフォルト表示フレーム数      
+mlast:int = [None, None]
+p_option:bool = True            # '-p'オプションは遡って表示するフレーム数を指定  
+#
+nums = [int(num) for num in args if num.isnumeric()]
+if len(nums) > 0:               # display frames
+    last = int(nums[0])         # frames
+#
+pf_opt = [opt[1:] for opt in opts if (opt.startswith('-p') and not opt.startswith('-pred')) or opt.startswith('-f')]
+# '-pxxx'は最後から遡るフレーム数を指定、 '-fxxxx'は開始フレーム数を指定
+#  -f'xxxx,yyyy'はケース比較時の、各ケースに対する開始フレーム数を指定
+if len(pf_opt) > 0:
+    nums = pf_opt[0].split(',')
+    if nums[0][0] == 'f':       
+        p_option = False
+    if nums[0][1:].isnumeric(): mlast[0] = int(nums[0][1:])
+    if len(nums) > 1 and nums[1].isnumeric():  mlast[1] = int(nums[1])
+    else: mlast[1] = mlast[0]
+else:
+    last = int(LAST_FRAMES)        # default display frames
+    mlast[0] = mlast[1] = last
 #
 # 対象ケース名を指定するコマンドオプションの解析
 #
@@ -114,6 +140,9 @@ for name in case_names:
     FPS, count = db.get_fps()
     if FPS is None:
         print(f"[kyudoApp]error:'{names} not found in frame_info table.")
+        exit(0)
+    if count == 0 and '-import' not in cmds:
+        print(f"[kyudoApp]error:'{names} import count is zero.")
         exit(0)
 #print(f"[kyudoApp]info:FPS={FPS:.3f}, import_count={count}")
 #
@@ -192,7 +221,20 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     else:    
         df_y = db.pandas_read_kyudo_section( ['K.label as label'], section )  # section={section,section+1}を選択
     if verbose: df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
-    
+
+    # 学習データの使用範囲の指定がある場合の処理
+    if len(pf_opt) > 0:
+        print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")    # 表示フレーム数   
+        if not p_option:   # '-fxxxx' は開始フレームをフレーム数で指定
+            frame_length = df_x.index[-1] - df_x.index[0] + 1
+            mlast[0] = frame_length - mlast[0]
+        if last > mlast[0] or last == 0: 
+            last = mlast[0]
+        print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")               
+        df_x = df_x.tail(mlast[0])
+        df_y = df_y.tail(mlast[0])
+        df_x = df_x.head(last)
+        df_y = df_y.head(last)   
     # numpy配列に変換
     x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
     y = df_y.to_numpy(dtype=np.int64)           # (input_frames, 1)
@@ -230,7 +272,14 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     if not predict:      
         # 学習実行
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
-        exit(0)
+        csvfile = model.csvpath
+        plot_loss = True
+        df = pd.read_csv(csvfile)
+        print(f"[kyudoApp]:read_csv:{df.shape}")
+        mlast[0] = n_epoch
+        last = n_epoch
+        key_names.append('loss')
+        args.append('loss')    
     else:
         # 予測実行
         y_pred = predict_Kyudo( model, x, s_frames )
@@ -239,14 +288,17 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
         
         out_csv = f"kyudo_predict_{case_names[0]}.csv"
-        df2csv(df_p, title='df_p on predict', file=out_csv)
+        df2csv(df_p, title=None, file=out_csv)
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
+        mlast[0] = x.shape[0]
+        last = mlast[0]
+        m_flg = True   # 入力データと予測結果グラフを表示
 #
-# CSVデータのプロットコマンド(-csv)オプションの解析
+# CSVデータのプロットコマンド(-loss|-predicted)オプションの解析
 #
-if '-csv' in cmds:
+if '-loss' in cmds or '-predicted' in cmds:
     csvfile = ''
-    i = cmds.index('-csv')
+    i = cmds.index('-loss') if '-loss' in cmds else cmds.index('-predicted')
     if len(cmds) > (i + 1):
         # トラッキングCSVファイルの切り出し
         if not cmds[i+1].startswith('-'): csvfile = cmds[i+1]
@@ -254,12 +306,22 @@ if '-csv' in cmds:
         # ファイルが存在しないとき終了
         print(f"[kyudoApp]error: csv-file({csvfile}) not found.")
         exit(0)    
-    # CSVファイルを読み込む     
-    plot_csv = True
-    df = pd.read_csv(csvfile)
-    print(f"[kyudoApp]:read_csv:{df.shape}")
-    key_names.append('csv')
-    args.append('csv')      # key_namesに'csv'を追加
+    # CSVファイル区分判定 
+    key = 'loss' if '-loss' in cmds else 'predicted'
+    # CSVファイルを読み込む
+    if key == 'predicted':  
+        df = pd.read_csv(csvfile, sep='\t', index_col=0)
+        plot_pred = True
+        m_flg = True
+    else:  
+        df = pd.read_csv(csvfile)
+        plot_loss = True 
+    print(f"[kyudoApp]:read_csv:{csvfile}, {df.shape}")
+    x_len = df.shape[0]
+    mlast[0] = x_len
+    last = x_len
+    key_names.append(key)
+    args.append(key)      # key_namesに'loss' or 'predicted'を追加
 #
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
@@ -269,14 +331,14 @@ if selnum == 0:
     selnum = 1
     selkeys.append('all')         # all keys
 #
-if plot_csv:
-    selkeys[0] = df.columns[1]    # 2列目を対象)
+if plot_loss:
+    selkeys[0] = df.columns[1]    # 2列目を対象
     print(f"[kyudoApp]:selkeys:{selkeys}, df.columns:{df.columns}")    
 #
 # 1軸のrangeを指定するコマンドオプションの解析
 #
-range_min:float = 0.00
-range_max:float = 0.40
+range_min:float = None
+range_max:float = None
 if '-range' in args:
     i = args.index('-range')
     if len(args) > (i + 1):
@@ -297,46 +359,18 @@ if '-second' in args:
     i = args.index('-second')
     if len(args) > (i + 1):
         second_name = args[i+1]
-        if second_name not in Col_names:
+        if second_name not in Kyudo_data_names:
             print(f"[kyudoApp]error:'{second_name}' not found. following names variable.")
-            print(Col_names)
+            print(Kyudo_data_names)
             exit()
+        selkeys.remove(second_name)
+        selnum -= 1
 #
-#
-# 表示範囲のindexを指定するコマンドオプションの解析
-#
-LAST_FRAMES = 500               # display frames(default is 500 frames)
-last:int = int(LAST_FRAMES)     # 表示フレーム数      
-mlast:int = [None, None]
-p_option:bool = True            # '-p'オプションは遡って表示するフレーム数を指定  
-
-
-#
-nums = [int(num) for num in args if num.isnumeric()]
-if len(nums) > 0:               # display frames
-    last = int(nums[0])         # frames
-#
-pf_opt = [opt[1:] for opt in opts if (opt.startswith('-p') and not opt.startswith('-pred')) or opt.startswith('-f')]
-# '-pxxx'は最後から遡るフレーム数を指定、 '-fxxxx'は開始フレーム数を指定
-#  -f'xxxx,yyyy'はケース比較時の、各ケースに対する開始フレーム数を指定
-if len(pf_opt) > 0:
-    nums = pf_opt[0].split(',')
-    if nums[0][0] == 'f':       
-        p_option = False
-    if nums[0][1:].isnumeric(): mlast[0] = int(nums[0][1:])
-    if len(nums) > 1 and nums[1].isnumeric():  mlast[1] = int(nums[1])
-    else: mlast[1] = mlast[0]
-else:
-    mlast[0] = mlast[1] = last
-
 # その他、コマンドオプションの解析
 #
 if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
-    if case_compare == True or plot_csv == True:
-        print("[chrart]error: '(multi case-name' or csv plot) and '-m' cannot be specified at the same time.")
-        exit(0)
-    while len(selkeys) > 1: del selkeys[1]      # 先頭キーポイントのみ対象
-    m_flg = True
+    if case_compare is False and plot_loss is False:
+        m_flg = True
 #
 if '-b' in opts:        #凡例の表示位置
     legend_dict = dict(x=0.01,y=0.01,xanchor='left',yanchor='bottom',orientation='h')
@@ -364,19 +398,22 @@ if selnum == 4:
                         subplot_titles=[key for key in selkeys])
 elif selnum == 1:
     if m_flg == True :
-        if len(selkeys) > 0 and selkeys[0] != 'all':
+        if len(selkeys) > 0 :
+            if selkeys[0] == 'all':\
+                titles = ['features','predicted label'] if predict else ['features','section/completed/label']
+            elif selkeys[0] == 'predicted':
+                titles = [selkeys[0],'real']
+            else:
+                titles = [selkeys[0],'section/completed/label']
             fig = make_subplots(rows=2, cols=1, vertical_spacing=0.2,
-                            subplot_titles=[selkeys[0],'xy_conf'],
-                            shared_xaxes=True,
-                            specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
-        else:
-            fig = make_subplots(rows=2, cols=1, vertical_spacing=0.2,
-                            subplot_titles=['Features','Predict'],
+                            subplot_titles=titles,
                             shared_xaxes=True,
                             specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
     elif case_compare == True:
         fig = make_subplots(rows=2, cols=1, vertical_spacing=0.1,
-                            subplot_titles=[key for key in case_names])
+                            subplot_titles=[key for key in case_names],
+                            shared_xaxes=True,
+                            specs=[[{"secondary_y": True}], [{"secondary_y": True}]])
     else:
         if len(selkeys) > 0 and selkeys[0] != 'all':
             fig = make_subplots(rows=1, cols=1, 
@@ -391,19 +428,23 @@ else:
                         subplot_titles=[key for key in selkeys if key != ''])
 #
 if verbose:
-    print(f"option:{opts}")             # オプション引数
-    print(f"selkeys:{selkeys}")         # 選択キーポイント名
-    print(f"case_names:{case_names}")
-    print(f"last:{last}")               # 表示フレーム数   
-    print(f"mlast:{mlast}")             # 表示フレーム数   
-    print(f"case_compare={case_compare}, section_conf={m_flg}")   
-    print(f"selnum:{selnum}")           
+    print(f"[kyudoApp]option:{opts}")                 # オプション引数
+    print(f"[kyudoApp]selkeys:{selkeys}")             # 選択キーポイント名
+    print(f"[kyudoApp]case_names:{case_names}")
+    print(f"[kyudoApp]mlast:{mlast}, last:{last}")    # 表示フレーム数   
+    print(f"[kyudoApp]case_compare={case_compare}, section_conf={m_flg}")   
+    print(f"[kyudoApp]selnum:{selnum}")           
     fig.print_grid()
 #
 #  データのプロット実行メイン
 #
 for icount, key in enumerate(selkeys, start=1):
+    print(f"[kyudoApp]info:Plot icount={icount},key={key}")
+    if icount > 2:
+        print(f"[kyudoApp]info:icount({icount}) > 2 break.")
+        break
     for icase, case_name in enumerate(case_names):
+        print(f"[kyudoApp]info:Plot icase={icase},case={case_name}")
         # 表示ブロック(irow,icol)の指定
         if selnum == 4:
             irow = int((icount+1)/2)
@@ -413,13 +454,44 @@ for icount, key in enumerate(selkeys, start=1):
             icol = 1
         #
         # 'kyudo-data'テーブルからのデータ読み込み
-        # (-csvオプション指定時はCSVファイルから読み込み)
+        # (-lossオプション指定時はCSVファイルから読み込み)
         db.case_name = case_name
-        if plot_csv:
+        if plot_loss:
+            # CSVファイル読み込みのlossデータ
             dfk = df
+        elif plot_pred:
+            # CSVファイル読み込みの予測データ
+            df.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
+            act_np = df['predicted'].to_numpy(dtype=np.int64)
+            # 予測データ(action)からセクション、完了フラグの再計算
+            sect_np = np.zeros_like(act_np)
+            comp_np = np.zeros_like(act_np)
+            section_np = df['section'].to_numpy(dtype=np.int64)
+            completed_np = df['completed'].to_numpy(dtype=np.int64)
+            section = section_np[0]
+            completed = completed_np[0]
+            for i in range(len(act_np)):
+                act = act_np[i]
+                if act == 1: completed = 1  # 動作完了
+                if act == 2:                # 次セクションの動作開始
+                    if section == 9:    # 最終セクション
+                        section = 2     # 胴づくり
+                    else: section += 1
+                    completed = 0
+                sect_np[i] = section
+                comp_np[i] = completed
+            dfk = pd.DataFrame( {'predicted': act_np,
+                                 'section': sect_np,
+                                 'completed': comp_np }, index=df.index )
+            print(f"[kyudoApp]info:dfk{dfk.shape}")
+            # 実測データの読み込み
+            df = db.pandas_read_kyudo()
+            print(f"[kyudoApp]info:df{df.shape}")
         elif predict:
-            dfk = df_p
+            # 予測結果データフレームの読み込み
+            dfk = df_p  
             dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
+            # 実測データの読み込み
             df = db.pandas_read_kyudo()
             print(f"[kyudoApp]info:df{df.shape}")
         else:
@@ -450,7 +522,7 @@ for icount, key in enumerate(selkeys, start=1):
         # データの作成、編集
         # 表示範囲の計算とデータの抽出
         #
-        if icount == 1:
+        if icount == 1 and not (plot_loss or plot_pred or predict):
             if not p_option:   # '-fxxxx' は開始フレームをフレーム数で指定
                 mlast[icase] = frame_length - mlast[icase]
             if last > mlast[icase] or last == 0: 
@@ -459,26 +531,15 @@ for icount, key in enumerate(selkeys, start=1):
         #
         mdf = df.tail(mlast[icase])
         mdfk = dfk.tail(mlast[icase])
-        if mlast[icase] > last:
-            mdf = mdf.head(last)
-            mdfk = mdfk.head(last)
+        mdf = mdf.head(last)
+        mdfk = mdfk.head(last)
+
         print(f"[kyudoApp]info:mdfk{mdfk.shape}")
         print(f"[kyudoApp]info:frame_no = [{mdfk.index[0]} -> {mdfk.index[-1]}]")
         #
         # データのプロット
         #
-        if key != 'all':
-            # < ratio >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name=key,
-                                        y=mdfk[key], 
-                                        mode="lines"),
-                                        #line_color= 'gray',                                  
-                                        #line={'dash':'dot'},
-                                row = irow, 
-                                col = icol   
-                            )
-        else:
+        if key == 'all':        # 学習データの入力項目プロット
             # < rw_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="rw_ratio",
@@ -487,16 +548,6 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = irow, 
                                 col = icol   
                             )
-            '''
-            # < lw_ratio >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="lw_ratio",
-                                        y=mdfk["lw_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            '''
             # < eyes_ratio >            
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="eyes_ratio",
@@ -515,20 +566,47 @@ for icount, key in enumerate(selkeys, start=1):
                                 col = icol,   
                                 secondary_y=True
                             )
-            '''
-            # < rl_deg >
-            # < hr_deg >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="hr_deg",
-                                        y=mdfk["hr_deg"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol,   
-                                secondary_y=True
-                            )
-            '''
         #              
-        # < add secondary column >
+        elif key == 'predicted':    # CSVファイル入力の予測結果データのプロット
+            #< label >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                    name="predicted",
+                                    y=mdfk["predicted"], 
+                                    marker_color= 'black',
+                                    mode="markers"),
+                            row = 1, 
+                            col = 1   
+                        )
+            # < section >
+            fig = fig.add_trace( go.Bar(x=mdfk.index, 
+                                    name="section",
+                                    y=mdfk["section"],
+                                    marker_color='grey'),
+                            row = 1, 
+                            col = 1,
+                            secondary_y=True
+                        )
+            # < completed >
+            fig = fig.add_trace( go.Bar(x=mdfk.index, 
+                                    name="completed",
+                                    y=mdfk["completed"],
+                                    marker_color='black'),
+                            row = 1, 
+                            col = 1,
+                            secondary_y=True
+                        )
+        else:                       # 学習用生データ
+            # <one of kyudo_data >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name=key,
+                                        y=mdfk[key], 
+                                        mode="lines"),
+                                        #line_color= 'gray',                                  
+                                        #line={'dash':'dot'},
+                                row = irow, 
+                                col = icol   
+                            )
+        # < add secondary column >  #   二軸指定の学習用生データ
         if selnum == 1 and second_name is not None:
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name=second_name,
@@ -544,7 +622,7 @@ for icount, key in enumerate(selkeys, start=1):
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                     name="label",
                                     y=mdf["label"], 
-                                    marker_color= 'red',
+                                    marker_color= 'black',
                                     mode="markers"),
                             row = 2, 
                             col = 1   
@@ -568,7 +646,7 @@ for icount, key in enumerate(selkeys, start=1):
                             secondary_y=True
                         )
             #< predict >
-            if predict:
+            if predict:             # 予測結果データのプロット
                 fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="predicted",
                                         y=mdfk["predicted"], 
@@ -577,39 +655,6 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = 2, 
                                 col = 1   
                             )
-                # < section >
-                '''
-                fig = fig.add_trace( go.Bar(x=mdfk.index, 
-                                        name="section",
-                                        y=mdfk["section"],
-                                        marker_color='white'),
-                                row = 2, 
-                                col = 1,
-                                secondary_y=True
-                            )
-                '''
-            '''
-            # < tag1(completed) >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                    name="tag1",
-                                    y=mdfk["tag1"],
-                                    marker_color= 'cyan',
-                                    mode="markers"),
-                            row = 2, 
-                            col = 1,
-                            secondary_y=True
-                        )
-            # < tag2(started) >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                    name="tag2",
-                                    y=mdfk["tag2"],
-                                    marker_color= 'blue',
-                                    mode="markers"),
-                            row = 2, 
-                            col = 1,
-                            secondary_y=True
-                        )
-            '''
         #signal
         #next case
     #
@@ -639,7 +684,8 @@ if selnum == 4:
     fig.update(layout_xaxis2_rangeslider_visible=False)
     fig.update(layout_xaxis3_rangeslider_visible=False)
     fig.update(layout_xaxis4_rangeslider_visible=False)
-    fig.update_yaxes(range=(range_min, range_max))
+    if range_min is not None and range_max is not None:
+        fig.update_yaxes(range=(range_min, range_max))
     fig.update_layout(
         showlegend = False
     )
@@ -648,13 +694,23 @@ else:
         fig.update(layout_xaxis_rangeslider_visible=False)
         fig.update(layout_xaxis2_rangeslider_visible=False)
         fig.update(layout_xaxis2_showticklabels = False)
-        fig.update_traces(dict(showlegend = False), row=2, col=1)
-        fig.update_yaxes(range=(range_min, range_max))
+        #fig.update_traces(dict(showlegend = False), row=2, col=1)
+        if range_min is not None and range_max is not None:
+            fig.update_yaxes(range=(range_min, range_max))
         #fig.update_xaxes(showticklabels = False)
     elif selnum == 1:
         if second_name is not None:
             fig.update_yaxes(title_text=second_name,  
                             secondary_y=True, showgrid=False,
+                            row=1, col=1)
+        if plot_loss is True:
+            fig.update_xaxes(title_text="epoch-count")
+        else:
+            fig.update_xaxes(title_text=f"frame-count (1/{FPS:.2f}={1/FPS:.2f}sec.)")  
+        if plot_pred: 
+            fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
+                            row=1, col=1)
+            fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True,
                             row=1, col=1)
     if m_flg == True :
         if slider:
@@ -662,7 +718,7 @@ else:
         fig.update(layout_xaxis2_showticklabels = True)
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
-            xaxis1_title = "Frame count", 
+            xaxis1_title = "frame count", 
             #yaxis = dict(title='norm/height',range=(range_min, range_max),showgrid=True), 
             yaxis3= dict(title='label', side='left', showgrid=True), 
             showlegend = True
@@ -670,7 +726,9 @@ else:
         if second_name is not None:
             fig.update_yaxes(title_text=second_name, secondary_y=True, showgrid=False,
                             row=1, col=1)
-        fig.update_yaxes(title_text="section-no", range=(0, 14), secondary_y=True, showgrid=True, 
+        fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
+                            row=2, col=1)
+        fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
@@ -680,6 +738,39 @@ else:
 fig.show()
 # 
 #fig.write_html('candle_figure.html', auto_open=True)
+#
+if plot_loss:
+    while True:
+        value = ''
+        print(f">Please input new-file-name( {csvfile} ).!: [/:cancle]")
+        value = input(f"{csvfile[-18:-4]} -> :")
+        if value == '/' or len(value) == 0: break
+        newfile = f"{csvfile[:-18]}{value}.csv"
+        if os.path.isfile(newfile) == True:
+            print(f"{newfile} is already exsit.Overwrite? [y/n]:")
+            value = input(f":")
+            if value.lower() != 'n': continue
+            os.remove(newfile)
+        os.rename(csvfile, newfile)
+        print(f"[kyudoApp]info:{csvfile} renamed to '{newfile}'")
+        break
+#
+if predict:
+    while True:
+        value = ''
+        print(f">Please input new-file-name( {out_csv} ).!: [/:cancle]")
+        value = input(f"{out_csv[14:-4]} -> :")
+        if value == '/' or len(value) == 0: break
+        newfile = f"{out_csv[:14]}{value}.csv"
+        if os.path.isfile(newfile) == True:
+            print(f"{newfile} is already exsit.Overwrite? [y/n]:")
+            value = input(f":")
+            if value.lower() != 'n': continue
+            os.remove(newfile)
+        os.rename(out_csv, newfile)
+        print(f"[kyudoApp]info:{out_csv} renamed to '{newfile}'")
+        break
+# kyudo_predict_iijima-1.7s1-3
 #
 #
 #eof
