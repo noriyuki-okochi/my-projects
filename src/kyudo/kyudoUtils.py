@@ -169,7 +169,8 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
   model.close_csv()      
   #  学習結果のモデルを保存する
   class_name:str = model.get_class_name()
-  model_name = f'{MODEL_NAME}{class_name[-1]}' + 'e' if model.embed else 'n'
+  model_name = f'{MODEL_NAME}{class_name[-1]}'
+  model_name +=  'e' if model.embed else 'n'
   output_size = model.output_size
   model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
   torch.save(model.state_dict(), model_pth)

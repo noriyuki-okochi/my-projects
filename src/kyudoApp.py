@@ -287,7 +287,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df_yp = pd.DataFrame(y_pred, columns=['predicted'])
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
         
-        out_csv = f"kyudo_predict_{case_names[0]}.csv"
+        out_csv = f"predict_{case_names[0]}.csv"
         df2csv(df_p, title=None, file=out_csv)
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
         mlast[0] = x.shape[0]
@@ -650,7 +650,7 @@ for icount, key in enumerate(selkeys, start=1):
                 fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name="predicted",
                                         y=mdfk["predicted"], 
-                                        marker_color= 'black',
+                                        marker_color= 'red',
                                         mode="markers"),
                                 row = 2, 
                                 col = 1   
@@ -759,13 +759,13 @@ if predict:
     while True:
         value = ''
         print(f">Please input new-file-name( {out_csv} ).!: [/:cancle]")
-        value = input(f"{out_csv[14:-4]} -> :")
+        value = input(f"{out_csv[8:-4]} -> :")
         if value == '/' or len(value) == 0: break
-        newfile = f"{out_csv[:14]}{value}.csv"
+        newfile = f"{out_csv[:8]}{value}.csv"
         if os.path.isfile(newfile) == True:
             print(f"{newfile} is already exsit.Overwrite? [y/n]:")
             value = input(f":")
-            if value.lower() != 'n': continue
+            if value.lower() == 'n': continue
             os.remove(newfile)
         os.rename(out_csv, newfile)
         print(f"[kyudoApp]info:{out_csv} renamed to '{newfile}'")
