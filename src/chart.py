@@ -46,7 +46,7 @@ opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("chart.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
          + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
-         + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
+         + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
@@ -182,8 +182,8 @@ if '-WMA' in args:
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
-LAST_FRAMES = 0                 # display frames(default is 0:all frames)
-last:int = int(LAST_FRAMES)     # 表示フレーム数      
+LAST_FRAMES = 500               # display frames(default is 500)
+last:int = 0                    # {-f|-p}指定時のデフォルト表示フレーム数      
 mlast:int = [None, None]
 p_option:bool = True            # '-p'オプションは遡って表示するフレーム数を指定  
 
@@ -205,6 +205,7 @@ if len(pf_opt) > 0:
     if len(nums) > 1 and nums[1].isnumeric():  mlast[1] = int(nums[1])
     else: mlast[1] = mlast[0]
 else:
+    last = int(LAST_FRAMES)
     mlast[0] = mlast[1] = last
 
 # その他、コマンドオプションの解析
@@ -505,7 +506,7 @@ else:
         if second_name is not None:
             fig.update_yaxes(title_text=second_name, secondary_y=True, showgrid=False,
                             row=1, col=1)
-        fig.update_yaxes(title_text="section-no", range=(0, 14), secondary_y=True, showgrid=True, 
+        fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
