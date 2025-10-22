@@ -209,6 +209,7 @@ def predict_Kyudo( model, np_x, s_frames):
   print(y_data.shape)  
   section = 0
   completed = 0
+  i = 0
   model.eval()
   for t in range(input_frames):
       x = x_data[t].reshape(1, s_frames, input_size)
@@ -218,7 +219,8 @@ def predict_Kyudo( model, np_x, s_frames):
           action = torch.argmax( y_pred, dim=1).item()
       #
       if action != 0:
-          log_write(f"[predict_Kyudo]:not zero action={action}, t={t}")    
+          i += 1
+          log_write(f"[predict_Kyudo]:({i:2d}) not zero action={action}, t={t}")    
       ulog.debug(f"[predict_Kyudo]:action={action}")
       y_data[t] = action
       
