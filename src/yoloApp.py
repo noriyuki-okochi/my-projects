@@ -1197,123 +1197,123 @@ def plot(myResult, annotated_frame=None):
     mylog.log(DEBUG, f"Tracking_enabled={Tracking_enabled}")
     mylog.log(DEBUG, f"[plot]: {type(result.keypoints)},{len(result.keypoints)}個のキーポイント")
 
-    if annotated_frame is None:
+    #if annotated_frame is None:
         # YOLOv8のplot関数を使用してフレームに描画  
         # 　kpt_line=False： キーポイントのマークのみを描画）
-        annotated_frame = result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
-    else:    
-        # 対象ボックスのキーポイントの接続ラインを描画
-        draw_kpts_line(annotated_frame, myResult.points)   
+        #annotated_frame = result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
+    #else:    
+    # 対象ボックスのキーポイントの接続ラインを描画
+    draw_kpts_line(annotated_frame, myResult.points)   
 
-        if Section_no < 2: 
-            # カメラの位置取得（足踏み完了まで）
-            CameraPos = get_camera_pos(myResult)                
+    if Section_no < 2: 
+        # カメラの位置取得（足踏み完了まで）
+        CameraPos = get_camera_pos(myResult)                
 
-        # セクション情報を更新
-        arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
-        
-        if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
-            # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
-            if Lap_start > 0:    
-                # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
-                Step_error = False
-                Alart_id = 0
-                if Section_no == 0 or Completed:
-                    # 動作の開始を判定
-                    if section_started(Section_no, myResult):
-                        Split_start = Frame_counter                         # スプリット開始時間を記録
-                        Split_sec = 0
-                        Completed = False                                   # セクションが開始されたら完了フラグをリセット    
-                        Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
-                        if Section_no != 9: 
-                            Section_no = Section_no + 1                     # セクション番号をインクリメント
-                            Step_counter = 0                                # セクション内の動作カウンター
-                        else: 
-                            counter = int(Step_counter/10)      
-                            mylog.log(INFO, f"[plot]:Step_counter={Step_counter}, {counter}") 
-                            if counter == 2: 
-                                Lap_start = 0                               # 退場動作開始の場合、解析終了
-                                Split_sec = 0
-                                Split_start = 0
-                            else:                                           # 乙矢の矢つがえ動作開始
-                                # セクション番号を2にリセット、動作カウンターを30に設定
-                                Section_no = 2
-                                Step_counter = 30
-                                mylog.log(INFO, f"[plot]:Next {Section_names[Section_no]} Sction_no={Section_no}, Step_counter={Step_counter}") 
-                        #
-                    else:
-                        Nop_counter += 1
-                        if Step_error:
-                            # セクション内の動作が不正な場合
-                            Alart_section = Section_no
-                            mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                            if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
-                                Section_no += 1                             # セクション番号をインクリメント
-                            if Alart_id == Alart_KaiNasi: Section_no += 1   # 会なしで離れた場合
-                            Step_counter = 0
-                            Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
+    # セクション情報を更新
+    arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
+    
+    if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
+        # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
+        if Lap_start > 0:    
+            # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
+            Step_error = False
+            Alart_id = 0
+            if Section_no == 0 or Completed:
+                # 動作の開始を判定
+                if section_started(Section_no, myResult):
+                    Split_start = Frame_counter                         # スプリット開始時間を記録
+                    Split_sec = 0
+                    Completed = False                                   # セクションが開始されたら完了フラグをリセット    
+                    Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
+                    if Section_no != 9: 
+                        Section_no = Section_no + 1                     # セクション番号をインクリメント
+                        Step_counter = 0                                # セクション内の動作カウンター
+                    else: 
+                        counter = int(Step_counter/10)      
+                        mylog.log(INFO, f"[plot]:Step_counter={Step_counter}, {counter}") 
+                        if counter == 2: 
+                            Lap_start = 0                               # 退場動作開始の場合、解析終了
+                            Split_sec = 0
+                            Split_start = 0
+                        else:                                           # 乙矢の矢つがえ動作開始
+                            # セクション番号を2にリセット、動作カウンターを30に設定
+                            Section_no = 2
+                            Step_counter = 30
+                            mylog.log(INFO, f"[plot]:Next {Section_names[Section_no]} Sction_no={Section_no}, Step_counter={Step_counter}") 
                     #
                 else:
-                    # 動作の完了を判定
-                    if section_completed(Section_no, myResult):
-                        Completed = True 
-                        if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
-                            Split_start = 0                                 # スプリット開始時間をリセット
-                        if Section_no == 9 and Step_counter == 0:           # 退場動作の場合、解析終了 
-                            Lap_start = 0
+                    Nop_counter += 1
+                    if Step_error:
+                        # セクション内の動作が不正な場合
+                        Alart_section = Section_no
+                        mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
+                        if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
+                            Section_no += 1                             # セクション番号をインクリメント
+                        if Alart_id == Alart_KaiNasi: Section_no += 1   # 会なしで離れた場合
+                        Step_counter = 0
+                        Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
+                #
+            else:
+                # 動作の完了を判定
+                if section_completed(Section_no, myResult):
+                    Completed = True 
+                    if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
+                        Split_start = 0                                 # スプリット開始時間をリセット
+                    if Section_no == 9 and Step_counter == 0:           # 退場動作の場合、解析終了 
+                        Lap_start = 0
+                    Step_counter = 0
+                    Nop_counter = 0
+                else:
+                    Nop_counter += 1
+                    if Step_error:
+                        # セクション内の動作が不正な場合
+                        Alart_section = Section_no
+                        mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
+                        if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
+                        if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
+                        if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
+                        if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
                         Step_counter = 0
                         Nop_counter = 0
-                    else:
-                        Nop_counter += 1
-                        if Step_error:
-                            # セクション内の動作が不正な場合
-                            Alart_section = Section_no
-                            mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                            if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
-                            if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
-                            if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
-                            if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
-                            Step_counter = 0
-                            Nop_counter = 0
-                    #
                 #
-                Db.section = Section_no        # トラッキングデータのセクション番号を設定              
-                Db.completed = 1 if Completed else 0
+            #
+            Db.section = Section_no        # トラッキングデータのセクション番号を設定              
+            Db.completed = 1 if Completed else 0
 
-                if Tracking_enabled:
-                    # 解析結果のデータをトラッキング登録先（DB/CSV）に出力する
-                    tracking_result(myResult)
-                if Update_enabled:
-                    # トラッキングデータのテーブル（'section'/'completed'）を更新する
-                    Db.update_tracking_section()  
-                    if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
-        #
-        # セクション情報をフレームに描画
-        if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
-        if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
-   
-        # セクション名を編集
-        section_name, Section_color = edit_section_name(Section_no, Step_counter)   
-        others_color =  WHITE                       # その他の色（白）
+            if Tracking_enabled:
+                # 解析結果のデータをトラッキング登録先（DB/CSV）に出力する
+                tracking_result(myResult)
+            if Update_enabled:
+                # トラッキングデータのテーブル（'section'/'completed'）を更新する
+                Db.update_tracking_section()  
+                if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
+    #
+    # セクション情報をフレームに描画
+    if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
+    if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
 
-        if Alart_id > 0: 
-            #Alart_message = Alart_msg[Alart_id]
-            Alart_message = Alart_msg[Alart_id*10]
-            print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
-            mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
-            
-        # テキストの描画           
-        cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-        #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
-        annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-        cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-        if Section_no == 4 or Section_no == 5 or Section_no == 6:
-            cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-        if Section_no == 7 or Section_no == 8:
-            cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-        # 警告メッセージの描画
-        annotated_frame = draw_text(annotated_frame, Alart_message, (10, 110), RED)
+    # セクション名を編集
+    section_name, Section_color = edit_section_name(Section_no, Step_counter)   
+    others_color =  WHITE                       # その他の色（白）
+
+    if Alart_id > 0: 
+        #Alart_message = Alart_msg[Alart_id]
+        Alart_message = Alart_msg[Alart_id*10]
+        print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
+        mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
+        
+    # テキストの描画           
+    cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
+    annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
+    cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if Section_no == 4 or Section_no == 5 or Section_no == 6:
+        cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if Section_no == 7 or Section_no == 8:
+        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 警告メッセージの描画
+    annotated_frame = draw_text(annotated_frame, Alart_message, (10, 110), RED)
     #
     return annotated_frame
 #
@@ -2299,12 +2299,13 @@ def main():
 
                 # 検出結果をフレームに描画
                 if manual_plot:
+                    # 生画像に手動（OpenCV）で描画
+                    # 射法八節の姿勢解析を実行
                     if Tracking_only or Update_tracking: 
                         Db.frame_no = Frame_counter     # トラッキングデータのフレーム番号を設定  
                     
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
-                        # 生画像に手動（OpenCV）で描画
                         annotated_frame = plot( myResult, frame)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
@@ -2317,8 +2318,10 @@ def main():
                                                     rect[0], rect[1], rect[2], rect[3] )
 
                 else:
-                    # YOLOのplot関数を使用してフレームに描画
-                    annotated_frame = plot( myResult )
+                    # YOLOv8のplot関数を使用してフレームに描画  
+                    # 　kpt_line=False： キーポイントのマークのみを描画）
+                    annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
+                    #annotated_frame = plot( myResult )
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
         #
