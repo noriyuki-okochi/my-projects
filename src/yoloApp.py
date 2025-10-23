@@ -1185,7 +1185,79 @@ def edit_section_name(no, counter):
         color =  YELLOW                         # セクションの色（黄色）BGR
         if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
 
-    return name, color  
+    return name, color
+#
+# 動作の開始を判定する関数
+#  
+def manual_analize_start(section_no, myResult):
+    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
+    global Step_error, Alart_section, Alart_id
+    
+    # 動作の開始を判定
+    if section_started(section_no, myResult):
+        Split_start = Frame_counter                         # スプリット開始時間を記録
+        Split_sec = 0
+        Completed = False                                   # セクションが開始されたら完了フラグをリセット    
+        Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
+        if Section_no != 9: 
+            Section_no = Section_no + 1                     # セクション番号をインクリメント
+            Step_counter = 0                                # セクション内の動作カウンター
+        else: 
+            counter = int(Step_counter/10)      
+            mylog.log(INFO, f"[manual_analize_start]:Step_counter={Step_counter}, {counter}") 
+            if counter == 2: 
+                Lap_start = 0                               # 退場動作開始の場合、解析終了
+                Split_sec = 0
+                Split_start = 0
+            else:                                           # 乙矢の矢つがえ動作開始
+                # セクション番号を2にリセット、動作カウンターを30に設定
+                Section_no = 2
+                Step_counter = 30
+                mylog.log(INFO, f"[manual_analize_start]:Next {Section_names[Section_no]} Sction_no={Section_no}, Step_counter={Step_counter}") 
+        #
+    else:
+        Nop_counter += 1
+        if Step_error:
+            # セクション内の動作が不正な場合
+            Alart_section = Section_no
+            mylog.log(INFO, f"[manual_analize_start]:Step_error={Step_error}, Alart_id={Alart_id}")
+            if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
+                Section_no += 1                             # セクション番号をインクリメント
+            if Alart_id == Alart_KaiNasi: Section_no += 1   # 会なしで離れた場合
+            Step_counter = 0
+            Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
+        #
+    return Section_no, Completed  
+#
+# 動作の完了を判定する関数
+#
+def manual_analize_completed(section_no, myResult):
+    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
+    global Step_error, Alart_section, Alart_id
+    
+    # 動作の完了を判定
+    if section_completed(section_no, myResult):
+        Completed = True 
+        if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
+            Split_start = 0                                 # スプリット開始時間をリセット
+        if Section_no == 9 and Step_counter == 0:           # 退場動作の場合、解析終了 
+            Lap_start = 0
+        Step_counter = 0
+        Nop_counter = 0
+    else:
+        Nop_counter += 1
+        if Step_error:
+            # セクション内の動作が不正な場合
+            Alart_section = Section_no
+            mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
+            if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
+            if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
+            if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
+            if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
+            Step_counter = 0
+            Nop_counter = 0
+        #
+    return Section_no, Completed  
 #
 # 検出結果をフレームに描画する関数
 #
@@ -1220,62 +1292,10 @@ def plot(myResult, annotated_frame=None):
             Alart_id = 0
             if Section_no == 0 or Completed:
                 # 動作の開始を判定
-                if section_started(Section_no, myResult):
-                    Split_start = Frame_counter                         # スプリット開始時間を記録
-                    Split_sec = 0
-                    Completed = False                                   # セクションが開始されたら完了フラグをリセット    
-                    Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
-                    if Section_no != 9: 
-                        Section_no = Section_no + 1                     # セクション番号をインクリメント
-                        Step_counter = 0                                # セクション内の動作カウンター
-                    else: 
-                        counter = int(Step_counter/10)      
-                        mylog.log(INFO, f"[plot]:Step_counter={Step_counter}, {counter}") 
-                        if counter == 2: 
-                            Lap_start = 0                               # 退場動作開始の場合、解析終了
-                            Split_sec = 0
-                            Split_start = 0
-                        else:                                           # 乙矢の矢つがえ動作開始
-                            # セクション番号を2にリセット、動作カウンターを30に設定
-                            Section_no = 2
-                            Step_counter = 30
-                            mylog.log(INFO, f"[plot]:Next {Section_names[Section_no]} Sction_no={Section_no}, Step_counter={Step_counter}") 
-                    #
-                else:
-                    Nop_counter += 1
-                    if Step_error:
-                        # セクション内の動作が不正な場合
-                        Alart_section = Section_no
-                        mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                        if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
-                            Section_no += 1                             # セクション番号をインクリメント
-                        if Alart_id == Alart_KaiNasi: Section_no += 1   # 会なしで離れた場合
-                        Step_counter = 0
-                        Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
-                #
+                Section_no, Completed = manual_analize_start(Section_no, myResult)
             else:
                 # 動作の完了を判定
-                if section_completed(Section_no, myResult):
-                    Completed = True 
-                    if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
-                        Split_start = 0                                 # スプリット開始時間をリセット
-                    if Section_no == 9 and Step_counter == 0:           # 退場動作の場合、解析終了 
-                        Lap_start = 0
-                    Step_counter = 0
-                    Nop_counter = 0
-                else:
-                    Nop_counter += 1
-                    if Step_error:
-                        # セクション内の動作が不正な場合
-                        Alart_section = Section_no
-                        mylog.log(INFO, f"[plot]:Step_error={Step_error}, Alart_id={Alart_id}")
-                        if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
-                        if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
-                        if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
-                        if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
-                        Step_counter = 0
-                        Nop_counter = 0
-                #
+                Section_no, Completed = manual_analize_completed(Section_no, myResult)
             #
             Db.section = Section_no        # トラッキングデータのセクション番号を設定              
             Db.completed = 1 if Completed else 0
