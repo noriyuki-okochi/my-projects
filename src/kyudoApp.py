@@ -244,7 +244,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
     log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
     log_write(f"[kyudoApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
-    log_write(f"[kyudoApp]:section-option:{section}")
+    log_write(f"[kyudoApp]:section-option={section}")
     #
     # GRUモデルのインスタンスを生成する
     #
@@ -739,38 +739,24 @@ fig.show()
 # 
 #fig.write_html('candle_figure.html', auto_open=True)
 #
-if plot_loss:
+if plot_loss or predict:
     while True:
         value = ''
+        if predict: csvfile = out_csv
+        prompt = csvfile[-18:-4] if plot_loss else csvfile[8:-4]
         print(f">Please input new-file-name( {csvfile} ).!: [/:cancle]")
-        value = input(f"{csvfile[-18:-4]} -> :")
+        value = input(f"{prompt} -> :")
         if value == '/' or len(value) == 0: break
-        newfile = f"{csvfile[:-18]}{value}.csv"
-        if os.path.isfile(newfile) == True:
-            print(f"{newfile} is already exsit.Overwrite? [y/n]:")
-            value = input(f":")
-            if value.lower() != 'n': continue
-            os.remove(newfile)
-        os.rename(csvfile, newfile)
-        print(f"[kyudoApp]info:{csvfile} renamed to '{newfile}'")
-        break
-#
-if predict:
-    while True:
-        value = ''
-        print(f">Please input new-file-name( {out_csv} ).!: [/:cancle]")
-        value = input(f"{out_csv[8:-4]} -> :")
-        if value == '/' or len(value) == 0: break
-        newfile = f"{out_csv[:8]}{value}.csv"
+        prefix = csvfile[:-18] if plot_loss else csvfile[:8]
+        newfile = f"{prefix}{value}.csv" 
         if os.path.isfile(newfile) == True:
             print(f"{newfile} is already exsit.Overwrite? [y/n]:")
             value = input(f":")
             if value.lower() == 'n': continue
             os.remove(newfile)
-        os.rename(out_csv, newfile)
-        print(f"[kyudoApp]info:{out_csv} renamed to '{newfile}'")
+        os.rename(csvfile, newfile)
+        print(f"[kyudoApp]info:{csvfile} renamed to '{newfile}'")
         break
-# kyudo_predict_iijima-1.7s1-3
 #
 #
 #eof
