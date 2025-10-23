@@ -79,13 +79,14 @@ V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name> [classes=3|19]]\n"\
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name> [-gru] [classes=3|19]]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
         + "                         [-I ['<frame_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
     print(" --- Option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
+    print(" -gru(:analize with NN-model)")
     print(" -r(aw-video)")
     print(" -clip(raw-video)")
     print(" -multi(video-layer display)")
@@ -1259,9 +1260,18 @@ def manual_analize_completed(section_no, myResult):
         #
     return Section_no, Completed  
 #
+#
+# GRUモデルによる動作解析関数
+def gru_analize(section_no, myResult):
+    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
+    global Step_error, Alart_section, Alart_id
+    
+    # GRUモデルによる動作解析
+    return Section_no, Completed
+#
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult, annotated_frame=None):
+def plot(myResult, annotated_frame=None, nn_gru=False):
     global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, CameraPos, Nop_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
@@ -1290,12 +1300,16 @@ def plot(myResult, annotated_frame=None):
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
             Step_error = False
             Alart_id = 0
-            if Section_no == 0 or Completed:
-                # 動作の開始を判定
-                Section_no, Completed = manual_analize_start(Section_no, myResult)
+            if nn_gru:
+                # GRUモデルによる動作解析
+                Section_no, Completed = gru_analize(Section_no, myResult)
             else:
-                # 動作の完了を判定
-                Section_no, Completed = manual_analize_completed(Section_no, myResult)
+                if Section_no == 0 or Completed:
+                    # 動作の開始を判定
+                    Section_no, Completed = manual_analize_start(Section_no, myResult)
+                else:
+                    # 動作の完了を判定
+                    Section_no, Completed = manual_analize_completed(Section_no, myResult)
             #
             Db.section = Section_no        # トラッキングデータのセクション番号を設定              
             Db.completed = 1 if Completed else 0
@@ -1317,12 +1331,12 @@ def plot(myResult, annotated_frame=None):
     others_color =  WHITE                       # その他の色（白）
 
     if Alart_id > 0: 
-        #Alart_message = Alart_msg[Alart_id]
+        #　警告メッセージ（全角文字）取得
         Alart_message = Alart_msg[Alart_id*10]
         print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
         mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
         
-    # テキストの描画           
+    # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
     cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
     annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
@@ -1809,7 +1823,8 @@ def main():
     cam_id = None                                   # デフォルトのカメラID
     raw_video = False                               # 生画像を表示するオプション
     clip_video = False                              # 生画像をクリップしてファイルを作成
-    manual_plot = False                             # 手動でプロットするオプション
+    manual_plot = False                             # 手動でプロット、姿勢解析するオプション
+    nn_gru = False                                  # GRUによる姿勢解析オプション
     multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = False                                # '-g'キー操作ガイダンス表示
@@ -1911,8 +1926,10 @@ def main():
         multi_frames = True     # 生画像を表示するオプション
         raw_video = True        # 生画像を表示するオプション
        
-    if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロットするオプション
+    if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
         manual_plot = True
+    if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
+        nn_gru = True
         
     if not raw_video and ( '-t' in opts) :
         manual_plot = True
@@ -2326,7 +2343,7 @@ def main():
                     
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
-                        annotated_frame = plot( myResult, frame)
+                        annotated_frame = plot( myResult, frame, nn_gru)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
