@@ -10,11 +10,12 @@ from datetime import datetime
 from copy import copy 
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
-import math
+import pandas as pd
 
 # local package
 from  kyudo.env import * 
 from  kyudo.param import * 
+from kyudo.appUtil import * 
 from mysqlite3.mysqlite3 import MyDb
 
 # Ultralytics YOLOv8とアプリ専用のロガー設定
@@ -143,25 +144,6 @@ def help():
     print("例)ローカルのplot機能で解析結果を描画: python yoloApp.py -a -m")  
     return
 #
-class StackActParam:
-    def __init__(self):
-        self.pars = []   # 動作解析パラメータ（番号、値）のリスト
-    def push(self, list):
-        self.clear()
-        for no, val in list:
-            self.pars.append( (no, val) )
-    def pop(self, idx=None):
-        if len(self.pars) == 0:
-            return None
-        return self.pars.pop() if idx is None else self.pars.pop(idx)
-    def get(self, idx):
-        if len(self.pars) == 0 or idx >= len(self.pars):
-            return None
-        return self.pars[idx]
-    def clear(self):
-        self.pars = []
-    def len(self):
-        return len(self.pars)
 #   
 Stkp = StackActParam()  # 動作解析パラメータ設定用のスタック
 #
@@ -170,32 +152,6 @@ def print_param(tbl):
     mylog.log(INFO, f"frame:{tbl['frame']}, step = {tbl['step']}, act = {tbl['act']}")
     for sect, raw_vals in enumerate(tbl['param']):
         mylog.log(INFO, f"({sect:2d}): {raw_vals}") 
-#
-def get_action_param(action_param_tbls, param_nm, step_no):
-    for tbl in action_param_tbls:
-        if param_nm == tbl['frame'] and step_no == tbl['step']:
-            return tbl['param'], tbl
-    return None, None
-#
-# ベクトルの長さ、角度を計算する関数
-#    vectの座標 [x, y]ndarray
-def vector_length_angle(vect):
-    return np.linalg.norm(vect), math.degrees(np.arctan2(vect[1], vect[0]))  # (長さ, 角度（ラジアン -> 角度）)
-#
-# 2点の座標が近いかどうかを判定する関数
-#    p1, p2の座標 [x, y]ndarray
-def near_points(p1, p2, threshold=10):
-    ans = False
-    '''
-    :param p1: 点1の座標 [x, y]ndarray
-    '''
-    vect = p1 - p2  # 2点のベクトルを計算
-    length, x = vector_length_angle(vect.numpy())  # ベクトルの長さと角度を計算
-    if abs(length) < threshold:
-        # ベクトルの長さが閾値以下の場合、近いと判断
-        ans = True
-    mylog.log(DEBUG, f"near={ans} : p1=({p1[0]},{p1[1]}), p2=({p2[0]}, {p2[1]}), threshold={threshold}")
-    return ans
 #
 #    検出結果から最前面のボックスを取得する関数
 def get_max_box(result):
@@ -261,55 +217,6 @@ def get_camera_pos(myResult):
         Camera_position = ipos
     return CameraPos_name[ipos]
 #
-# リングバッファのクラス定義
-#
-class RingBuffer:
-    def __init__(self, size):
-        self.size = size
-        self.buffer = []
-        self.index = 0      # 書き込みインデックス
-        self.length = 0
-
-    def append(self, item):
-        if len(self.buffer) < self.size:
-            self.buffer.append(item)
-            self.length = self.length + 1
-        else:
-            self.buffer[self.index] = item
-        self.index = (self.index + 1) % self.size
-
-    def get(self, ipos=None):
-        # ipos=None(0)のとき、最後の書き込みitemを返す
-        if ipos is None: ipos = 0
-        ipos = abs(ipos) + 1
-        if ipos > self.length:
-            return None
-        
-        idx = self.index - ipos 
-        if idx < 0: idx = self.length - (ipos - self.index)
-        return self.buffer[idx]
-    
-    def clear(self):
-        self.buffer = []
-        self.index = 0      # 書き込みインデックス
-        self.length = 0
-        
-    def len(self):
-        return self.length
-#
-#
-#    閾値の計算を行うクラス    
-#   
-class Threshold:
-    """
-    :param block_height: ブロックの高さ（画像の高さ）
-    """
-    def __init__(self, block_height):
-        self.block_height = block_height
-    def __call__(self, ratio):
-         return int(self.block_height * ratio)     # 閾値を計算して返す
-    def ratio(self, val):
-        return val / self.block_height             # 閾値の比率を計算して返す
 #
 #    キーポイントのデータ解析をする関数
 #
@@ -366,7 +273,7 @@ class Keypoint:
 # 例外クラス
 class BoundaryBoxError(Exception):
     pass
-
+# キーポイント解析クラスの拡張クラス定義
 class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
@@ -522,6 +429,32 @@ class MyResult(Keypoint):
         else:
             mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
+
+##    特徴量のデータフレームクラス
+class FeaturePdf:
+    Features_list = ['rw_ratio', 'rw_deg', 'lw_ratio', 'eyes_ratio',\
+                     'hr_ratio', 'hr_deg', 'section','completed']
+    def __init__(self, seq_frames:int):
+        self.seq_size = seq_frames
+        input_size = len(FeaturePdf.Features_list)
+        self.kyudo_data_list = [None]*input_size
+        self.curPdf = pd.DataFrame(np.zeros((1, input_size)), columns=FeaturePdf.Features_list)
+        self.prePdf = pd.DataFrame(np.zeros((1, input_size)), columns=FeaturePdf.Features_list)
+    
+    def set_kyudo_data_list(self, result: MyResult):
+        self.kyudo_data_list = []
+    def insert_previous_pdf(self, list):
+        self.prePdf = pd.DataFrame(list)
+    def set_current_pdf(self, list):
+        self.curPdf = pd.DataFrame(list)
+        
+    def update_previous_pdf(self):
+        self.prePdf.drop(0, inplace=True)                       # 先頭行を削除
+        self.prePdf =  pd.concat([self.prePdf, self.curPdf])    # 現在のデータを追加
+        
+    def get_input_pdf(self):
+        return pd.concat([self.prePdf, self.curPdf])            # 現在と過去のデータを結合して返す
+
 ###
 #    画像のコントラストと明るさを調整する関数
 #
@@ -539,7 +472,6 @@ def adjust_frame_contrast(frame, alpha=1,beta=0):
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult):
-#    keypoints = myResult.keypoints                     # キーポイントリスト(Tensor)
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
