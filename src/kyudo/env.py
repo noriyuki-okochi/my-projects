@@ -45,7 +45,15 @@ Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle']
 # 動作解析起点データのサンプリング間隔（フレーム数）
 Sample_frames:int = 1
 Sample_lag:int = 7
-
+# ハイパーパラメータのデフォルト値設定
+Sequence_frames:int = 128       # 入力シーケンスのフレーム数
+Batch_size:int = 256
+N_epoch:int = 501
+Section_dim:int = 8
+Completed_dim:int = 4
+Hyper_parameters = (Sequence_frames, \
+                    Batch_size, N_epoch,\
+                    Section_dim, Completed_dim)    
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)

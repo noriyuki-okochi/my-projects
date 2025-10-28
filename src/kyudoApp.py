@@ -164,7 +164,7 @@ if model_opt is not None:
 # ハイパーパラメータの設定
 # (s_frames, batch_size, n_epoch[, section_embed_dim, completed_embed_dim ])
 # (1,2,3)までの指定時は、埋め込みなし
-hyper_parameters = (128, 256, 501, 8, 4)   
+hyper_parameters = Hyper_parameters   
 if '-hparam' in cmds:
     hyper_parameters = get_hyper_parameters( cmds, hyper_parameters )
 
