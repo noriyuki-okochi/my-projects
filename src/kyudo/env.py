@@ -23,7 +23,7 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
         'left_knee':13, 'right_knee':14, 'left_ankle':15, 'right_ankle':16}  # キーポイント名
 
 # Kyudo_dataテーブルの項目名
-Kyudo_data_names = ['box_conf', 'box_w', 'box_h',\
+Kyudo_data_names = ['box_id', 'box_conf', 'box_w', 'box_h',\
                 'rw_norm', 'lw_norm',\
                 'rl_norm', 'rl_angle',\
                 'hr_norm', 'hr_angle',\
