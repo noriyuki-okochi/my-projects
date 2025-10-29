@@ -1659,6 +1659,12 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         Lap_start = 0                       # ラップ開始時間をリセット 
         Split_start = 0                     # スプリット開始時間をリセット 
         Step_counter = 0                    # セクション内の動作カウンターをリセット              
+
+    elif key == ord(' '):
+        #  動作完了
+        Completed = True
+        if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
+            Split_start = 0                                 # スプリット開始時間をリセット
     
     elif key == ord('.') and len(ctl['para_data']) == 0: 
                                             # (.) フレームカウンターを2秒進める
@@ -2248,7 +2254,7 @@ def main():
         if nn_gru:
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
-            input_dim = len(Features_list_1)
+            input_dim = len(Features_list_8)
             print(f"input_dim={input_dim}")
             
             _, _, _, section_dim, completed_dim = Hyper_parameters
