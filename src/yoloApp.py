@@ -13,9 +13,11 @@ import numpy as np
 import pandas as pd
 
 # local package
-from  kyudo.env import * 
-from  kyudo.param import * 
+from kyudo.env import * 
+from kyudo.param import * 
 from kyudo.appUtil import * 
+from kyudo.kyudoModel import * 
+from kyudo.kyudoUtils import *
 from mysqlite3.mysqlite3 import MyDb
 
 # Ultralytics YOLOv8とアプリ専用のロガー設定
@@ -66,7 +68,6 @@ Tracking_enabled:bool = False   # トラッキングオン
 Tracking_onece:bool = False     # トラッキング開始済
 Update_tracking:bool = False    # DBのトラッキングデータ(section,completed)更新
 Update_enabled:bool = False     # DBのトラッキングデータ更新オン
-
 # データベースのインスタンスを作成
 Db = MyDb(DB_PATH)  
 Db.mode = 'csv'         # 解析結果のトラッキングデータをCSVファイルに出力する
@@ -80,7 +81,7 @@ V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name> [-gru] [classes=3|19]]\n"\
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name> [-gru <model-path>] [classes=3|19]]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
         + "                         [-I ['<frame_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
@@ -144,8 +145,8 @@ def help():
     print("例)ローカルのplot機能で解析結果を描画: python yoloApp.py -a -m")  
     return
 #
-#   
-Stkp = StackActParam()  # 動作解析パラメータ設定用のスタック
+# 動作解析パラメータ設定用のスタック   
+Stkp = StackActParam()  
 #
 # 動作解析パラメータテーブルをログファイルに出力する
 def print_param(tbl):
@@ -359,7 +360,7 @@ class MyResult(Keypoint):
         return arrow_length  # 移動ベクトルの長さのリストを返す            
                 
     # 移動ベクトルの長さの移動平均を計算する    
-    def calc_moving_average(self, prePointsBuffer, weights):        
+    def calc_moving_average(self, prePointsBuffer:RingBuffer, weights):        
         """
         :param prePointsBuffer: リングバッファ
         :return: None
@@ -382,7 +383,7 @@ class MyResult(Keypoint):
             self.arrow_moving_ave[idx] = np.average(arrow_length, weights=weights)  
     
     # 各キーポイントの過去から現在位置への移動ベクトルの長さと角度を計算する                    
-    def calc_arrow_length_angles(self, prepointsBuffer):
+    def calc_arrow_length_angles(self, prepointsBuffer:RingBuffer):
         for i in range(0, prepointsBuffer.length):              # 直近のポイント(=0)から始める
             preResult = prepointsBuffer.get( i )                # 過去のキーポイントデータを取得     
             arrow_points = self.points - preResult.points       # 過去のキーポイントと現在位置の差分ベクトルを計算
@@ -437,41 +438,82 @@ class FeaturePdf:
     def __init__(self, seq_frames:int):
         self.seq_size = seq_frames
         input_size = len(FeaturePdf.Features_list)
-        self.kyudo_data_list = [None]*input_size
-        self.curPdf = pd.DataFrame(np.zeros((1, input_size)), columns=FeaturePdf.Features_list)
-        self.prePdf = pd.DataFrame(np.zeros((1, input_size)), columns=FeaturePdf.Features_list)
+        self.kyudo_data_list = [None]*len(Kyudo_data_names)
+        self.features_list = [None]*len(FeaturePdf.Features_list)
+        self.curPdf = None
+        self.prePdf = None
     
-    def set_kyudo_data_list(self, result: MyResult):
-        self.kyudo_data_list = []
-    def insert_previous_pdf(self, list):
-        self.prePdf = pd.DataFrame(list)
-    def set_current_pdf(self, list):
-        self.curPdf = pd.DataFrame(list)
+    def set_kyudo_data_list(self, data_list, rw_angle):
+        self.kyudo_data_list = data_list
+        self.features_list[1] = rw_angle / 180.0                    # rw_deg
         
+    def get_kyudo_data_list(self):
+        return self.kyudo_data_list
+            
+    def set_current_pdf(self, section_no, completed):
+        box_h = self.kyudo_data_list[3]    # box_height 
+        self.features_list[0] = self.kyudo_data_list[4] / box_h     # rw_ratio
+        self.features_list[2] = self.kyudo_data_list[5] / box_h     # lw_ratio
+        self.features_list[3] = self.kyudo_data_list[12] / box_h    # eyes_ratio
+        self.features_list[4] = self.kyudo_data_list[8] / box_h     # hr_ratio
+        self.features_list[5] = self.kyudo_data_list[10] /180.0     # hr_deg
+        self.features_list[6] = section_no                          # section
+        self.features_list[7] = completed                           # completed   
+        
+        narray = np.array(self.features_list).reshape(1, -1)
+        self.curPdf = pd.DataFrame(narray, columns=FeaturePdf.Features_list)
+
+    def add_previous_pdf(self):
+        if self.prePdf is None:
+            self.prePdf = self.curPdf.copy()                        # カレントデータで初期作成
+        else:
+            self.prePdf = pd.concat([self.prePdf, self.curPdf])     # 過去データに結合
+            
     def update_previous_pdf(self):
-        self.prePdf.drop(0, inplace=True)                       # 先頭行を削除
-        self.prePdf =  pd.concat([self.prePdf, self.curPdf])    # 現在のデータを追加
+        self.prePdf = self.prePdf.iloc[1:]                          # 先頭行を削除
+        self.prePdf =  pd.concat([self.prePdf, self.curPdf])        # カレントデータを追加
         
     def get_input_pdf(self):
-        return pd.concat([self.prePdf, self.curPdf])            # 現在と過去のデータを結合して返す
-
-###
-#    画像のコントラストと明るさを調整する関数
+        return pd.concat([self.prePdf, self.curPdf])                # 現在と過去のデータを結合して返す
+    
+    def is_ready(self):
+        if self.prePdf is None: return False
+        elif len(self.prePdf) < self.seq_size - 1: return False
+        else:                                                       # 十分なデータが揃っている場合
+            return True
+# 特徴量データフレームのインスタンス作成
+InputPdf = FeaturePdf(Sequence_frames)
 #
-def adjust_frame_contrast(frame, alpha=1,beta=0):
-    """
-    :param frame: 入力画像
-    :param alpha: コントラスト係数（1.0で元のコントラスト、0.0でコントラストなし）
-    :param beta: 明るさ係数（0で元の明るさ、正の値で明るく、負の値で暗く）
-    :return: 調整後の画像
-    """
+# GRUモデルによる動作解析関数
+def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
+    global Split_start, Split_sec, Lap_start 
+    
+    mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
+    mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
+    
+    x = input_pdf.to_numpy(dtype=np.float32)
+    s_frames = len(input_pdf)
+    # GRUモデルによる動作解析
+    y = predict_Kyudo( model, x, s_frames)
+    mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
+    action = y[0]
+    mylog.log(INFO, f"[gru_analize]: action={action}")
+
+    # タイマー情報の更新
+    if action == 2:
+        Split_start = Frame_counter                         # スプリット開始時間を記録
+        Split_sec = 0
+    elif action == 1:
+        if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
+            Split_start = 0                                 # スプリット開始時間をリセット
+        if section == 9:                                    # 退場動作の場合、解析終了 
+            Lap_start = 0
     #
-    table = np.array([np.clip((i * alpha + beta), 0, 255) for i in range(256)], dtype=np.uint8)
-    adjusted_frame = cv2.LUT(frame, table)  # ルックアップテーブルを使用してコントラストと明るさを調整
-    return adjusted_frame
+    return update_section_completed(action, section, completed, output_size=3)
+
 #
 # 解析結果をトラッキングする関数              
-def tracking_result( myResult):
+def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, csvout=True):
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -483,48 +525,51 @@ def tracking_result( myResult):
     box_conf = boxes.conf[box_id].item()                # 解析対象の信頼度
 
     keyPoints = myResult                                # キーポイントのデータ解析インスタンス    
-    # トラッキングデータ
-    for name, idx in Kn2idx.items():
-        key_id = idx
-        if idx > 12: continue
-        
-        key_name = name
-        x = keyPoints.points[idx][0]                    # キーポイントX座標(Numpy)
-        y = keyPoints.points[idx][1]                    # キーポイントY座標(Numpy)
-        xy_conf = keyPoints.confs[idx]                  # キーポイントの信頼度(Numpy)
-        norm, angle = arrow[idx]                        # 移動ベクトルの長さと角度
-        ratio = norm/box_h                              # ボックスの高さに対する比率
-                
-        data_list = [key_id, key_name, box_id, box_w, box_h, x, y, xy_conf, norm, ratio, angle]
-        
-        Db.insert_tracking_data( data_list )  # データベースに挿入、またはCSVファイルに書き込み
-    
-    # 姿勢解析データ
-    rw_norm, _ = arrow[Kn2idx['right_wrist']]                       # 右手首移動ベクトルの長さと角度
-    lw_norm, _ = arrow[Kn2idx['left_wrist']]                        # 左手首移動ベクトルの長さと角度
-    rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')  # 右手首と左手首のベクトルの長さと角度を計算
-    hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')   # 右腰と右手首のベクトルの長さと角度を計算
-    _, er_angle = keyPoints.norm('right_elbow','right_wrist')       # 右肘と右手首のベクトルの長さと角度を計算
-    _, sl_angle = keyPoints.norm('left_shoulder','left_wrist')      # 左肩と左手首のベクトルの長さと角度を計算
-    eyes_norm, _ = keyPoints.norm('right_eye','left_eye')           # 右目と左目のベクトルの長さと角度を計算
-    hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算
-    
-    data_list = [box_id, box_conf, box_w, box_h,\
-                 rw_norm, lw_norm, rl_norm, rl_angle, hr_norm, hr_angle,\
-                 er_angle, sl_angle, eyes_norm, hips_norm]
-    
-    Db.insert_kyudo_data( data_list, Num_classes )  # CSVファイルに書き込み
-    
-    if Db.mode == 'csv': 
-        Db.csvfile1.flush()
+    if csvout == True:
+        # トラッキングデータ
+        for name, idx in Kn2idx.items():
+            key_id = idx
+            if idx > 12: continue
+            
+            key_name = name
+            x = keyPoints.points[idx][0]                    # キーポイントX座標(Numpy)
+            y = keyPoints.points[idx][1]                    # キーポイントY座標(Numpy)
+            xy_conf = keyPoints.confs[idx]                  # キーポイントの信頼度(Numpy)
+            norm, angle = arrow[idx]                        # 移動ベクトルの長さと角度
+            ratio = norm/box_h                              # ボックスの高さに対する比率
+                    
+            data_list = [key_id, key_name, box_id, box_w, box_h, x, y, xy_conf, norm, ratio, angle]            
+            # CSVファイルに書き込み
+            Db.outcsv_tracking_data( data_list )        
+            Db.csvfile1.flush()
+
+        # 姿勢解析データ
+        data_list = inputPdf.get_kyudo_data_list()
+        # CSVファイルに書き込み
+        Db.outcsv_kyudo_data( data_list, Num_classes )  
         Db.csvfile2.flush()
-    else:    Db.commit()
+    else:    
+        # 姿勢解析データ
+        rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                       # 右手首移動ベクトルの長さと角度
+        lw_norm, _ = arrow[Kn2idx['left_wrist']]                        # 左手首移動ベクトルの長さと角度
+        rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')  # 右手首と左手首のベクトルの長さと角度を計算
+        hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')   # 右腰と右手首のベクトルの長さと角度を計算
+        _, er_angle = keyPoints.norm('right_elbow','right_wrist')       # 右肘と右手首のベクトルの長さと角度を計算
+        _, sl_angle = keyPoints.norm('left_shoulder','left_wrist')      # 左肩と左手首のベクトルの長さと角度を計算
+        eyes_norm, _ = keyPoints.norm('right_eye','left_eye')           # 右目と左目のベクトルの長さと角度を計算
+        hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算
+    
+        data_list = [box_id, box_conf, box_w, box_h,\
+                    rw_norm, lw_norm, rl_norm, rl_angle, hr_norm, hr_angle,\
+                    er_angle, sl_angle, eyes_norm, hips_norm]
+        # データリストをセット
+        inputPdf.set_kyudo_data_list( data_list, rw_angle)  
     
     return
 #
 # 次のセクションが開始したかどうかを判定する関数
 #
-def section_started(section_no, myResult):
+def section_started(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
@@ -722,7 +767,7 @@ def section_started(section_no, myResult):
 #
 #セクションが完了したかどうかを判定する関数
 #
-def section_completed(section_no, myResult):
+def section_completed(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
     global RL_angle, SL_angle, ER_angle
     
@@ -1122,7 +1167,7 @@ def edit_section_name(no, counter):
 #
 # 動作の開始を判定する関数
 #  
-def manual_analize_start(section_no, myResult):
+def manual_analize_start(section_no, myResult:MyResult):
     global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
     global Step_error, Alart_section, Alart_id
     
@@ -1164,7 +1209,7 @@ def manual_analize_start(section_no, myResult):
 #
 # 動作の完了を判定する関数
 #
-def manual_analize_completed(section_no, myResult):
+def manual_analize_completed(section_no, myResult:MyResult):
     global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
     global Step_error, Alart_section, Alart_id
     
@@ -1193,17 +1238,9 @@ def manual_analize_completed(section_no, myResult):
     return Section_no, Completed  
 #
 #
-# GRUモデルによる動作解析関数
-def gru_analize(section_no, myResult):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
-    global Step_error, Alart_section, Alart_id
-    
-    # GRUモデルによる動作解析
-    return Section_no, Completed
-#
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult, annotated_frame=None, nn_gru=False):
+def plot(myResult:MyResult, annotated_frame=None, nn_gru=False, model=None):
     global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, CameraPos, Nop_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
@@ -1227,15 +1264,32 @@ def plot(myResult, annotated_frame=None, nn_gru=False):
     arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
     
     if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
+        # 姿勢解析入力データリストを作成、保存しておく
+        tracking_result(myResult, InputPdf, csvout=False)
         # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
         if Lap_start > 0:    
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
             Step_error = False
             Alart_id = 0
             if nn_gru:
-                # GRUモデルによる動作解析
-                Section_no, Completed = gru_analize(Section_no, myResult)
-            else:
+                # GRUモデルによる姿勢解析
+                # カレントのデータフレームを作成、保存
+                InputPdf.set_current_pdf(Section_no, Completed)
+                mylog.log(DEBUG, f"[plot]: curPdf.shape={InputPdf.curPdf.shape}")
+                mylog.log(DEBUG, f"[plot]: {InputPdf.curPdf.tail()}")
+                if not InputPdf.is_ready():
+                    # シーケンスデータの準備をする
+                    InputPdf.add_previous_pdf()
+                    mylog.log(DEBUG, f"[plot]: prePdf.shape={InputPdf.prePdf.shape}")
+                    mylog.log(DEBUG, f"[plot]: {InputPdf.prePdf.tail()}")
+                else:
+                    # 入力データフレームを取得
+                    input_pdf = InputPdf.get_input_pdf()
+                    # GRUモデルによる動作解析
+                    Section_no, Completed = gru_analize(Section_no, Completed, model, input_pdf)
+                    InputPdf.update_previous_pdf()
+            else:   
+                # プログラムロジックによる姿勢解析
                 if Section_no == 0 or Completed:
                     # 動作の開始を判定
                     Section_no, Completed = manual_analize_start(Section_no, myResult)
@@ -1247,8 +1301,8 @@ def plot(myResult, annotated_frame=None, nn_gru=False):
             Db.completed = 1 if Completed else 0
 
             if Tracking_enabled:
-                # 解析結果のデータをトラッキング登録先（DB/CSV）に出力する
-                tracking_result(myResult)
+                # 解析結果のデータをCSVに出力する
+                tracking_result(myResult, InputPdf, csvout=True)
             if Update_enabled:
                 # トラッキングデータのテーブル（'section'/'completed'）を更新する
                 Db.update_tracking_section()  
@@ -1304,6 +1358,20 @@ def edit_key_ope(out_file, raw_video, clip_video):
         if Update_tracking: ope_str += ':(u)pdate-tracking'
         if raw_video and (not clip_video):   ope_str += ':(r)epeat-play'
         return  ope_str
+#
+#    画像のコントラストと明るさを調整する関数
+#
+def adjust_frame_contrast(frame, alpha=1,beta=0):
+    """
+    :param frame: 入力画像
+    :param alpha: コントラスト係数（1.0で元のコントラスト、0.0でコントラストなし）
+    :param beta: 明るさ係数（0で元の明るさ、正の値で明るく、負の値で暗く）
+    :return: 調整後の画像
+    """
+    #
+    table = np.array([np.clip((i * alpha + beta), 0, 255) for i in range(256)], dtype=np.uint8)
+    adjusted_frame = cv2.LUT(frame, table)  # ルックアップテーブルを使用してコントラストと明るさを調整
+    return adjusted_frame
 #
 # モザイク処理
 #
@@ -1860,8 +1928,19 @@ def main():
        
     if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
         manual_plot = True
+    
+    model_pth = None
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
+        i = args.index('-gru')
+        if len(args) > (i + 1) and args[i + 1][0] != '-' : model_pth = args[i +1]
+        if model_pth is None:
+            print("モデル名の指定がありません")
+            return
+        else:
+            if os.path.isfile(model_pth) is False:
+                print(f"[yoloApp]error:model-file({model_pth}) not found.")
+                return
         
     if not raw_video and ( '-t' in opts) :
         manual_plot = True
@@ -2162,8 +2241,27 @@ def main():
         print(f"YOLOv8 ログレベル={mylog_level}")
         print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}, 出力クラス区分数: {Num_classes}")        
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
+        
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
+        if nn_gru:
+            print("GRUによる姿勢解析を有効化します")
+            mylog.log(INFO, "GRUによる姿勢解析を有効化します")
+            input_dim = len(Features_list_1)
+            print(f"input_dim={input_dim}")
+            
+            _, _, _, section_dim, completed_dim = Hyper_parameters
+            model_gru = KyudoGRUs( input_size = input_dim, output_size = Num_classes,
+                            section_embed_dim = section_dim,
+                            completed_embed_dim = completed_dim )
+            model_gru.to( get_device() )
+            print(f"model_gru={model_gru}")
+            mylog.log(INFO,f"model_gru={model_gru}")
+            
+            # 学習済モデルの読み込み
+            model_gru.load_state_dict( torch.load(model_pth, map_location = get_device()) )
+            print(f"[main]:model loaded from {model_pth}")
+            mylog.log(INFO,f"model loaded from {model_pth}")
         
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
@@ -2275,7 +2373,8 @@ def main():
                     
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
-                        annotated_frame = plot( myResult, frame, nn_gru)
+                        annotated_frame = plot( myResult, frame, \
+                                                nn_gru, model_gru if nn_gru else None)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
@@ -2334,7 +2433,8 @@ def main():
                     if i > 0: str += ", "
                     str += f"{no}={val}"
                 cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1)            
-        #       
+        #    
+        # ウィンドウに表示する   
         cv2.imshow('YOLO Pose Detection', annotated_frame)
         
         #キー入力をチェックするする
@@ -2347,7 +2447,7 @@ def main():
         #
         if key_ope(key, keyCtl, annotated_frame, cap[0], idir, out_file, raw_video, clip_video) == False:
             # キー操作が終了（'q'）で、ループを抜ける
-            print("[main]:Interrapted by KEY(q).")
+            print("[main]:Interrapted by 'q'")
             break
         #
         # 繰り返し再生の処理

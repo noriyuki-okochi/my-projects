@@ -188,28 +188,38 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
 def predict_Kyudo( model, np_x, s_frames):
   # 予測データ
   input_frames, input_size = np_x.shape
-  log_write(f"[predict_Kyudo]:np_x={np_x.shape}")     
-  
-  # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
-  #input_frames -= s_frames
-  x_zeros = np.zeros( (s_frames, input_size) )
-  x = np.vstack( [x_zeros, np_x] )
-  log_write(f"[predict_Kyudo]:x={x.shape}")     
+  ulog.debug(f"[predict_Kyudo]:np_x={np_x.shape}") 
+      
+  real = True if input_frames == s_frames else False
+  if not real:
+    # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
+    #input_frames -= s_frames
+    x_zeros = np.zeros( (s_frames, input_size) )
+    x = np.vstack( [x_zeros, np_x] )
+  else:
+    x = np_x
+    input_frames = 1
+  ulog.debug(f"[predict_Kyudo]:x={x.shape}")     
   #ulog.debug(f"[predict_Kyudo]:x={x}")
  #
   x_data = np.zeros( (input_frames, s_frames, input_size) )
   for i in range(input_frames):
     x_data[i] = x[i:i + s_frames].reshape(-1, input_size)
+    
+  if real:
+    section = x_data[1:,:, -2]
+    completed = x_data[1:,:, -1]
+  else:
+    section = 0
+    completed = 0
+    
   x_data[1:,:, -2] = 0.0   # section
-  x_data[1:,:, -1] = 0.0   # completed
-  
+  x_data[1:,:, -1] = 0.0   # completed  
   x_data = torch.tensor(x_data, dtype=torch.float32).to(device )
-  log_write(f"[predict_Kyudo]:x_data={x_data.shape}")
+  ulog.debug(f"[predict_Kyudo]:x_data={x_data.shape}")
   
   y_data = np.zeros( (input_frames, 1) )
-  print(y_data.shape)  
-  section = 0
-  completed = 0
+  #print(y_data.shape)  
   i = 0
   model.eval()
   for t in range(input_frames):
@@ -225,18 +235,19 @@ def predict_Kyudo( model, np_x, s_frames):
       ulog.debug(f"[predict_Kyudo]:action={action}")
       y_data[t] = action
       
-      # セクションと完了状態の更新
-      section, completed = update_section_completed( action, section, completed, model.output_size)
-      ulog.debug(f"[predict_Kyudo]:section={section}:completed={completed}")
-          
-      # 状態を次の入力データに埋め込む
-      for k in range(1, s_frames):
-        if (t + k) < input_frames:
-          x_data[t + k, -k, -2] = float(section)
-          x_data[t + k, -k, -1] = float(completed)
+      if not real:
+        # セクションと完了状態の更新
+        section, completed = update_section_completed( action, section, completed, model.output_size)
+        ulog.debug(f"[predict_Kyudo]:section={section}:completed={completed}")
+            
+        # 状態を次の入力データに埋め込む
+        for k in range(1, s_frames):
+          if (t + k) < input_frames:
+            x_data[t + k, -k, -2] = float(section)
+            x_data[t + k, -k, -1] = float(completed)
         
   y_data = y_data.reshape(-1)  
-  log_write(f"[predict_Kyudo]:y_pred={y_data.shape}")   
+  ulog.debug(f"[predict_Kyudo]:y_pred={y_data.shape}")   
   return y_data 
   
   
