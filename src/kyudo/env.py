@@ -33,8 +33,15 @@ Kyudo_data_names = ['box_id', 'box_conf',\
                 'eyes_norm', 'hips_norm']
 
 # 学習用データの読み込みリスト
-Features_list_1 = ['rw_norm/box_h as rw_ratio',\
+Features_list_8 = ['rw_norm/box_h as rw_ratio',\
                 'rw_angle/180.0 as rw_deg',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'section','completed']
+
+Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
