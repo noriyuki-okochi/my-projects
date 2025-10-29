@@ -443,9 +443,8 @@ class FeaturePdf:
         self.curPdf = None
         self.prePdf = None
     
-    def set_kyudo_data_list(self, data_list, rw_angle):
+    def set_kyudo_data_list(self, data_list):
         self.kyudo_data_list = data_list
-        self.features_list[1] = rw_angle / 180.0                    # rw_deg
         
     def get_kyudo_data_list(self):
         return self.kyudo_data_list
@@ -453,10 +452,11 @@ class FeaturePdf:
     def set_current_pdf(self, section_no, completed):
         box_h = self.kyudo_data_list[3]    # box_height 
         self.features_list[0] = self.kyudo_data_list[4] / box_h     # rw_ratio
-        self.features_list[2] = self.kyudo_data_list[5] / box_h     # lw_ratio
-        self.features_list[3] = self.kyudo_data_list[12] / box_h    # eyes_ratio
-        self.features_list[4] = self.kyudo_data_list[8] / box_h     # hr_ratio
-        self.features_list[5] = self.kyudo_data_list[10] /180.0     # hr_deg
+        self.features_list[1] = self.kyudo_data_list[5] / 180.0     # rw_deg
+        self.features_list[2] = self.kyudo_data_list[6] / box_h     # lw_ratio
+        self.features_list[3] = self.kyudo_data_list[14] / box_h    # eyes_ratio
+        self.features_list[4] = self.kyudo_data_list[10] / box_h    # hr_ratio
+        self.features_list[5] = self.kyudo_data_list[11] /180.0     # hr_deg
         self.features_list[6] = section_no                          # section
         self.features_list[7] = completed                           # completed   
         
@@ -551,7 +551,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, csvout=True):
     else:    
         # 姿勢解析データ
         rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                       # 右手首移動ベクトルの長さと角度
-        lw_norm, _ = arrow[Kn2idx['left_wrist']]                        # 左手首移動ベクトルの長さと角度
+        lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                        # 左手首移動ベクトルの長さと角度
         rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')  # 右手首と左手首のベクトルの長さと角度を計算
         hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')   # 右腰と右手首のベクトルの長さと角度を計算
         _, er_angle = keyPoints.norm('right_elbow','right_wrist')       # 右肘と右手首のベクトルの長さと角度を計算
@@ -560,10 +560,11 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, csvout=True):
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算
     
         data_list = [box_id, box_conf, box_w, box_h,\
-                    rw_norm, lw_norm, rl_norm, rl_angle, hr_norm, hr_angle,\
+                    rw_norm, rw_angle, lw_norm, lw_angle,\
+                    rl_norm, rl_angle, hr_norm, hr_angle,\
                     er_angle, sl_angle, eyes_norm, hips_norm]
         # データリストをセット
-        inputPdf.set_kyudo_data_list( data_list, rw_angle)  
+        inputPdf.set_kyudo_data_list( data_list )  
     
     return
 #
