@@ -106,7 +106,7 @@ class KyudoGRU(nn.Module):
 # GRU(single-head)モデルの定義
 #
 class KyudoGRUs(KyudoGRU):
-  def __init__(self, input_size=7, hidden_size=64, output_size=19, n_layers=1,
+  def __init__(self, input_size=8, hidden_size=64, output_size=3, n_layers=1,
                section_embed_dim=8,
                completed_embed_dim=4):
     super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers,
