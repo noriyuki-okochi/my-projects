@@ -168,5 +168,29 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     print(f"[chart]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
     return True
 #
+# 登録ケースの削除関数
+# db: MyDbデータベースオブジェクト
+# case_name: 削除ケース名 
+def delete_frame_info(db:MyDb, case_name):
+    _,csvfile = db.get_file_path(case_name)
+    if csvfile is not None:
+        if db.delete_case(case_name) == True:
+            print(f"[delete_frame_info]:info: case_name='{case_name}' deleted.")
+        #
+        print(f"> '{csvfile}' will be deleted. continue?. [y/n].")
+        ans = input('>>')
+        if ans == 'y': 
+            try:
+                os.remove( csvfile )
+                print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
+                csvfile = csvfile.replace('track', 'kyudo')
+                os.remove( csvfile )
+                print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
+            except:
+                print(f"[delete_frame_info]:info: '{csvfile}' not found.")
+    
+    else:
+        print(f"[delete_frame_info]:error: case_name='{case_name}' not found.")
+    return            
 #
 #eof

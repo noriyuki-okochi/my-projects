@@ -125,11 +125,9 @@ if len(case_names) > 0 and '-D' in opts:
     # 登録済ケースの削除
     #
     for name in case_names:
-        if db.delete_case(name) is True:
-            print(f"[kyudoApp]:info: case_name='{name}' deleted.")
-        else:
-            print(f"[kyudoApp]:error: case_name='{name}' not found.")            
+        delete_frame_info(db, name)
     exit(0)
+    
 if len(case_names) == 0:
     print("[kyudoApp]:error:'-case <name>' must be specified.")
     exit(0)
@@ -145,7 +143,7 @@ for name in case_names:
         print(f"[kyudoApp]error:'{names} import count is zero.")
         exit(0)
 #print(f"[kyudoApp]info:FPS={FPS:.3f}, import_count={count}")
-#
+#c
 # CSVデータのインポートを指定するコマンドオプションの解析
 #
 if '-import' in cmds and len(case_names) > 0 :

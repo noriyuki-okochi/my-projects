@@ -84,11 +84,9 @@ if len(case_names) > 0 and '-D' in opts:
     # 登録済ケースの削除
     #
     for name in case_names:
-        if db.delete_case(name) is True:
-            print(f"[chart]:info: case_name='{name}' deleted.")
-        else:
-            print(f"[chart]:error: case_name='{name}' not found.")            
+        delete_frame_info(db, name)
     exit(0)
+    
 if len(case_names) == 0:
     print("[chart]:error:'-case <name>' must be specified.")
     exit(0)
