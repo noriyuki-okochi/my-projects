@@ -47,7 +47,7 @@ class MyDb:
         # カラム名を出力
         names ="case_name,frame_no,"\
             +  "box_id,box_conf,box_w,box_h,"\
-            +  "rw_norm,lw_norm,"\
+            +  "rw_norm,rw_angle,lw_norm,lw_angle,"\
             +  "rl_norm,rl_angle,hr_norm,hr_angle,"\
             +  "er_angle,sl_angle,eyes_norm,hips_norm,"\
             +  "section,completed,label,inserted_at,time_epoch\n"
@@ -115,10 +115,11 @@ class MyDb:
             # キーが存在する場合は削除
             sql = f"delete from frame_info where case_name ='{case_name}'"
             self.cur.execute(sql)
+            self.conn.commit()
             ret = True
         return ret
  
-# insert tracking-data.(db or csv)
+# insert tracking-data.(db)
 #
     def insert_tracking_data(self, data_list):
         
@@ -126,32 +127,46 @@ class MyDb:
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
         time_epoc = int(time.mktime(d.timetuple()))
         
-        if self.mode == '':
-            values = f"'{self.case_name}',{self.frame_no},"     # case_name, frame_no
-        else:
-            values = f"{self.case_name},{self.frame_no},"
-            
+        values = f"'{self.case_name}',{self.frame_no},"     # case_name, frame_no
         
         for i, value in enumerate(data_list):
             if i == 0 or i == 2:                                # key_id or box_id
                 values += f"{value},"
             elif i == 1:                                        # key_name
-                if self.mode == '':  values += f"'{value}'," 
-                else:  values += f"{value},"
+                values += f"'{value}'," 
             else:
                 values += f"{value:.3f},"
             
         values += f"'{timestamp}',{time_epoc}"
             
-        if self.mode == 'csv':
-            self.csvfile1.write(f"{values}\n")
-        else:
-            sql = "insert into tracking_data"\
-                + "(case_name, frame_no, key_id,"\
-                + " key_name, box_id, box_w, box_h, x, y, xy_conf, norm, ratio, angle,"\
-                + " inserted_at, time_epoch)"\
-                + f" values({values})"
-            self.cur.execute(sql)
+        sql = "insert into tracking_data"\
+            + "(case_name, frame_no, key_id,"\
+            + " key_name, box_id, box_w, box_h, x, y, xy_conf, norm, ratio, angle,"\
+            + " inserted_at, time_epoch)"\
+            + f" values({values})"
+        self.cur.execute(sql)
+        self.conn.commit()
+#
+# write tracking-data to csv-file
+#
+    def outcsv_tracking_data(self, data_list):
+        
+        d = datetime.now()
+        timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
+        time_epoc = int(time.mktime(d.timetuple()))
+        
+        values = f"{self.case_name},{self.frame_no},"
+                    
+        for i, value in enumerate(data_list):
+            if i == 0 or i == 2:                                # key_id or box_id
+                values += f"{value},"
+            elif i == 1:                                        # key_name
+                values += f"{value},"
+            else:
+                values += f"{value:.3f},"
+            
+        values += f"'{timestamp}',{time_epoc}"            
+        self.csvfile1.write(f"{values}\n")
 #
 #
     def delete_tracking_data(self):
@@ -160,6 +175,8 @@ class MyDb:
             self.cur.execute(sql)
         except:
             print("[delete_tracking_data]:no records.")
+        else:
+            self.conn.commit()
 #
 #
     def update_tracking_section(self):
@@ -194,10 +211,12 @@ class MyDb:
             self.cur.execute(sql)
         except:
             print("[delete_kyudo_data]:no records.")
+        else:
+            self.conn.commit()
 #
-# insert kyudo-data.( csv only)
+# write kyudo-data to csv-file
 #
-    def insert_kyudo_data(self, data_list, num_classes = 3):
+    def outcsv_kyudo_data(self, data_list, num_classes = 3):
         
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
@@ -220,8 +239,7 @@ class MyDb:
             label = 1 if num_classes == 3 else (self.section * 2)
             self._completed = self.completed
           
-        values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"
-            
+        values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"            
         self.csvfile2.write(f"{values}\n")
 #
 # convert tracking_data to kyudo_data
@@ -236,10 +254,10 @@ class MyDb:
             + f" on R.frame_no = L.frame_no order by R.frame_no asc"
         try:
             self.cur.execute(sql)
-            self.conn.commit()
         except Exception as e:
-            print(f"[conv_tracking2kyudo]:error:{e}")
-        
+            print(f"[conv_tracking2kyudo]:error:{e}")        
+        else:
+            self.conn.commit()
 # select FPS from balance-table
 #
     def get_fps(self, case_name=None):
@@ -257,8 +275,8 @@ class MyDb:
         return FPS, import_count
 
     def get_file_path(self, case_name=None):
-        FPS = None
-        import_count = 0
+        img_path = None
+        csv_path = None
         if case_name is None:
             case_name = self.case_name
 
@@ -294,11 +312,15 @@ class MyDb:
         if cols is None: 
             sql = f"select * from kyudo_data where case_name='{self.case_name}' order by frame_no asc"
         else: 
+            sql = 'select frame_no,' +  ','.join(cols)                                    
+            sql += f" from tracking_data where case_name ='{self.case_name}' order by frame_no asc"
+            '''
             sql = 'select K.frame_no as frame_no,' +  ','.join(cols)                                    
             sql += f" from (select * from kyudo_data where case_name ='{self.case_name}') as K left join "\
                    " (select case_name, frame_no, angle from tracking_data "\
                    f" where case_name ='{self.case_name}' and key_name='right_wrist') as T "\
                     " on K.frame_no = T.frame_no order by K.frame_no asc"
+            '''
         
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #

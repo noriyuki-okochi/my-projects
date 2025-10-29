@@ -23,21 +23,23 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
         'left_knee':13, 'right_knee':14, 'left_ankle':15, 'right_ankle':16}  # キーポイント名
 
 # Kyudo_dataテーブルの項目名
-Kyudo_data_names = ['box_id', 'box_conf', 'box_w', 'box_h',\
-                'rw_norm', 'lw_norm',\
+Kyudo_data_names = ['box_id', 'box_conf',\
+                'box_w', 'box_h',\
+                'rw_norm', 'rw_angle',\
+                'lw_norm', 'lw_angle',\
                 'rl_norm', 'rl_angle',\
                 'hr_norm', 'hr_angle',\
                 'er_angle', 'sl_angle',\
                 'eyes_norm', 'hips_norm']
 
 # 学習用データの読み込みリスト
-Features_list_1 = ['K.rw_norm/K.box_h as rw_ratio',\
-                'T.angle/180.0 as rw_deg',\
-                'K.lw_norm/K.box_h as lw_ratio',\
-                'K.eyes_norm/K.box_w as eyes_ratio',\
-                'K.hr_norm/K.box_h as hr_ratio',\
-                'K.hr_angle/180.0 as hr_deg',\
-                'K.section','K.completed']
+Features_list_1 = ['rw_norm/box_h as rw_ratio',\
+                'rw_angle/180.0 as rw_deg',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'section','completed']
 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
 Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle'] 
