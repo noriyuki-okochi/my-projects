@@ -434,13 +434,15 @@ class MyResult(Keypoint):
 
 ##    特徴量のデータフレームクラス
 class FeaturePdf:
-    Features_list = ['rw_ratio', 'rw_deg', 'lw_ratio', 'eyes_ratio',\
-                     'hr_ratio', 'hr_deg', 'section','completed']
-    def __init__(self, seq_frames:int):
+    Features_list_8 = [ 'rw_ratio', 'rw_deg', 'lw_ratio', 'eyes_ratio',\
+                        'hr_ratio', 'hr_deg', 'section','completed' ]
+    Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+                        'hr_ratio', 'hr_deg', 'section','completed' ]
+    def __init__(self, input_dim:int=Input_dim, seq_frames:int=Sequence_frames):
         self.seq_size = seq_frames
-        input_size = len(FeaturePdf.Features_list)
+        self.input_size = input_dim
         self.kyudo_data_list = [None]*len(Kyudo_data_names)
-        self.features_list = [None]*len(FeaturePdf.Features_list)
+        self.features_list = [None]*self.input_size
         self.curPdf = None
         self.prePdf = None
     
@@ -449,20 +451,31 @@ class FeaturePdf:
         
     def get_kyudo_data_list(self):
         return self.kyudo_data_list
-            
+
     def set_current_pdf(self, section_no, completed):
         box_h = self.kyudo_data_list[3]    # box_height 
-        self.features_list[0] = self.kyudo_data_list[4] / box_h     # rw_ratio
-        self.features_list[1] = self.kyudo_data_list[5] / 180.0     # rw_deg
-        self.features_list[2] = self.kyudo_data_list[6] / box_h     # lw_ratio
-        self.features_list[3] = self.kyudo_data_list[14] / box_h    # eyes_ratio
-        self.features_list[4] = self.kyudo_data_list[10] / box_h    # hr_ratio
-        self.features_list[5] = self.kyudo_data_list[11] /180.0     # hr_deg
-        self.features_list[6] = section_no                          # section
-        self.features_list[7] = completed                           # completed   
+        i = 0
+        self.features_list[i] = self.kyudo_data_list[4] / box_h     # rw_ratio
+        i += 1
+        if self.input_size == 8:
+            self.features_list[i] = self.kyudo_data_list[5] / 180.0 # rw_deg
+            i += 1
+        self.features_list[i] = self.kyudo_data_list[6] / box_h     # lw_ratio
+        i += 1
+        self.features_list[i] = self.kyudo_data_list[14] / box_h    # eyes_ratio
+        i += 1
+        self.features_list[i] = self.kyudo_data_list[10] / box_h    # hr_ratio
+        i += 1
+        self.features_list[i] = self.kyudo_data_list[11] /180.0     # hr_deg
+        i += 1
+        self.features_list[i] = section_no                          # section
+        i += 1
+        self.features_list[i] = completed                           # completed   
         
         narray = np.array(self.features_list).reshape(1, -1)
-        self.curPdf = pd.DataFrame(narray, columns=FeaturePdf.Features_list)
+        if self.input_size == 7:    columns_list = FeaturePdf.Features_list_7
+        elif self.input_size == 8:  columns_list = FeaturePdf.Features_list_8
+        self.curPdf = pd.DataFrame(narray, columns=columns_list)
 
     def add_previous_pdf(self):
         if self.prePdf is None:
@@ -483,7 +496,7 @@ class FeaturePdf:
         else:                                                       # 十分なデータが揃っている場合
             return True
 # 特徴量データフレームのインスタンス作成
-InputPdf = FeaturePdf(Sequence_frames)
+InputPdf = FeaturePdf(Input_dim, Sequence_frames)
 #
 # GRUモデルによる動作解析関数
 def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
@@ -2271,7 +2284,7 @@ def main():
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
             
-            input_dim = len(Features_list_8)
+            input_dim = len(Features_list_7)
             _, _, _, section_dim, completed_dim = Hyper_parameters
             print(f"input_dim={input_dim}")
 
