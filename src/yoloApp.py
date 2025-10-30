@@ -11,6 +11,7 @@ from copy import copy
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import pandas as pd
+import copy
 
 # local package
 from kyudo.env import * 
@@ -1473,7 +1474,8 @@ class Rect:
     
 # グローバル変数
 Rect_area = Rect()
-
+#RectAreas:Rect = []
+#
 def draw_rectangle(event, x, y, flags, param):
     global Rect_area
 
@@ -1491,6 +1493,51 @@ def draw_rectangle(event, x, y, flags, param):
         Rect_area.end = (x, y)
         Rect_area.drawing = False
         if Rect_area.length() > 100: Rect_area.roi_set = True
+#
+# クリッピング領域指定
+def clip_process( frame ):
+    global Rect_area
+    rectAreas:Rect = []
+    # クリッピング・ウィンドウとマウスイベント・コールバック登録
+    cv2.namedWindow("Select ROI")
+    cv2.setMouseCallback("Select ROI", draw_rectangle)
+    # クリッピング処理
+    while True:
+        temp_frame = frame.copy()   # 読み込んだ先頭フレーム上で矩形領域を指定する
+        for rect in rectAreas:
+            # 指定済み矩形のライン描画
+            cv2.rectangle(temp_frame, rect.start, rect.end, GREEN, 1)
+            
+        if Rect_area.drawing and Rect_area.start and Rect_area.end:
+            # 矩形のライン描画
+            cv2.rectangle(temp_frame, Rect_area.start, Rect_area.end, GREEN, 2)
+        # キーオペレーションのヘルプ表示
+        hight, _ = temp_frame.shape[:2]
+        help_str = "r(eset)|c(onfirm)|q(uit)"
+        cv2.putText(temp_frame, help_str, (10, hight - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
+        cv2.imshow("Select ROI", temp_frame)
+        #
+        key_val = cv2.waitKey(1) & 0xFF 
+        if Rect_area.roi_set: 
+            # 連続して領域を指定する（先頭がクリッピング領域、2番目からモザイク領域）
+            Rect_area.roi_set = False
+            rectAreas.append( copy.copy(Rect_area) )
+            continue            
+        if key_val == ord("r"):
+            # 全てキャンセルして指定し直す
+            Rect_area.roi_set = False
+            rectAreas.clear()
+            continue
+        if key_val == ord("q") or key_val == ord("c") :
+            # 処理を中断、または継続する
+            break
+    #
+    cv2.destroyWindow("Select ROI")
+    if key_val == ord("q") : return  None   # 以降の処理を中断してプログラムを終了
+    if len(rectAreas) == 0:
+        print(f"クリッピング領域を指定してください。")
+        return rectAreas
+    return copy.deepcopy( rectAreas )
 #
 # キー入力操作関数
 #
@@ -1662,9 +1709,10 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 
     elif key == ord(' '):
         #  動作完了
+        print(f"動作完了を設定")
         Completed = True
-        if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
-            Split_start = 0                                 # スプリット開始時間をリセット
+        if Section_no != 6 and Section_no != 8: # 「会」、「残身」はスプリットを計測
+            Split_start = 0                     # スプリット開始時間をリセット
     
     elif key == ord('.') and len(ctl['para_data']) == 0: 
                                             # (.) フレームカウンターを2秒進める
@@ -2177,54 +2225,19 @@ def main():
     #---------------------------------------------------------------------  
     # クリッピング領域指定
     #---------------------------------------------------------------------  
-    rectAreas = []
-    if clip_video: 
-        # クリッピング・ウィンドウとマウスイベント・コールバック登録
-        cv2.namedWindow("Select ROI")
-        cv2.setMouseCallback("Select ROI", draw_rectangle)
-        # クリッピング処理
-        while True:
-            temp_frame = frame.copy()   # 読み込んだ先頭フレーム上で矩形領域を指定する
-            for rect in rectAreas:
-                # 指定済み矩形のライン描画
-                cv2.rectangle(temp_frame, rect.start, rect.end, GREEN, 1)
-                
-            if Rect_area.drawing and Rect_area.start and Rect_area.end:
-                # 矩形のライン描画
-                cv2.rectangle(temp_frame, Rect_area.start, Rect_area.end, GREEN, 2)
-            # キーオペレーションのヘルプ表示
-            hight, _ = temp_frame.shape[:2]
-            help_str = "r(eset)|c(onfirm)|q(uit)"
-            cv2.putText(temp_frame, help_str, (10, hight - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
-            cv2.imshow("Select ROI", temp_frame)
-            #
-            key_val = cv2.waitKey(1) & 0xFF 
-            if Rect_area.roi_set: 
-                # 連続して領域を指定する（先頭がクリッピング領域、2番目からモザイク領域）
-                Rect_area.roi_set = False
-                rectAreas.append( copy(Rect_area) )
-                continue            
-            if key_val == ord("r"):
-                # 全てキャンセルして指定し直す
-                Rect_area.roi_set = False
-                rectAreas.clear()
-                continue
-            if key_val == ord("q") or key_val == ord("c") :
-                # 処理を中断、または継続する
+    rectAreas:Rect = []
+    if clip_video:
+        while( True ): 
+            rectAreas = clip_process( frame )
+            if rectAreas is  None: return           # 'q'押下で終了
+            elif len(rectAreas) > 0:                # 'c'押下で処理継続
+                # クリッピング領域座標の取得
+                rect = rectAreas.pop(0)
+                frame_width, frame_height = rect.width_height()
+                frame_x = rect.x[0]
+                frame_y = rect.y[0]
                 break
-        #
-        cv2.destroyWindow("Select ROI")
-        if key_val == ord("q") : return     # 以降の処理を中断してプログラムを終了
-        if len(rectAreas) == 0:
-            print(f"クリッピング領域を指定してください。")
-            return
-        # クリッピング領域座標の取得
-        rect = rectAreas.pop(0)
-        frame_width, frame_height = rect.width_height()
-        frame_x = rect.x[0]
-        frame_y = rect.y[0]
     #------------------------------------------------------------------------
-    #
     # 映像出力ファイルの設定
     keyCtl['videoWrite'] = False
     out_file = ''
@@ -2242,22 +2255,26 @@ def main():
     #
     if not raw_video:
         #
-        # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
+        # NNモデルのインスタンス生成
         #
         print(f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLOv8 ログレベル={mylog_level}")
         print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}, 出力クラス区分数: {Num_classes}")        
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
-        
+                
+        # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
+        
         if nn_gru:
+            # KyudoGRUモデルの読み込み（事前学習済みモデル）
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
-            input_dim = len(Features_list_8)
-            print(f"input_dim={input_dim}")
             
+            input_dim = len(Features_list_8)
             _, _, _, section_dim, completed_dim = Hyper_parameters
+            print(f"input_dim={input_dim}")
+
             model_gru = KyudoGRUs( input_size = input_dim, output_size = Num_classes,
                             section_embed_dim = section_dim,
                             completed_embed_dim = completed_dim )
@@ -2269,7 +2286,7 @@ def main():
             model_gru.load_state_dict( torch.load(model_pth, map_location = get_device()) )
             print(f"[main]:model loaded from {model_pth}")
             mylog.log(INFO,f"model loaded from {model_pth}")
-        
+    #    
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
     mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
