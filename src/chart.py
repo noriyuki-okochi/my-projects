@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 # local package
 from  kyudo.env import * 
 from  kyudo.param import * 
+from  kyudo.appUtil import * 
 from mysqlite3.mysqlite3 import MyDb
 
 #print(http.__file__)
@@ -23,6 +24,7 @@ from mysqlite3.mysqlite3 import MyDb
 #
 verbose:bool = False         # debug write
 m_flg:bool = False           # not display section/conf
+slider:bool = False          # display slider
 #
 # connect db
 db = MyDb(DB_PATH)
@@ -43,9 +45,10 @@ key_names:str = [name for name in Kn2idx]
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("chart.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
-         + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
-         + "        [-p(ast-frames))] [-f(irst-frame)'<count1>[,<count2>']] [<display-frames>] \n"\
-         + "        [-m(ulti)] [-b(ottom)] [-h(elp)] [-d(ebug)]")
+         + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] \n"\
+         + "        [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
+         + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
+         + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-h(elp)] [-d(ebug)]")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
@@ -82,11 +85,9 @@ if len(case_names) > 0 and '-D' in opts:
     # 登録済ケースの削除
     #
     for name in case_names:
-        if db.delete_case(name) is True:
-            print(f"[chart]:info: case_name='{name}' deleted.")
-        else:
-            print(f"[chart]:error: case_name='{name}' not found.")            
+        delete_frame_info(db, name)
     exit(0)
+    
 if len(case_names) == 0:
     print("[chart]:error:'-case <name>' must be specified.")
     exit(0)
@@ -98,54 +99,17 @@ for name in case_names:
     if FPS is None:
         print(f"[chart]error:'{names} not found in frame_info table.")
         exit(0)
+    if count == 0 and '-import' not in cmds:
+        print(f"[chart]error:'{names} import count is zero.")
+        exit(0)
 #print(f"[chart]info:FPS={FPS:.3f}, import_count={count}")
 #
 # CSVデータのインポートを指定するコマンドオプションの解析
 #
 if '-import' in cmds:
-    db.case_name = case_names[0]    # 対象は先頭のケース名に限定
-    csvfile = ''
-    i = cmds.index('-import')
-    if len(cmds) > (i + 1):
-        # トラッキングCSVファイルの切り出し
-        if not cmds[i+1].startswith('-'): csvfile = cmds[i+1]
-    if csvfile == '':
-        # コマンドラインで指定のない時はframe_infoテーブルから取得
-        i, csvfile = db.get_file_path()
-    
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[chart]error: csv-file({csvfile}) not found.")
-        exit(0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[chart]:read_csv:{df.shape}")
-    
-    # DBへトラッキングデータ登録
-    db.delete_tracking_data()      # 登録済データの削除
-    df.to_sql('tracking_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[chart]info:import '{csvfile}' to 'tracking_data'{df.shape}.")
-    # インポート実行回数更新
-    count += 1
-    db.update_frame_info('import', count)
-    
-    # 姿勢解析データをkyudo_dataテーブルへ変換登録
-    csvfile = csvfile.replace('track','kyudo')
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[chart]error: csv-file({csvfile}) not found.")
-        exit(0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[chart]:read_csv:{df.shape}")
-    
-    db.delete_kyudo_data()         # 登録済データの削除
-    df.to_sql('kyudo_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[chart]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
-#
-if count == 0:
-    print(f"[chart]error:No tracking data. you must import csv-file.")
-    exit(0)
+    # 対象は先頭のケース名に限定
+    if import_tracking_data(db, cmds, case_names[0]) is False:
+        exit(0)
 #
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
@@ -180,9 +144,9 @@ if '-second' in args:
     i = args.index('-second')
     if len(args) > (i + 1):
         second_name = args[i+1]
-        if second_name not in Col_names:
+        if second_name not in Second_names:
             print(f"[chart]error:'{second_name}' not found. following names variable.")
-            print(Col_names)
+            print(Second_names)
             exit()
 #
 # spanデータの表示を指定するコマンドオプションの解析
@@ -217,8 +181,8 @@ if '-WMA' in args:
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
-LAST_FRAMES = 500               # display frames(default is 500 frames)
-last:int = int(LAST_FRAMES)     # 表示フレーム数      
+LAST_FRAMES = 500               # display frames(default is 500)
+last:int = 0                    # {-f|-p}指定時のデフォルト表示フレーム数      
 mlast:int = [None, None]
 p_option:bool = True            # '-p'オプションは遡って表示するフレーム数を指定  
 
@@ -240,6 +204,7 @@ if len(pf_opt) > 0:
     if len(nums) > 1 and nums[1].isnumeric():  mlast[1] = int(nums[1])
     else: mlast[1] = mlast[0]
 else:
+    last = int(LAST_FRAMES)
     mlast[0] = mlast[1] = last
 
 # その他、コマンドオプションの解析
@@ -255,6 +220,9 @@ if '-b' in opts:        #凡例の表示位置
     legend_dict = dict(x=0.01,y=0.01,xanchor='left',yanchor='bottom',orientation='h')
 else:
     legend_dict = dict(x=0.01,y=0.99,xanchor='left',yanchor='top',orientation='h')
+#
+if '-s' in opts:        #display slider
+    slider = True   
 #
 if '-d' in opts:        #debug write
     verbose = True   
@@ -293,13 +261,12 @@ else:
                         subplot_titles=[key for key in selkeys if key != ''])
 #
 if verbose:
-    print(f"option:{opts}")             # オプション引数
-    print(f"selkeys:{selkeys}")         # 選択キーポイント名
-    print(f"case_names:{case_names}")
-    print(f"last:{last}")               # 表示フレーム数   
-    print(f"mlast:{mlast}")             # 表示フレーム数   
-    print(f"case_compare={case_compare}, section_conf={m_flg}")   
-    print(f"selnum:{selnum}")           
+    print(f"[chart]info:option:{opts}")                 # オプション引数
+    print(f"[chart]info:selkeys:{selkeys}")             # 選択キーポイント名
+    print(f"[chart]info:case_names:{case_names}")
+    print(f"[chart]info:mlast:{mlast}, last:{last}")    # 表示フレーム数   
+    print(f"[chart]info:case_compare={case_compare}, section_conf={m_flg}")   
+    print(f"[chart]info:selnum:{selnum}")           
     fig.print_grid()
 #
 #  データのプロット実行メイン
@@ -358,9 +325,10 @@ for icount, key in enumerate(selkeys, start=1):
         #
         mdf = df.tail(mlast[icase])
         mdfk = dfk.tail(mlast[icase])
-        if mlast[icase] > last:
-            mdf = mdf.head(last)
-            mdfk = mdfk.head(last)
+        if mlast[icase] < last:
+            last = mlast[icase]
+        mdf = mdf.head(last)
+        mdfk = mdfk.head(last)
         print(f"[chart]info: mdf.shape={mdf.shape}")
         print(f"[chart]info: mdf.index=[{mdf.index[0]} -> {mdf.index[-1]}]")
         #
@@ -455,16 +423,17 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
-            # < tag1(completed) >
+            # < label >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                    name="tag1",
-                                    y=mdfk["tag1"],
-                                    marker_color= 'cyan',
+                                    name="action",
+                                    y=mdfk["label"],
+                                    marker_color= 'yellow',
                                     mode="markers"),
                             row = 2, 
                             col = 1,
                             secondary_y=True
                         )
+            '''
             # < tag2(started) >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                     name="tag2",
@@ -475,6 +444,7 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
+            '''
         #signal
         #next case
     #
@@ -522,7 +492,8 @@ else:
                             secondary_y=True, showgrid=False,
                             row=1, col=1)
     if m_flg == True :
-        fig.update(layout_xaxis2_rangeslider_visible=True)
+        if slider:
+            fig.update(layout_xaxis2_rangeslider_visible=True)
         fig.update(layout_xaxis2_showticklabels = True)
         fig.update_layout(
             #xaxis_rangeslider = dict(visible=True),
@@ -534,7 +505,7 @@ else:
         if second_name is not None:
             fig.update_yaxes(title_text=second_name, secondary_y=True, showgrid=False,
                             row=1, col=1)
-        fig.update_yaxes(title_text="section-no", range=(0, 14), secondary_y=True, showgrid=True, 
+        fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
