@@ -71,18 +71,21 @@ Update_tracking:bool = False    # DBのトラッキングデータ(section,compl
 Update_enabled:bool = False     # DBのトラッキングデータ更新オン
 # データベースのインスタンスを作成
 Db = MyDb(DB_PATH)  
-Db.mode = 'csv'         # 解析結果のトラッキングデータをCSVファイルに出力する
+Db.mode = 'csv'                 # 解析結果のトラッキングデータをCSVファイルに出力する
 # GRUモデル
-Num_classes:int = 3     # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
+Num_input:int = Input_dim       # 入力データ次元数
+Num_frames = Sequence_frames    # 入力シーケンスのフレーム数
+Num_classes:int = Output_dim    # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 # YOLOv8モデル
-V8_model:str = 'v8s'    # YOLOv8のモデルファイル名
+V8_model:str = 'v8s'            # YOLOv8のモデルファイル名
 #
 # YOLOv8とOpenPoseの組み合わせ例（Ultralytics YOLOv8 + YOLOv8-poseモデル利用）
 # このコードは、YOLOv8を使用してカメラまたは動画ファイルから骨格検出を行うものです。
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name> [-gru <model-path>] [classes=3|19]]\n"\
+    print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name>\n"\
+        + "                         [-gru <model-path> [inputdim=7|8]] [classes=3|19]]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
         + "                         [-I ['<frame_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
@@ -438,7 +441,7 @@ class FeaturePdf:
                         'hr_ratio', 'hr_deg', 'section','completed' ]
     Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg', 'section','completed' ]
-    def __init__(self, input_dim:int=Input_dim, seq_frames:int=Sequence_frames):
+    def __init__(self, input_dim:int=Input_dim, seq_frames:int=Num_frames):
         self.seq_size = seq_frames
         self.input_size = input_dim
         self.kyudo_data_list = [None]*len(Kyudo_data_names)
@@ -495,8 +498,6 @@ class FeaturePdf:
         elif len(self.prePdf) < self.seq_size - 1: return False
         else:                                                       # 十分なデータが揃っている場合
             return True
-# 特徴量データフレームのインスタンス作成
-InputPdf = FeaturePdf(Input_dim, Sequence_frames)
 #
 # GRUモデルによる動作解析関数
 def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
@@ -507,6 +508,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
     
     x = input_pdf.to_numpy(dtype=np.float32)
     s_frames = len(input_pdf)
+    
     # GRUモデルによる動作解析
     y = predict_Kyudo( model, x, s_frames)
     mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
@@ -527,7 +529,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
 
 #
 # 解析結果をトラッキングする関数              
-def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, csvout=True):
+def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -560,7 +562,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, csvout=True):
         # 姿勢解析データ
         data_list = inputPdf.get_kyudo_data_list()
         # CSVファイルに書き込み
-        Db.outcsv_kyudo_data( data_list, Num_classes )  
+        Db.outcsv_kyudo_data( data_list, output_dim )  
         Db.csvfile2.flush()
     else:    
         # 姿勢解析データ
@@ -1252,10 +1254,12 @@ def manual_analize_completed(section_no, myResult:MyResult):
         #
     return Section_no, Completed  
 #
+# 特徴量データフレームのインスタンス
+InputPdf:FeaturePdf = None
 #
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult:MyResult, annotated_frame=None, nn_gru=False, model=None):
+def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
     global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, CameraPos, Nop_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
@@ -1280,7 +1284,7 @@ def plot(myResult:MyResult, annotated_frame=None, nn_gru=False, model=None):
     
     if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
         # 姿勢解析入力データリストを作成、保存しておく
-        tracking_result(myResult, InputPdf, csvout=False)
+        tracking_result(myResult, InputPdf, output_dim, csvout=False)
         # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
         if Lap_start > 0:    
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
@@ -1317,7 +1321,7 @@ def plot(myResult:MyResult, annotated_frame=None, nn_gru=False, model=None):
 
             if Tracking_enabled:
                 # 解析結果のデータをCSVに出力する
-                tracking_result(myResult, InputPdf, csvout=True)
+                tracking_result(myResult, InputPdf, output_dim, csvout=True)
             if Update_enabled:
                 # トラッキングデータのテーブル（'section'/'completed'）を更新する
                 Db.update_tracking_section()  
@@ -1880,10 +1884,11 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 def main(): 
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
-    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Num_classes
+    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled
     global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt
     global StartAction_param, CompleteAction_param
     global Rect_area
+    global InputPdf
 
     #
     # start of main
@@ -1998,6 +2003,9 @@ def main():
         manual_plot = True
     
     model_pth = None
+    input_dim = Num_input
+    output_dim = Num_classes
+    seq_frames = Num_frames
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
         i = args.index('-gru')
@@ -2009,7 +2017,41 @@ def main():
             if os.path.isfile(model_pth) is False:
                 print(f"[yoloApp]error:model-file({model_pth}) not found.")
                 return
-        
+        # モデル名からパラメータを取得
+        i = model_pth.rfind('_')
+        if i > 0: 
+            paramstr = model_pth[i+1:-3]
+            print(f"[yoloApp]debug:params = {paramstr}")
+            params = paramstr.split('-')
+            if len(params) == 3 and \
+               params[0].isnumeric() and params[1].isnumeric() and params[2].isnumeric():
+                input_dim = int(params[0])
+                seq_frames = int(params[1])
+                output_dim = int(params[2])               
+        # モデル入力次元数を設定
+        num_opts = [opt for opt in args if opt.startswith('inputdim')]
+        if len(num_opts) > 0: 
+            # inputdim=<no>の解析
+            params = num_opts[0].split('=')
+            if len(params) == 2 and params[1].isnumeric():
+                input_dim = int(params[1])
+                if input_dim != 7 and input_dim != 8:
+                    print("入力次元数は7か8のどちらかで指定してください")
+                    return
+        # 特徴量データフレームのインスタンス作成
+        InputPdf = FeaturePdf(input_dim, seq_frames)
+
+    # モデルデータ出力のケース数を設定
+    num_opts = [opt for opt in args if opt.startswith('classes')]
+    if len(num_opts) > 0: 
+        # classes=<no>の解析
+        params = num_opts[0].split('=')
+        if len(params) == 2 and params[1].isnumeric():
+            output_dim = int(params[1])
+            if output_dim != 3 and output_dim != 19:
+                print("クラス数は3か19のどちらかで指定してください")
+                return
+    
     if not raw_video and ( '-t' in opts) :
         manual_plot = True
         Tracking_only = True    # トラッキングのみを行うオプション
@@ -2040,16 +2082,6 @@ def main():
             print(f"> '{case_name}' already registered. Are you sure?[y/n].")
             ans = input('>>')
             if ans != 'y': return
-        # トラッキングデータ出力のケース数を設定
-        num_opts = [opt for opt in args if opt.startswith('classes')]
-        if len(num_opts) > 0: 
-            # classes=<no>の解析
-            params = num_opts[0].split('=')
-            if len(params) == 2 and params[1].isnumeric():
-                Num_classes = int(params[1])
-                if Num_classes != 3 and Num_classes != 19:
-                    print("クラス数は3か19のどちらかで指定してください")
-                    return
     #
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
@@ -2143,7 +2175,7 @@ def main():
     # キーオペレーションのガイダンス表示
     color = 'G'
     guid_opt = [opt for opt in opts if opt.startswith('-g')]
-    if len(guid_opt) > 0:
+    if len(guid_opt) > 0 and guid_opt[0] != '-gru':
         guidance = True 
         # ガイダンスの色を取得
         if len(guid_opt[0]) > 2: color = guid_opt[0][2].upper()
@@ -2252,6 +2284,7 @@ def main():
                 break
     #------------------------------------------------------------------------
     # 映像出力ファイルの設定
+    #------------------------------------------------------------------------
     keyCtl['videoWrite'] = False
     out_file = ''
     if ('-w' in opts) or clip_video:
@@ -2267,12 +2300,12 @@ def main():
         #print(f"os.sep: {os.sep}")
     #
     if not raw_video:
-        #
+        #------------------------------------------------------------------------
         # NNモデルのインスタンス生成
-        #
+        #------------------------------------------------------------------------
         print(f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLOv8 ログレベル={mylog_level}")
-        print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}, 出力クラス区分数: {Num_classes}")        
+        print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}, 出力クラス区分数: {output_dim}")        
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
                 
         # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
@@ -2280,23 +2313,20 @@ def main():
         model.info()  # モデル情報を表示
         
         if nn_gru:
-            # KyudoGRUモデルの読み込み（事前学習済みモデル）
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
             
-            input_dim = len(Features_list_7)
             _, _, _, section_dim, completed_dim = Hyper_parameters
-            print(f"input_dim={input_dim}")
-
-            model_gru = KyudoGRUs( input_size = input_dim, output_size = Num_classes,
+            print(f"input_dim={input_dim}")            
+            # KyudoGRUモデルの読み込み（事前学習済みモデル）
+            model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
                             section_embed_dim = section_dim,
                             completed_embed_dim = completed_dim )
             model_gru.to( get_device() )
-            print(f"model_gru={model_gru}")
-            mylog.log(INFO,f"model_gru={model_gru}")
-            
-            # 学習済モデルの読み込み
             model_gru.load_state_dict( torch.load(model_pth, map_location = get_device()) )
+
+            print(f"model_gru={model_gru}")
+            mylog.log(INFO,f"model_gru={model_gru}")            
             print(f"[main]:model loaded from {model_pth}")
             mylog.log(INFO,f"model loaded from {model_pth}")
     #    
@@ -2310,8 +2340,14 @@ def main():
     if not raw_video:
         mylog.log(INFO, f"[main]:サンプリング: {Sample_frames}フレーム({sample_seconds:.3f} sec.), Lag={Sample_lag}")
         print(f"[main]:サンプリング:Fps={Fps:.2f}, Interval={Sample_frames}フレーム({sample_seconds:.3f}sec.), Lag={Sample_lag}")    
+    
+    if nn_gru:
+        mylog.log(INFO, f"[main]:入力次元数: {input_dim}, シーケンスフレーム数： {seq_frames}, 出力クラス区分数: {output_dim}")
+        print(f"[main]:入力次元数: {input_dim}, シーケンスフレーム数： {seq_frames}, 出力クラス区分数: {output_dim}")
+    
     if Tracking_only or Update_tracking:
-        mylog.log(INFO, f"[main]:出力クラス区分数: {Num_classes}")
+        mylog.log(INFO, f"[main]:出力クラス区分数: {output_dim}")
+        print(f"[main]:出力クラス区分数: {output_dim}")
     #   
     Frame_counter = 1                   # フレームカウンターの初期化
     if raw_video is True:
@@ -2331,8 +2367,9 @@ def main():
         print_param(CompleteAction_param)
         print_param(StartAction_param)
     #
-    # メインのループ処理
-    #
+    #------------------------------------------------------------------------
+    #  メインのループ処理 
+    #------------------------------------------------------------------------
     while True:
         # 次のフレームの読み込み
         ret, frame = cap[0].read()
@@ -2410,7 +2447,7 @@ def main():
                     
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
-                        annotated_frame = plot( myResult, frame, \
+                        annotated_frame = plot( myResult, frame, input_dim, \
                                                 nn_gru, model_gru if nn_gru else None)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
@@ -2473,7 +2510,7 @@ def main():
         #    
         # ウィンドウに表示する   
         cv2.imshow('YOLO Pose Detection', annotated_frame)
-        
+        #print(f"({Frame_counter})")
         #キー入力をチェックするする
         key = cv2.waitKey(keyCtl['iwait']) & 0xFF
         if key == -1: 
