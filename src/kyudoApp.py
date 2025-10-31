@@ -59,7 +59,7 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name>] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-         + "        [<section>=<no>] [<classes>=<num>] [-train|-predict] [{-models|-modelm} ['<model-path>']]\n"\
+         + "        [{-train|-predict}  [<classes>=<num>] [<section>=<no>]  {-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-h(elp)] [-d(ebug)]")
     exit(0)
@@ -157,7 +157,10 @@ if '-models' in cmds: model_opt = '-models'
 if '-modelm' in cmds: model_opt = '-modelm'
 if model_opt is not None:
     i = cmds.index( model_opt )
-    if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' : model_pth = cmds[i +1]
+    if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' : 
+        model_pth = cmds[i +1]
+        if model_pth.startswith('classes') or model_pth.startswith('section'): 
+            model_pth = None
 
 # ハイパーパラメータの設定
 # (s_frames, batch_size, n_epoch[, section_embed_dim, completed_embed_dim ])
@@ -179,7 +182,7 @@ if len(sect_opts) > 0:
 # class=<num>の解析(出力クラス数の指定)
 #num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
 #num_classes = 19   # (8セクションx2+2)=0~18 
-num_classes:int = 19
+num_classes:int = 3
 num_opts = [opt for opt in args if opt.startswith('classes')]
 if len(num_opts) > 0: 
     # classes=<no>の解析
@@ -198,6 +201,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #  学習用データの読み込み
     features = Features_list_7
     input_dim = len(features)
+    log_write(f"[kyudoApp]:input_dim={input_dim}")
     log_write(f"[kyudoApp]:features:{features}")
     if section is None:
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
@@ -215,20 +219,23 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     if verbose: df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
     
     if section is None:
-        df_y = db.pandas_read_kyudo( ['K.label as label'] )    # 教師ラベル(input_frames, 1)
+        df_y = db.pandas_read_kyudo( ['label as label'] )    # 教師ラベル(input_frames, 1)
     else:    
-        df_y = db.pandas_read_kyudo_section( ['K.label as label'], section )  # section={section,section+1}を選択
+        df_y = db.pandas_read_kyudo_section( ['label as label'], section )  # section={section,section+1}を選択
     if verbose: df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
 
     # 学習データの使用範囲の指定がある場合の処理
+    pf_vals = None
     if len(pf_opt) > 0:
+        print(f"[kyudoApp]df_x.shape={df_x.shape}")   
         print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")    # 表示フレーム数   
         if not p_option:   # '-fxxxx' は開始フレームをフレーム数で指定
             frame_length = df_x.index[-1] - df_x.index[0] + 1
             mlast[0] = frame_length - mlast[0]
         if last > mlast[0] or last == 0: 
             last = mlast[0]
-        print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")               
+        pf_vals = (mlast[0], last)               
+        print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")
         df_x = df_x.tail(mlast[0])
         df_y = df_y.tail(mlast[0])
         df_x = df_x.head(last)
@@ -268,7 +275,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         else:
             print(f"[kyudoApp]error:model-file({model_pth}) not found.")
     if not predict:      
-        # 学習実行
+        # 学習実行(train)
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
         csvfile = model.csvpath
         plot_loss = True
@@ -277,9 +284,9 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         mlast[0] = n_epoch
         last = n_epoch
         key_names.append('loss')
-        args.append('loss')    
+        args.append('loss') 
     else:
-        # 予測実行
+        # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
         # 入力、ラベル、予測結果データフレームの作成
         df_yp = pd.DataFrame(y_pred, columns=['predicted'])
@@ -489,9 +496,14 @@ for icount, key in enumerate(selkeys, start=1):
             # 予測結果データフレームの読み込み
             dfk = df_p  
             dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
+            mdfk = dfk
             # 実測データの読み込み
             df = db.pandas_read_kyudo()
             print(f"[kyudoApp]info:df{df.shape}")
+            if pf_vals is not None:            
+                mdf = df.tail(pf_vals[0])
+                mdf = mdf.head(pf_vals[1])
+                print(f"[kyudoApp]info:mdf{mdf.shape}")
         else:
             if section is not None:
                 dfk = db.pandas_read_kyudo_section(section = section)
@@ -527,10 +539,11 @@ for icount, key in enumerate(selkeys, start=1):
                 last = mlast[icase]
             print(f"[kyudoApp]info:mlast[{icase}]={mlast[icase]}, last={last}")               
         #
-        mdf = df.tail(mlast[icase])
-        mdfk = dfk.tail(mlast[icase])
-        mdf = mdf.head(last)
-        mdfk = mdfk.head(last)
+        if not predict:
+            mdf = df.tail(mlast[icase])
+            mdf = mdf.head(last)
+            mdfk = dfk.tail(mlast[icase])
+            mdfk = mdfk.head(last)
 
         print(f"[kyudoApp]info:mdfk{mdfk.shape}")
         print(f"[kyudoApp]info:frame_no = [{mdfk.index[0]} -> {mdfk.index[-1]}]")
