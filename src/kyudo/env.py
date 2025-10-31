@@ -47,7 +47,10 @@ Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed']
-
+# 入力データの次元数
+Input_dim = len(Features_list_7)
+# 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
+Output_dim = 3 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
 Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle'] 
 
