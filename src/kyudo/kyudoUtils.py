@@ -155,12 +155,11 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
             # 
             loss.backward()
             optimaizer.step()
-            #  
-            # calculate average loss
-            #loss_train /= (j + 1)                 
-            #record_loss_train.append(loss_train)  # record loss to list
-            
-            model.write_csv( [i, loss_train] )    # 学習過程をCSVファイルに出力
+        #  
+        # calculate average loss
+        loss_train /= (j + 1)                 
+        #record_loss_train.append(loss_train)   # record loss to list    
+        model.write_csv( [i, loss_train] )      # 学習過程をCSVファイルに出力
         if i%20 == 0:
             # 20エポックごとに学習過程を表示
             #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},y={y[0]}')
