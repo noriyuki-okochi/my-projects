@@ -313,7 +313,7 @@ class MyDb:
             sql = f"select * from kyudo_data where case_name='{self.case_name}' order by frame_no asc"
         else: 
             sql = 'select frame_no,' +  ','.join(cols)                                    
-            sql += f" from tracking_data where case_name ='{self.case_name}' order by frame_no asc"
+            sql += f" from kyudo_data where case_name ='{self.case_name}' order by frame_no asc"
             '''
             sql = 'select K.frame_no as frame_no,' +  ','.join(cols)                                    
             sql += f" from (select * from kyudo_data where case_name ='{self.case_name}') as K left join "\
