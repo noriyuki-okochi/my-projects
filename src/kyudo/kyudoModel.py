@@ -76,11 +76,11 @@ class KyudoGRU(nn.Module):
     return ym
   
   # CSVファイルのオープン、書き込み、クローズ
-  def open_csv(self, headers='', path="./", fname='model'):
+  def open_csv(self, headers='', path="./", fname='model', mode='w'):
       # CSV出力ファイルの作成
       timestamp = datetime.now().strftime('%Y%m%d')
       self.csvpath = path[:path.rfind('/')+1] + f"{fname}_{timestamp}.csv"
-      self.csvfile = open( self.csvpath, 'w')
+      self.csvfile = open( self.csvpath, mode)
       # カラム名を出力
       line = ''
       for name in headers:
@@ -151,6 +151,7 @@ class KyudoGRUs(KyudoGRU):
     #y = self.fc(out[:,-1,:])
     _, hidden = self.gru( x_concat, inith )
     y = self.fc( hidden.squeeze(0) )
+    #y = self.mask_output( y, section )
     return y
 #
 # GRU(multi-heads)モデルの定義
@@ -163,8 +164,13 @@ class KyudoGRUm(KyudoGRU):
                                     section_embed_dim=section_embed_dim,
                                    completed_embed_dim=completed_embed_dim) 
     self.output_size = output_size
+    '''
     # 複数の全結合層を用意（section数分）
     self.heads = nn.ModuleList([ nn.Linear(hidden_size, output_size) for _ in range(10) ])
+    '''
+    # 複数のGRU層を用意（section数分）
+    self.heads = nn.ModuleList([ self.gru for _ in range(10) ])
+    self.fc = nn.Linear(hidden_size, output_size)
   
   def forward(self, x):
     """
@@ -175,7 +181,6 @@ class KyudoGRUm(KyudoGRU):
     """
     batch_size, seq_len, featues_size = x.size()
 
-    section_no = int(x[0, -1, -2])            # section
     #
     if self.embed is True:
       section_ids   = x[:, -1, -2].long()     # [batch]
@@ -196,11 +201,53 @@ class KyudoGRUm(KyudoGRU):
     else:
       x_concat = x   
     #
+    section_no = int(x[0, -2, -2])                          # section
+    blocks =[]
+    ii, nn = 0, 0
+    section = section_no
+
+    for i in range(batch_size):
+        no = int(x[i, -2, -2])
+        if no != section:
+            blocks.append((ii, section, nn))
+            ii = i
+            section = no
+            nn = 1
+        else: nn += 1
+    if nn > 0 : blocks.append((ii, section, nn))
+    # 連続するセクション（ブロック単位）毎に一括処理   
+    y  = []
+    for block in blocks:
+        i, section_no, block_size = block
+        x = x_concat[i:i+block_size]
+        inith = self.init_hidden(block_size)
+        _, hidden = self.heads[section_no]( x, inith )      # hidden: [block_size. 1, hidden_size]
+        yi = self.fc( hidden.squeeze(0) )                   # [block_size, output_size]
+        y.append(yi)
+    #　バッチ単位にまとめる
+    return torch.cat(y, dim=0)                              # [batch_size, output_size]  
+##   
+    '''
+    # 複数のGRU層を適用（サンプル毎のループ処理） ：処理負荷が大きい
+    inith = self.init_hidden(1)
+    y = []
+    for i in range(batch_size):
+        section_no = int(x[i, -1, -2])                      # section
+        xi = x_concat[i].unsqueeze(0)                       # [1, seq_len, featues_size]
+        _, hidden = self.heads[section_no]( xi, inith )     # hidden: [1. 1, hidden_size]
+        yi = self.fc( hidden.squeeze(0) )                   # [1, output_size]
+        y.append(yi)
+    return torch.cat(y, dim=0)                              # [batch_size, output_size]  
+    '''
+##   
+    '''
+    # 複数の全結合層を適用 ：精度が悪い
     inith = self.init_hidden(batch_size)
     _, hidden = self.gru( x_concat, inith )
     y = self.heads[section_no]( hidden.squeeze(0) )   
-    #   
-    #y = self.mask_output( y, section )
-    return y  
+    return y                                                # [batch_size, output_size]  
+    '''
+    # 複数のGRU層を適用（同一セクション単位で一括処理）　
+    # 連続するセクションの情報（開始、セクション番号、サンプル数）を収集する
 #
 #eof 
