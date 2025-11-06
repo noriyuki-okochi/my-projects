@@ -2021,7 +2021,7 @@ def main():
         i = model_pth.rfind('_')
         if i > 0: 
             paramstr = model_pth[i+1:-3]
-            print(f"[yoloApp]debug:params = {paramstr}")
+            #print(f"[yoloApp]debug:params = {paramstr}")
             params = paramstr.split('-')
             if len(params) == 3 and \
                params[0].isnumeric() and params[1].isnumeric() and params[2].isnumeric():
@@ -2315,13 +2315,22 @@ def main():
         if nn_gru:
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
-            
             _, _, _, section_dim, completed_dim = Hyper_parameters
             print(f"input_dim={input_dim}")            
             # KyudoGRUモデルの読み込み（事前学習済みモデル）
-            model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
-                            section_embed_dim = section_dim,
-                            completed_embed_dim = completed_dim )
+            parts =model_pth.split('_') 
+            if 'modelse' in parts:
+                model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
+                                section_embed_dim = section_dim,
+                                completed_embed_dim = completed_dim )
+            elif 'modelme' in parts:
+                model_gru = KyudoGRUm( input_size = input_dim, output_size = output_dim,
+                                hidden_size=32,
+                                section_embed_dim = section_dim,
+                                completed_embed_dim = completed_dim )
+            else:
+                print(f"非対応のモデルです。")
+                return   
             model_gru.to( get_device() )
             model_gru.load_state_dict( torch.load(model_pth, map_location = get_device()) )
 
