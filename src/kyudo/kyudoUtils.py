@@ -11,8 +11,13 @@ import logging
 DEBUG = logging.DEBUG
 INFO = logging.INFO
 ERROR = logging.ERROR
+
+LOG_FILE_MODE = 'w'
+CSV_FILE_MODE = 'w'
+LOSS_FILE_MODE = 'w'
+
 ulog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('kyudo_util.log', mode='a')  # ログファイルの設定
+filehandler = logging.FileHandler('kyudo_util.log', mode=LOG_FILE_MODE)  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
@@ -44,7 +49,7 @@ def df2csv(df, case_name='none', title=None, file=None):
     # CSVファイルのヘッダー出力
     if title is not None:
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        f = open(out_csv, 'a')
+        f = open(out_csv, CSV_FILE_MODE)
         f.write(f"# {title}: {timestamp}\n")
         f.close()
     # CSVファイルのデータ出力      
@@ -139,7 +144,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
     optimaizer = optim.Adam(model.parameters(), lr=0.001 )
     
     #record_loss_train = []  # list to record loss value
-    model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train' )
+    model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
     
     # 学習ループ
     for i in range(n_epoch):
