@@ -446,8 +446,8 @@ class FeaturePdf:
         self.input_size = input_dim
         self.kyudo_data_list = [None]*len(Kyudo_data_names)
         self.features_list = [None]*self.input_size
-        self.curPdf = None
-        self.prePdf = None
+        self.curPdf:pd.DataFrame = None
+        self.prePdf:pd.DataFrame = None
     
     def set_kyudo_data_list(self, data_list):
         self.kyudo_data_list = data_list
@@ -498,6 +498,15 @@ class FeaturePdf:
         elif len(self.prePdf) < self.seq_size - 1: return False
         else:                                                       # 十分なデータが揃っている場合
             return True
+    
+    def set_zero_previous_pdf(self):
+        zero_data_list = [0.0]*len(Kyudo_data_names)
+        zero_data_list[3] = 1.0
+        for _ in range(self.seq_size - 5):
+            self.set_kyudo_data_list( zero_data_list )
+            self.set_current_pdf(0, 1)
+            self.add_previous_pdf()
+            
 #
 # GRUモデルによる動作解析関数
 def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
@@ -524,8 +533,12 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
             Split_start = 0                                 # スプリット開始時間をリセット
         if section == 9:                                    # 退場動作の場合、解析終了 
             Lap_start = 0
+    
+    rslt = update_section_completed(action, section, completed, output_size=Num_classes)
+    if action != 0:
+        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
     #
-    return update_section_completed(action, section, completed, output_size=3)
+    return rslt
 
 #
 # 解析結果をトラッキングする関数              
@@ -2040,6 +2053,8 @@ def main():
                     return
         # 特徴量データフレームのインスタンス作成
         InputPdf = FeaturePdf(input_dim, seq_frames)
+        # ゼロデータで初期化
+        InputPdf.set_zero_previous_pdf()
 
     # モデルデータ出力のケース数を設定
     num_opts = [opt for opt in args if opt.startswith('classes')]
