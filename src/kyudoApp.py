@@ -283,7 +283,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
         csvfile = model.csvpath
         plot_loss = True
-        df = pd.read_csv(csvfile)
+        df = pd.read_csv(csvfile, sep='\t')
         print(f"[kyudoApp]:read_csv:{df.shape}")
         mlast[0] = n_epoch
         last = n_epoch
