@@ -33,8 +33,8 @@ class KyudoRNN(nn.Module):
 class KyudoGRU(nn.Module):
   def __init__(self, input_size, hidden_size, n_layers,
                section_vocab_size=10,
-               section_embed_dim=8,
                completed_vocab_size=3,
+               section_embed_dim=8,
                completed_embed_dim=4):
     super(KyudoGRU, self).__init__() 
     #
@@ -84,7 +84,7 @@ class KyudoGRU(nn.Module):
       # カラム名を出力
       line = ''
       for name in headers:
-          if len(line) > 0: line += f",{name}"
+          if len(line) > 0: line += f"\t{name}"
           else: line += name
       self.csvfile.write(line + "\n")
       self.csvfile.flush()
@@ -93,7 +93,7 @@ class KyudoGRU(nn.Module):
       if self.csvfile is None: return
       line = ''
       for v in values:
-          if len(line) > 0: line += f",{v:.4f}"
+          if len(line) > 0: line += f"\t{v:.4f}"
           else: line += f"{v}"
       self.csvfile.write(line + "\n")
 
@@ -107,11 +107,13 @@ class KyudoGRU(nn.Module):
 #
 class KyudoGRUs(KyudoGRU):
   def __init__(self, input_size=7, hidden_size=64, output_size=3, n_layers=1,
-               section_embed_dim=8,
-               completed_embed_dim=4):
+                section_vocab_size=10, completed_vocab_size=3,
+                section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers,
-                                   section_embed_dim=section_embed_dim,
-                                   completed_embed_dim=completed_embed_dim) 
+                                    section_vocab_size=section_vocab_size,
+                                    completed_vocab_size=completed_vocab_size,
+                                    section_embed_dim=section_embed_dim,
+                                    completed_embed_dim=completed_embed_dim) 
     #
     self.output_size = output_size
     self.fc = nn.Linear(hidden_size, output_size)
@@ -147,8 +149,6 @@ class KyudoGRUs(KyudoGRU):
       x_concat = x
     #
     inith = self.init_hidden(batch_size)
-    #out, _ = self.gru(x, inith)
-    #y = self.fc(out[:,-1,:])
     _, hidden = self.gru( x_concat, inith )
     y = self.fc( hidden.squeeze(0) )
     #y = self.mask_output( y, section )
@@ -158,18 +158,20 @@ class KyudoGRUs(KyudoGRU):
 #
 class KyudoGRUm(KyudoGRU):
   def __init__(self, input_size=7, hidden_size=64, output_size=3, n_layers=1,
-               section_embed_dim=8,
-               completed_embed_dim=4):
+               section_vocab_size=10, completed_vocab_size=3,
+               section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers,
-                                    section_embed_dim=section_embed_dim,
-                                   completed_embed_dim=completed_embed_dim) 
+                                    section_vocab_size=section_vocab_size, 
+                                    completed_vocab_size=completed_vocab_size,
+                                    section_embed_dim=section_embed_dim, 
+                                    completed_embed_dim=completed_embed_dim) 
     self.output_size = output_size
     '''
     # 複数の全結合層を用意（section数分）
     self.heads = nn.ModuleList([ nn.Linear(hidden_size, output_size) for _ in range(10) ])
     '''
     # 複数のGRU層を用意（section数分）
-    self.heads = nn.ModuleList([ self.gru for _ in range(10) ])
+    self.heads = nn.ModuleList([ self.gru for _ in range(section_vocab_size) ])
     self.fc = nn.Linear(hidden_size, output_size)
   
   def forward(self, x):
@@ -201,20 +203,18 @@ class KyudoGRUm(KyudoGRU):
     else:
       x_concat = x   
     #
-    section_no = int(x[0, -2, -2])                          # section
+    # 連続するセクション（ブロック単位）情報を作成   
     blocks =[]
-    ii, nn = 0, 0
-    section = section_no
-
+    no = int(x[0, -1, -2])                              # サンプルのセクション番号
+    ii, section, nn = 0, no, 0
     for i in range(batch_size):
-        no = int(x[i, -2, -2])
+        no = int(x[i, -1, -2])
         if no != section:
             blocks.append((ii, section, nn))
-            ii = i
-            section = no
-            nn = 1
+            ii, section, nn = i, no, 1
         else: nn += 1
     if nn > 0 : blocks.append((ii, section, nn))
+    
     # 連続するセクション（ブロック単位）毎に一括処理   
     y  = []
     for block in blocks:
@@ -239,6 +239,16 @@ class KyudoGRUm(KyudoGRU):
         y.append(yi)
     return torch.cat(y, dim=0)                              # [batch_size, output_size]  
     '''
+##   
+    '''
+    # 複数のGRU層を適用（一括処理） ：サンプルに対するセクション番号が適合していない不合理が存在
+    section_no = int(x[0, -1, -2])                          # 先頭サンプルのセクション番号
+    inith = self.init_hidden(batch_size)
+    _, hidden = self.heads[section_no]( x_concat, inith )   # hidden: [1. 1, hidden_size]
+    y = self.fc( hidden.squeeze(0) )                        # [1, output_size]
+    return y                                                # [batch_size, output_size]  
+    '''
+##   
 ##   
     '''
     # 複数の全結合層を適用 ：精度が悪い
