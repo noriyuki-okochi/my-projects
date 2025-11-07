@@ -12,8 +12,8 @@ DEBUG = logging.DEBUG
 INFO = logging.INFO
 ERROR = logging.ERROR
 
-LOG_FILE_MODE = 'w'
-CSV_FILE_MODE = 'w'
+LOG_FILE_MODE = 'a'
+CSV_FILE_MODE = 'a'
 LOSS_FILE_MODE = 'w'
 
 ulog = logging.getLogger(__name__)
@@ -91,7 +91,9 @@ def update_section_completed( action, section, completed, output_size):
         if action == 1:       # 動作完了
             completed = 1
         elif action == 2:     # 動作開始
-            section = min(section + 1, 9) 
+            #section = min(section + 1, 9) 
+            if section == 9: section = 2
+            else: section = section + 1 
             completed = 0
     #
     elif output_size == 19:
@@ -194,8 +196,8 @@ def predict_Kyudo( model, np_x, s_frames):
     input_frames, input_size = np_x.shape
     ulog.debug(f"[predict_Kyudo]:np_x={np_x.shape}") 
         
-    real = True if input_frames == s_frames else False
-    if not real:
+    immediately = True if input_frames == s_frames else False
+    if not immediately:
         # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
         #input_frames -= s_frames
         x_zeros = np.zeros( (s_frames, input_size) )
@@ -210,19 +212,19 @@ def predict_Kyudo( model, np_x, s_frames):
     for i in range(input_frames):
         x_data[i] = x[i:i + s_frames].reshape(-1, input_size)
         
-    if real:
-        section = x_data[1:,:, -2]
-        completed = x_data[1:,:, -1]
+    if immediately:
+        section = x_data[0:,-1, -2]
+        completed = x_data[0:,-1, -1]
     else:
-        section = 0
-        completed = 0
-        
-    x_data[1:,:, -2] = 0.0   # section
-    x_data[1:,:, -1] = 0.0   # completed  
+        section = x_data[1,-1, -2]
+        completed = x_data[1,-1, -1]        
+        x_data[1:,:, -2] = 0.0   # section
+        x_data[1:,:, -1] = 0.0   # completed
+          
     x_data = torch.tensor(x_data, dtype=torch.float32).to(device )
     ulog.debug(f"[predict_Kyudo]:x_data={x_data.shape}")
     
-    y_data = np.zeros( (input_frames, 1) )
+    y_data = np.zeros( (input_frames, 1) ,dtype=np.int64)
     #print(y_data.shape)  
     i = 0
     model.eval()
@@ -239,7 +241,7 @@ def predict_Kyudo( model, np_x, s_frames):
         ulog.debug(f"[predict_Kyudo]:action={action}")
         y_data[t] = action
         
-        if not real:
+        if not immediately:
             # セクションと完了状態の更新
             section, completed = update_section_completed( action, section, completed, model.output_size)
             ulog.debug(f"[predict_Kyudo]:section={section}:completed={completed}")
