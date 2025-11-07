@@ -293,9 +293,11 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
         # 入力、ラベル、予測結果データフレームの作成
-        df_yp = pd.DataFrame(y_pred, columns=['predicted'])
+        #  （dtype='Int64'の指定でconcat後もintの型が保持された）
+        df_yp = pd.DataFrame(y_pred, columns=['predicted'], dtype='Int64')
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
-        
+        # NaNを含む列がfloat型に変更される
+        df_p = df_p.astype({'section':'Int64', 'completed':'Int64', 'label':'Int64'})
         out_csv = f"predict_{case_names[0]}.csv"
         df2csv(df_p, title=None, file=out_csv)
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
@@ -323,7 +325,7 @@ if '-loss' in cmds or '-predicted' in cmds:
         plot_pred = True
         m_flg = True
     else:  
-        df = pd.read_csv(csvfile)
+        df = pd.read_csv(csvfile, sep='\t')
         plot_loss = True 
     print(f"[kyudoApp]:read_csv:{csvfile}, {df.shape}")
     x_len = df.shape[0]
