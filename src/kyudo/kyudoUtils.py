@@ -194,7 +194,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
 def predict_Kyudo( model, np_x, s_frames):
     # 予測データ
     input_frames, input_size = np_x.shape
-    ulog.debug(f"[predict_Kyudo]:np_x={np_x.shape}") 
+    #ulog.debug(f"[predict_Kyudo]:np_x={np_x.shape}") 
         
     immediately = True if input_frames == s_frames else False
     if not immediately:
@@ -205,7 +205,7 @@ def predict_Kyudo( model, np_x, s_frames):
     else:
         x = np_x
         input_frames = 1
-    ulog.debug(f"[predict_Kyudo]:x={x.shape}")     
+    #ulog.debug(f"[predict_Kyudo]:x={x.shape}")     
     #ulog.debug(f"[predict_Kyudo]:x={x}")
     #
     x_data = np.zeros( (input_frames, s_frames, input_size) )
