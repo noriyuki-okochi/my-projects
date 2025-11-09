@@ -50,6 +50,7 @@ class MyDb:
             +  "rw_norm,rw_angle,lw_norm,lw_angle,"\
             +  "rl_norm,rl_angle,hr_norm,hr_angle,"\
             +  "er_angle,sl_angle,eyes_norm,hips_norm,"\
+            +  "tag1,"\
             +  "section,completed,label,inserted_at,time_epoch\n"
         self.csvfile2.write(names)
         self.csvfile2.flush()
@@ -225,7 +226,7 @@ class MyDb:
         values = f"{self.case_name},{self.frame_no},"                   # case_name, frame_no
                    
         for i, value in enumerate(data_list): 
-            if i == 0:                                                  # box_id
+            if i == 0 or i == len(data_list) - 1:                       # 0:box_id, -1:tag1
                 values += f"{value},"
             else:
                 values += f"{value:.6f},"
