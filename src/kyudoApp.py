@@ -199,7 +199,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
         exit(0)
     #  学習用データの読み込み
-    features = Features_list_7
+    features = Features_list_7 if Input_dim == 7 else Features_list_8
     input_dim = len(features)
     log_write(f"[kyudoApp]:input_dim={input_dim}")
     log_write(f"[kyudoApp]:features:{features}")
