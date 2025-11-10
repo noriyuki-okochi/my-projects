@@ -47,6 +47,7 @@ Split_start:int = 0         # スプリットベースフレームカウント
 Lap_sec:float = 0.0         # ラップ秒 
 Lap_start:int = 0           # ラップベースフレームカウント
 Action_start:float = 0.0    # アクションベース時間
+Action:int = 0              # アクション（予測結果）
 Completed:bool = False      # 完了フラグ
 Step_counter:int = 0        # セクション内のステップカウンター
 Nop_counter:int = 0         # スキップカウンター
@@ -523,7 +524,6 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
     y = predict_Kyudo( model, x, s_frames)
     mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
     action = y[0]
-
     # タイマー情報の更新
     if action == 2:
         Action_start = Lap_sec
@@ -541,7 +541,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
         mylog.log(INFO, f"[gru_analize]: frame={Frame_counter}, action={action}")
         mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
     #
-    return rslt
+    return rslt[0], rslt[1], action
 
 #
 # 解析結果をトラッキングする関数              
@@ -1284,7 +1284,8 @@ InputPdf:FeaturePdf = None
 # 検出結果をフレームに描画する関数
 #
 def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, CameraPos, Nop_counter
+    global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
+    global Split_start, Split_sec, Lap_start, Lap_sec
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
     result = myResult.result
@@ -1329,7 +1330,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                     # 入力データフレームを取得
                     input_pdf = InputPdf.get_input_pdf()
                     # GRUモデルによる動作解析
-                    Section_no, Completed = gru_analize(Section_no, Completed, model, input_pdf)
+                    Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
                     InputPdf.update_previous_pdf()
             else:   
                 # プログラムロジックによる姿勢解析
@@ -2407,6 +2408,7 @@ def main():
     #------------------------------------------------------------------------
     #  メインのループ処理 
     #------------------------------------------------------------------------
+    actStr = ''
     while True:
         # 次のフレームの読み込み
         ret, frame = cap[0].read()
@@ -2539,10 +2541,14 @@ def main():
                 pos = (x, y - 45)
                 comp = 1 if Completed else 0
                 str = f"param({Section_no}-{comp}-{Step_counter:2d}) : "
-                for i in  range( Stkp.len() ):
-                    no, val = Stkp.get(i)
-                    if i > 0: str += ", "
-                    str += f"{no}={val}"
+                if not nn_gru: 
+                    for i in  range( Stkp.len() ):
+                        no, val = Stkp.get(i)
+                        if i > 0: str += ", "
+                        str += f"{no}={val}"
+                else:
+                    if Action != 0: actStr = f"Action={Action}"
+                    str += actStr
                 cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1)            
         #    
         # ウィンドウに表示する   
