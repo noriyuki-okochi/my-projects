@@ -42,10 +42,12 @@ Debug_opt:int = 0           # デバッグレベル
 Frame_counter:int = 0       # フレームカウンター
 Fps:float = 30              # フレームレート
 Section_no:int = 0          # セクション番号
-Split_sec:int = 0           # スプリット秒
-Split_start:int = 0         # スプリットベース時間
-Lap_sec:int = 0             # ラップ秒 
-Lap_start:int = 0           # ラップベース時間
+Split_sec:float = 0.0       # スプリット秒
+Split_start:int = 0         # スプリットベースフレームカウント
+Lap_sec:float = 0.0         # ラップ秒 
+Lap_start:int = 0           # ラップベースフレームカウント
+Action_start:float = 0.0    # アクションベース時間
+Action:int = 0              # アクション（予測結果）
 Completed:bool = False      # 完了フラグ
 Step_counter:int = 0        # セクション内のステップカウンター
 Nop_counter:int = 0         # スキップカウンター
@@ -437,8 +439,8 @@ class MyResult(Keypoint):
 
 ##    特徴量のデータフレームクラス
 class FeaturePdf:
-    Features_list_8 = [ 'rw_ratio', 'rw_deg', 'lw_ratio', 'eyes_ratio',\
-                        'hr_ratio', 'hr_deg', 'section','completed' ]
+    Features_list_8 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+                        'hr_ratio', 'hr_deg', 'act_sec', 'section','completed' ]
     Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg', 'section','completed' ]
     def __init__(self, input_dim:int=Input_dim, seq_frames:int=Num_frames):
@@ -446,8 +448,8 @@ class FeaturePdf:
         self.input_size = input_dim
         self.kyudo_data_list = [None]*len(Kyudo_data_names)
         self.features_list = [None]*self.input_size
-        self.curPdf = None
-        self.prePdf = None
+        self.curPdf:pd.DataFrame = None
+        self.prePdf:pd.DataFrame = None
     
     def set_kyudo_data_list(self, data_list):
         self.kyudo_data_list = data_list
@@ -460,9 +462,6 @@ class FeaturePdf:
         i = 0
         self.features_list[i] = self.kyudo_data_list[4] / box_h     # rw_ratio
         i += 1
-        if self.input_size == 8:
-            self.features_list[i] = self.kyudo_data_list[5] / 180.0 # rw_deg
-            i += 1
         self.features_list[i] = self.kyudo_data_list[6] / box_h     # lw_ratio
         i += 1
         self.features_list[i] = self.kyudo_data_list[14] / box_h    # eyes_ratio
@@ -471,6 +470,9 @@ class FeaturePdf:
         i += 1
         self.features_list[i] = self.kyudo_data_list[11] /180.0     # hr_deg
         i += 1
+        if self.input_size == 8:
+            self.features_list[i] = self.kyudo_data_list[16]        # act_sec
+            i += 1
         self.features_list[i] = section_no                          # section
         i += 1
         self.features_list[i] = completed                           # completed   
@@ -498,10 +500,19 @@ class FeaturePdf:
         elif len(self.prePdf) < self.seq_size - 1: return False
         else:                                                       # 十分なデータが揃っている場合
             return True
+    
+    def set_zero_previous_pdf(self, rate:float = 1.0):
+        zero_data_list = [0.0]*len(Kyudo_data_names)
+        zero_data_list[3] = 1.0     # box_height(any not zero)
+        for _ in range( int(self.seq_size*rate) ):
+            self.set_kyudo_data_list( zero_data_list )
+            self.set_current_pdf(0, 0)
+            self.add_previous_pdf()
+            
 #
 # GRUモデルによる動作解析関数
 def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
-    global Split_start, Split_sec, Lap_start 
+    global Split_start, Split_sec, Lap_start, Action_start
     
     mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
     mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
@@ -513,19 +524,24 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
     y = predict_Kyudo( model, x, s_frames)
     mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
     action = y[0]
-    mylog.log(INFO, f"[gru_analize]: action={action}")
-
     # タイマー情報の更新
     if action == 2:
+        Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
-        Split_sec = 0
+        Split_sec = 0.0
     elif action == 1:
+        Action_start = Lap_sec
         if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
             Split_start = 0                                 # スプリット開始時間をリセット
         if section == 9:                                    # 退場動作の場合、解析終了 
             Lap_start = 0
+    
+    rslt = update_section_completed(action, section, completed, output_size=Num_classes)
+    if action != 0:
+        mylog.log(INFO, f"[gru_analize]: frame={Frame_counter}, action={action}")
+        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
     #
-    return update_section_completed(action, section, completed, output_size=3)
+    return rslt[0], rslt[1], action
 
 #
 # 解析結果をトラッキングする関数              
@@ -566,19 +582,23 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         Db.csvfile2.flush()
     else:    
         # 姿勢解析データ
-        rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                       # 右手首移動ベクトルの長さと角度
-        lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                        # 左手首移動ベクトルの長さと角度
+        rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                # 右手首移動ベクトルの長さと角度
+        lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                 # 左手首移動ベクトルの長さと角度
         rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')  # 右手首と左手首のベクトルの長さと角度を計算
         hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')   # 右腰と右手首のベクトルの長さと角度を計算
         _, er_angle = keyPoints.norm('right_elbow','right_wrist')       # 右肘と右手首のベクトルの長さと角度を計算
         _, sl_angle = keyPoints.norm('left_shoulder','left_wrist')      # 左肩と左手首のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')           # 右目と左目のベクトルの長さと角度を計算
-        hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算
-    
+        hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算        
+        # アクション発生後の経過時間（x10秒）
+        act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
+        #print(f"act_sec={act_sec}")                   
+        
         data_list = [box_id, box_conf, box_w, box_h,\
                     rw_norm, rw_angle, lw_norm, lw_angle,\
                     rl_norm, rl_angle, hr_norm, hr_angle,\
-                    er_angle, sl_angle, eyes_norm, hips_norm]
+                    er_angle, sl_angle, eyes_norm, hips_norm,\
+                    act_sec]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  
     
@@ -1185,13 +1205,15 @@ def edit_section_name(no, counter):
 # 動作の開始を判定する関数
 #  
 def manual_analize_start(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
+    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Action_start
+    global Completed, Step_counter, Nop_counter
     global Step_error, Alart_section, Alart_id
     
     # 動作の開始を判定
     if section_started(section_no, myResult):
+        Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
-        Split_sec = 0
+        Split_sec = 0.0
         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
         Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
         if Section_no != 9: 
@@ -1202,7 +1224,7 @@ def manual_analize_start(section_no, myResult:MyResult):
             mylog.log(INFO, f"[manual_analize_start]:Step_counter={Step_counter}, {counter}") 
             if counter == 2: 
                 Lap_start = 0                               # 退場動作開始の場合、解析終了
-                Split_sec = 0
+                Split_sec = 0.0
                 Split_start = 0
             else:                                           # 乙矢の矢つがえ動作開始
                 # セクション番号を2にリセット、動作カウンターを30に設定
@@ -1227,11 +1249,13 @@ def manual_analize_start(section_no, myResult:MyResult):
 # 動作の完了を判定する関数
 #
 def manual_analize_completed(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, Nop_counter
+    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Action_start
+    global Completed, Step_counter, Nop_counter
     global Step_error, Alart_section, Alart_id
     
     # 動作の完了を判定
     if section_completed(section_no, myResult):
+        Action_start = Lap_sec
         Completed = True 
         if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
             Split_start = 0                                 # スプリット開始時間をリセット
@@ -1260,7 +1284,8 @@ InputPdf:FeaturePdf = None
 # 検出結果をフレームに描画する関数
 #
 def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Completed, Step_counter, CameraPos, Nop_counter
+    global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
+    global Split_start, Split_sec, Lap_start, Lap_sec
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
     result = myResult.result
@@ -1305,7 +1330,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                     # 入力データフレームを取得
                     input_pdf = InputPdf.get_input_pdf()
                     # GRUモデルによる動作解析
-                    Section_no, Completed = gru_analize(Section_no, Completed, model, input_pdf)
+                    Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
                     InputPdf.update_previous_pdf()
             else:   
                 # プログラムロジックによる姿勢解析
@@ -1328,8 +1353,8 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                 if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
     #
     # セクション情報をフレームに描画
-    if Lap_start != 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
-    if Split_start != 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
+    if Lap_start > 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
+    if Split_start > 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
 
     # セクション名を編集
     section_name, Section_color = edit_section_name(Section_no, Step_counter)   
@@ -1706,12 +1731,12 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         ctl['tag2_section'] = Section_no
         if Section_no == 0:
             Lap_start = Frame_counter       # ラップ開始時間を記録
-            Lap_sec = 0
+            Lap_sec = 0.0
             ctl['tag1_section'] = 0         # tag登録用セクション番号
             ctl['tag2_section'] = 0         # tag登録用セクション番号
         else: 
             Split_start = Frame_counter
-            if Lap_start == 0: Lap_start = Frame_counter
+            if Lap_start > 0: Lap_start = Frame_counter
             if Section_no == 2 and ctl['key_inter'] != 0: 
                 # セクション2の連打は動作カウンターを20に設定
                 Step_counter = 20
@@ -2021,7 +2046,7 @@ def main():
         i = model_pth.rfind('_')
         if i > 0: 
             paramstr = model_pth[i+1:-3]
-            print(f"[yoloApp]debug:params = {paramstr}")
+            #print(f"[yoloApp]debug:params = {paramstr}")
             params = paramstr.split('-')
             if len(params) == 3 and \
                params[0].isnumeric() and params[1].isnumeric() and params[2].isnumeric():
@@ -2040,6 +2065,8 @@ def main():
                     return
         # 特徴量データフレームのインスタンス作成
         InputPdf = FeaturePdf(input_dim, seq_frames)
+        # ゼロデータで初期化
+        InputPdf.set_zero_previous_pdf(0.0)
 
     # モデルデータ出力のケース数を設定
     num_opts = [opt for opt in args if opt.startswith('classes')]
@@ -2055,6 +2082,8 @@ def main():
     if not raw_video and ( '-t' in opts) :
         manual_plot = True
         Tracking_only = True    # トラッキングのみを行うオプション
+        # トラッキングデータリストのインスタンス作成
+        InputPdf = FeaturePdf()
         i = args.index('-t')
     if not raw_video and ( '-u' in opts) :
         manual_plot = True
@@ -2315,13 +2344,22 @@ def main():
         if nn_gru:
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
-            
             _, _, _, section_dim, completed_dim = Hyper_parameters
             print(f"input_dim={input_dim}")            
             # KyudoGRUモデルの読み込み（事前学習済みモデル）
-            model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
-                            section_embed_dim = section_dim,
-                            completed_embed_dim = completed_dim )
+            parts =model_pth.split('_') 
+            if 'modelse' in parts:
+                model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
+                                section_embed_dim = section_dim,
+                                completed_embed_dim = completed_dim )
+            elif 'modelme' in parts:
+                model_gru = KyudoGRUm( input_size = input_dim, output_size = output_dim,
+                                hidden_size=32,
+                                section_embed_dim = section_dim,
+                                completed_embed_dim = completed_dim )
+            else:
+                print(f"非対応のモデルです。")
+                return   
             model_gru.to( get_device() )
             model_gru.load_state_dict( torch.load(model_pth, map_location = get_device()) )
 
@@ -2370,6 +2408,7 @@ def main():
     #------------------------------------------------------------------------
     #  メインのループ処理 
     #------------------------------------------------------------------------
+    actStr = ''
     while True:
         # 次のフレームの読み込み
         ret, frame = cap[0].read()
@@ -2447,7 +2486,7 @@ def main():
                     
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
-                        annotated_frame = plot( myResult, frame, input_dim, \
+                        annotated_frame = plot( myResult, frame, output_dim, \
                                                 nn_gru, model_gru if nn_gru else None)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
@@ -2502,10 +2541,14 @@ def main():
                 pos = (x, y - 45)
                 comp = 1 if Completed else 0
                 str = f"param({Section_no}-{comp}-{Step_counter:2d}) : "
-                for i in  range( Stkp.len() ):
-                    no, val = Stkp.get(i)
-                    if i > 0: str += ", "
-                    str += f"{no}={val}"
+                if not nn_gru: 
+                    for i in  range( Stkp.len() ):
+                        no, val = Stkp.get(i)
+                        if i > 0: str += ", "
+                        str += f"{no}={val}"
+                else:
+                    if Action != 0: actStr = f"Action={Action}"
+                    str += actStr
                 cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1)            
         #    
         # ウィンドウに表示する   

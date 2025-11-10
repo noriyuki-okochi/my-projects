@@ -30,23 +30,27 @@ Kyudo_data_names = ['box_id', 'box_conf',\
                 'rl_norm', 'rl_angle',\
                 'hr_norm', 'hr_angle',\
                 'er_angle', 'sl_angle',\
-                'eyes_norm', 'hips_norm']
+                'eyes_norm', 'hips_norm'\
+                'tag1'
+                ]
 
 # 学習用データの読み込みリスト
 Features_list_8 = ['rw_norm/box_h as rw_ratio',\
-                'rw_angle/180.0 as rw_deg',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
-                'section','completed']
+                'tag1 as act_sec',\
+                'section','completed'
+                ]
 
 Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
-                'section','completed']
+                'section','completed'
+                ]
 # 入力データの次元数
 Input_dim = len(Features_list_7)
 # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）

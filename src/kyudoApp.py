@@ -199,7 +199,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
         exit(0)
     #  学習用データの読み込み
-    features = Features_list_7
+    features = Features_list_7 if Input_dim == 7 else Features_list_8
     input_dim = len(features)
     log_write(f"[kyudoApp]:input_dim={input_dim}")
     log_write(f"[kyudoApp]:features:{features}")
@@ -258,11 +258,15 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
-    else:
+    elif model_opt == '-modelm':
         model = KyudoGRUm( input_size = input_dim, output_size = num_classes,
+                          hidden_size = 32,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
+    else:
+        print(f"[kyudoApp]error:'Illegal model option:{model_opt}")
+        exit(0)
     # モデル情報の表示
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
@@ -279,7 +283,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
         csvfile = model.csvpath
         plot_loss = True
-        df = pd.read_csv(csvfile)
+        df = pd.read_csv(csvfile, sep='\t')
         print(f"[kyudoApp]:read_csv:{df.shape}")
         mlast[0] = n_epoch
         last = n_epoch
@@ -289,9 +293,11 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
         # 入力、ラベル、予測結果データフレームの作成
-        df_yp = pd.DataFrame(y_pred, columns=['predicted'])
+        #  （dtype='Int64'の指定でconcat後もintの型が保持された）
+        df_yp = pd.DataFrame(y_pred, columns=['predicted'], dtype='Int64')
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
-        
+        # NaNを含む列がfloat型に変更される
+        df_p = df_p.astype({'section':'Int64', 'completed':'Int64', 'label':'Int64'})
         out_csv = f"predict_{case_names[0]}.csv"
         df2csv(df_p, title=None, file=out_csv)
         print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
@@ -319,7 +325,7 @@ if '-loss' in cmds or '-predicted' in cmds:
         plot_pred = True
         m_flg = True
     else:  
-        df = pd.read_csv(csvfile)
+        df = pd.read_csv(csvfile, sep='\t')
         plot_loss = True 
     print(f"[kyudoApp]:read_csv:{csvfile}, {df.shape}")
     x_len = df.shape[0]
@@ -328,10 +334,26 @@ if '-loss' in cmds or '-predicted' in cmds:
     key_names.append(key)
     args.append(key)      # key_namesに'loss' or 'predicted'を追加
 #
+# 2軸のカラムを指定するコマンドオプションの解析
+#
+second_name:str = None
+if '-second' in args:
+    i = args.index('-second')
+    if len(args) > (i + 1):
+        second_name = args[i+1]
+        if second_name not in Kyudo_data_names:
+            print(f"[kyudoApp]error:'{second_name}' not found. following names variable.")
+            print(Kyudo_data_names)
+            exit()
+#
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
 selkeys:str = [key for key in args if key in key_names]
 selnum:int = len(selkeys)
+if second_name in selkeys:
+    selkeys.remove(second_name)
+    selnum -= 1
+
 if selnum == 0: 
     selnum = 1
     selkeys.append('all')         # all keys
@@ -356,20 +378,6 @@ if '-range' in args:
         except ValueError:
             pass
 print(f"[kyudoApp]info:range_min={range_min},range_max={range_max}.")
-#
-# 2軸のカラムを指定するコマンドオプションの解析
-#
-second_name:str = None
-if '-second' in args:
-    i = args.index('-second')
-    if len(args) > (i + 1):
-        second_name = args[i+1]
-        if second_name not in Kyudo_data_names:
-            print(f"[kyudoApp]error:'{second_name}' not found. following names variable.")
-            print(Kyudo_data_names)
-            exit()
-        selkeys.remove(second_name)
-        selnum -= 1
 #
 # その他、コマンドオプションの解析
 #
