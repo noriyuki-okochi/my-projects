@@ -22,13 +22,54 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
         'left_wrist':9, 'right_wrist':10, 'left_hip':11, 'right_hip':12,
         'left_knee':13, 'right_knee':14, 'left_ankle':15, 'right_ankle':16}  # キーポイント名
 
+# Kyudo_dataテーブルの項目名
+Kyudo_data_names = ['box_id', 'box_conf',\
+                'box_w', 'box_h',\
+                'rw_norm', 'rw_angle',\
+                'lw_norm', 'lw_angle',\
+                'rl_norm', 'rl_angle',\
+                'hr_norm', 'hr_angle',\
+                'er_angle', 'sl_angle',\
+                'eyes_norm', 'hips_norm'\
+                'tag1'
+                ]
+
+# 学習用データの読み込みリスト
+Features_list_8 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'tag1 as act_sec',\
+                'section','completed'
+                ]
+
+Features_list_7 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'section','completed'
+                ]
+# 入力データの次元数
+Input_dim = len(Features_list_7)
+# 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
+Output_dim = 3 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
-Col_names = ['box_w', 'box_h', 'box_conf', 'x', 'y', 'xy_conf', 'angle', 'hw_angle', 'hw_ratio'] 
+Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle'] 
 
 # 動作解析起点データのサンプリング間隔（フレーム数）
 Sample_frames:int = 1
 Sample_lag:int = 7
-
+# ハイパーパラメータのデフォルト値設定
+Sequence_frames:int = 128       # 入力シーケンスのフレーム数
+Batch_size:int = 256
+N_epoch:int = 501
+Section_dim:int = 8
+Completed_dim:int = 4
+Hyper_parameters = (Sequence_frames, \
+                    Batch_size, N_epoch,\
+                    Section_dim, Completed_dim)    
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)

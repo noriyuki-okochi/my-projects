@@ -2,6 +2,7 @@
 yolo.code-workspace
 *.log
 *.csv
+*.db
 *__.*
 src/*__.* 
 src/.ipynb_checkpoints
