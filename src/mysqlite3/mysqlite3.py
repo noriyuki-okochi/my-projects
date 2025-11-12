@@ -328,19 +328,23 @@ class MyDb:
 #   read kyudo_data on each section(return pandas-DataFrame)
 #       
     def pandas_read_kyudo_section(self, cols=None, section=0):
-        
+        section2 = section + 1 if section < 9 else 2
         if cols is None: 
             sql = f"select * from kyudo_data where "\
-                  f" section >= {section} and section <= {section+1}"\
-                   " order by case_name, frame_no asc"
+                  f" section == {section} or section == {section2}"\
+                   " order by case_name, frame_no asc" 
         else: 
-            sql =  "select K.frame_no," +  ','.join(cols) + " from"                               
+            sql =  "select frame_no," +  ','.join(cols) + " from kyudo_data"\
+                  f" where section == {section} or section == {section2}"\
+                   " order by case_name, frame_no asc" 
+            '''
             sql += " (select * from kyudo_data where "\
-                   f" section >= {section} and section <= {section+1}) as K left join "\
+                   f" section == {section} or section == {section2}) as K left join "\
                    " (select case_name, frame_no, angle from tracking_data"\
                    " where key_name='right_wrist') as T "\
                    " on K.case_name = T.case_name and K.frame_no = T.frame_no"\
                    " order by K.case_name, K.frame_no asc"
+            '''                               
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
 #   read frame_info(return pandas-DataFrame)

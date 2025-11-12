@@ -1308,8 +1308,9 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
     
     if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
-        # 姿勢解析入力データリストを作成、保存しておく
-        tracking_result(myResult, InputPdf, output_dim, csvout=False)
+        if nn_gru:
+            # 姿勢解析入力データリストを作成、保存しておく
+            tracking_result(myResult, InputPdf, output_dim, csvout=False)
         # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
         if Lap_start > 0:    
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
@@ -1925,7 +1926,7 @@ def main():
     nn_gru = False                                  # GRUによる姿勢解析オプション
     multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     mosaic = False                                  # モザイク処理を行うオプション
-    guidance = False                                # '-g'キー操作ガイダンス表示
+    guidance = True                                 # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
@@ -2203,9 +2204,11 @@ def main():
     
     # キーオペレーションのガイダンス表示
     color = 'G'
+    guid_color = GREEN
+    guid_option = 3
     guid_opt = [opt for opt in opts if opt.startswith('-g')]
     if len(guid_opt) > 0 and guid_opt[0] != '-gru':
-        guidance = True 
+        #guidance = True 
         # ガイダンスの色を取得
         if len(guid_opt[0]) > 2: color = guid_opt[0][2].upper()
         if color == 'W': guid_color = WHITE
