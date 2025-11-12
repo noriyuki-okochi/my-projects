@@ -118,13 +118,17 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
     input_frames, input_size = np_x.shape
     log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")   
     # 訓練データ
+    input_frames -= s_frames
+    x = np_x
+    y_act = np_yact
     #
     # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
-    #input_frames -= s_frames
+    '''
     x_zeros = np.zeros( (s_frames, input_size) )
     y_zeros = np.zeros( (s_frames, 1) )
     x = np.vstack( [x_zeros, np_x] )
     y_act = np.vstack( [y_zeros, np_yact] )
+    '''
     log_write(f"[train_Kyudo]:x={x.shape}, y_act={y_act.shape}")   
     #
     x_data = np.zeros( (input_frames, s_frames, input_size) )
