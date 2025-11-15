@@ -90,7 +90,7 @@ def help():
         + "                         [-gru <model-path> [inputdim=7|8]] [classes=3|19]]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...] [-s<step-no>]\n"\
-        + "                         [-I ['<frame_name>']] [-h] [-g[<color><level>]] [-v] [-d<debug-level>] [--]")
+        + "                         [-I ['<frame_name>']] [-h] [-g[<level>[<color>]]] [-v] [-d<debug-level>] [--]")
     print(" --- Option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
@@ -111,7 +111,7 @@ def help():
     print(" -s(kill):skill-level default=1")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
     print(" -h(elp)")
-    print(" -g(uidance)<color><level>::[Y|G|B|W]: yellow, green(default), black, white,[1|2|3]")
+    print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-3>: 0:none, 1:info, 2:debug, 3:more-debug")
     print(" --(auto-pouse imidiately after start)")
@@ -142,6 +142,7 @@ def help():
     print(" c :警告メッセージ、その他、キー設定値のクリア")
     print(" ? :キー操作制御パラメータの表示")
     print(" q :処理の終了")
+    '''
     print(" --- example ---")
     print("例)カメラID 1 を指定             : python yoloApp.py 1")  
     print("例)当日作成の動画ファイルから選択 : python yoloApp.py")  
@@ -149,6 +150,7 @@ def help():
     print("例)全ての動画ファイルタイプから選択: python yoloApp.py -a")  
     print("例)選択した動画ファイルをRAWモードで再生: python yoloApp.py -a -r")  
     print("例)ローカルのplot機能で解析結果を描画: python yoloApp.py -a -m")  
+    '''
     return
 #
 # 動作解析パラメータ設定用のスタック   
@@ -1308,7 +1310,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
     
     if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
-        if nn_gru:
+        if Tracking_enabled or nn_gru:
             # 姿勢解析入力データリストを作成、保存しておく
             tracking_result(myResult, InputPdf, output_dim, csvout=False)
         # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
@@ -2209,17 +2211,17 @@ def main():
     guid_opt = [opt for opt in opts if opt.startswith('-g')]
     if len(guid_opt) > 0 and guid_opt[0] != '-gru':
         #guidance = True 
+        # ガイダンスの表示レベルを取得
+        if len(guid_opt[0]) > 2 and guid_opt[0][2:3].isalnum():
+            guid_option = int(guid_opt[0][2:3])
+            if guid_option == 0: guidance = False
+        else: guid_option = 2
         # ガイダンスの色を取得
-        if len(guid_opt[0]) > 2: color = guid_opt[0][2].upper()
+        if len(guid_opt[0]) > 3: color = guid_opt[0][3].upper()
         if color == 'W': guid_color = WHITE
         elif color == 'Y': guid_color = YELLOW
         elif color == 'B': guid_color = BLACK
         else: guid_color = GREEN
-        # ガイダンスの表示レベルを取得
-        if len(guid_opt[0]) > 3 and guid_opt[0][3:].isalnum():
-            guid_option = int(guid_opt[0][3:])
-            if guid_option == 0: guidance = False
-        else: guid_option = 2
         
     # YOLOV8のログレベルを設定
     if '-v' in opts:
