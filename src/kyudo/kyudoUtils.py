@@ -67,6 +67,7 @@ def get_hyper_parameters(cmds, def_parameters):
         if len(params) > 0:
           values = [None] * len(def_parameters)
           for i, p in enumerate(params):
+            p = p.strip()
             if not p.isnumeric(): values[i] = def_parameters[i]
             else: values[i] = int(p)
           parameters = tuple( values )
