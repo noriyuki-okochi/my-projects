@@ -37,7 +37,7 @@ db = MyDb(DB_PATH)
 #
 # print command line(arguments)
 args = sys.argv
-cmdline = ""
+cmdline = "python "
 for arg in args:
     cmdline += f" {arg}"
 #    
@@ -168,6 +168,7 @@ if model_opt is not None:
 hyper_parameters = Hyper_parameters   
 if '-hparam' in cmds:
     hyper_parameters = get_hyper_parameters( cmds, hyper_parameters )
+    log_write(f"[kyudoApp]:hyper_parameters={hyper_parameters}")
 
 # section=<no>の解析（指定セクションのデータのみ学習、またはプロット）
 df_k = None     # 予測結果データフレーム
@@ -276,7 +277,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         if os.path.isfile(model_pth):
             model.load_state_dict(torch.load(model_pth, map_location=get_device()))
             log_write(f"[kyudoApp]:model loaded from {model_pth}")
-        else:
+        elif predict:
             print(f"[kyudoApp]error:model-file({model_pth}) not found.")
     if not predict:      
         # 学習実行(train)
@@ -758,7 +759,7 @@ fig.show()
 # 
 #fig.write_html('candle_figure.html', auto_open=True)
 #
-if plot_loss or predict:
+if (plot_loss and not section) or predict:
     while True:
         value = ''
         if predict: csvfile = out_csv
