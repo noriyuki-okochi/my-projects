@@ -80,6 +80,8 @@ Num_frames = Sequence_frames    # 入力シーケンスのフレーム数
 Num_classes:int = Output_dim    # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 # YOLOv8モデル
 V8_model:str = 'v8s'            # YOLOv8のモデルファイル名
+# ビデオ出力設定
+Cv2Video = None                 # OpenCVのビデオライターインスタンス
 #
 # YOLOv8とOpenPoseの組み合わせ例（Ultralytics YOLOv8 + YOLOv8-poseモデル利用）
 # このコードは、YOLOv8を使用してカメラまたは動画ファイルから骨格検出を行うものです。
@@ -1590,6 +1592,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
     global Frame_counter, Section_no, Completed, Split_sec, Split_start, Lap_sec, Lap_start
     global Step_counter, Nop_counter, Step_error, Section_color, Alart_message
     global Tracking_enabled, Update_enabled, Tracking_onece
+    global Cv2Video
     
     if ctl['key_inter'] != 0 and (int(time.time()) - ctl['key_inter']) > ctl['key_wait']: 
         # キー入力の間隔が1秒経過したとき、連打タイマーをクリア
@@ -1662,6 +1665,11 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if ctl['videoWrite']: 
             print(f"出力ファイルに書き込みを開始します: {out_file}")
             mylog.log(INFO, ">> video write start")
+            if Cv2Video is None:
+                # 動画ファイルの書き込みオブジェクトを作成
+                frame_height, frame_width = annotated_frame.shape[0:2]
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
             mylog.log(INFO, ">> video write pause")
@@ -1852,7 +1860,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         vals = ctl['para_data'][1:].split(',')
         for i in range(Stkp.len()):
             idx, _ = Stkp.get(i)
-            if idx < len(vals):
+            if idx < len(vals) and vals[idx] != '':
                 value = float(vals[idx]) if '.' in vals[idx] else int(vals[idx])
                 tbl['param'][row][idx] = value
                 print(f"パラメータ更新:[{row},{idx}]={value:.4f}")
@@ -2113,7 +2121,7 @@ def main():
         if fps is not None:
             print(f"> '{case_name}' already registered. Are you sure?[y/n].")
             ans = input('>>')
-            if ans != 'y': return
+            if ans != 'y': Tracking_only = False
     #
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
@@ -2328,8 +2336,6 @@ def main():
             base_name = os.path.basename(file_name[0])
             out_file = f"{idir}_{base_name}"
 
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
         print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
         #print(f"os.sep: {os.sep}")
     #
@@ -2517,7 +2523,7 @@ def main():
         #
         if keyCtl['videoWrite']:
             # 出力ファイルに書き込み
-            cv2Video.write(annotated_frame)
+            Cv2Video.write(annotated_frame)
         
         # ウィンドウに操作ガイダンスを表示
         if guidance is True:
