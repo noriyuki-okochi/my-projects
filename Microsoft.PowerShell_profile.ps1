@@ -6,14 +6,21 @@ write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンス
 write-output '> yolo   -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／プロットツール'
 write-output '> kyudo  -help		：解析学習・予測／プロットツール'
+# モデルオプション設定
+$modelx = "-models"
+#
 # ハイパーパラメータ設定
+#$s = 128    # シーケンス長
+#$b = 256    # バッチサイズ
+#$e = 301    # エポック数
 $s = 64     # シーケンス長
 $b = 128    # バッチサイズ
 $e = 301    # エポック数
+$hparam = "($s,$b,$e,,)"
 # 登録ケース名リスト
 $cases_list = "iijima_1.7s1-3","iijima_1.7s2-3",
-              "anbe_1.7s1-3","anbe_1.7s2-3",
-              "iwata_1.7s1-3","iwata_1.7s2-3"
+              "anbe_1.7s1-3","anbe_1.7s2-3"
+#              "iwata_1.7s1-3","iwata_1.7s2-3"
 function yolo {
     param(
         [switch]$help,
@@ -103,6 +110,7 @@ function chart {
         [string]$case
     )
     if ($help) {
+        write-output '・コマンド -オプション'
         write-output '>chart  -list				：登録済ケース名の一覧を表示する'
         write-output '>chart  -import  "<登録ケース名>" 	：解析結果データファイルのデータをデータベースに登録する'
         write-output '>chart  -case "<登録ケース名>"		：解析結果データをグラフ表示する'
@@ -128,6 +136,7 @@ function kyudo {
     param(
         [switch]$help,
         [switch]$h,
+        [switch]$multi,
         [switch]$list,
         [string]$delete,
         [string]$import,
@@ -136,13 +145,22 @@ function kyudo {
         [switch]$section,
         [string]$predict
     )
+    $model = "-model"
+    if ($multi) {
+        $modelx = "-modelm"
+        $s = 64     # シーケンス長
+        $b = 128    # バッチサイズ
+        $e = 281    # エポック数
+        $hparam = "($s,$b,$e,,)"
+    }
     if ($help) {
+        write-output '・コマンド -オプション'
         write-output '>kyudo  -list				：登録済ケース名の一覧を表示する'
-        write-output '>kyudo  -deletet  "<登録ケース名>"	：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -import  "<登録ケース名>" 	：解析結果データファイルのデータをデータベースに登録する'
+        write-output '>kyudo  -deletet  "<登録ケース名>"	：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -case "<登録ケース名>"		：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train "<登録ケース名>" [-section] -modelm [<モデルファイル>]	：解析結果データで学習する'
-        write-output '>kyudo  -predict "<登録ケース名>" -modelm <モデルファイル>        	：解析結果データで予測する'
+        write-output '>kyudo  -train "<登録ケース名>" [-section] [-multi] -model [<モデルファイル>]	：解析結果データで学習する'
+        write-output '>kyudo  -predict "<登録ケース名>" [-multi] -model <モデルファイル>        	：解析結果データで予測する'
         write-output '>kyudo  -h				：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -155,28 +173,27 @@ function kyudo {
         python ./src/kyudoApp.py -d   -case $delete  -D
     }
     elseif ($import -ne '') {
-        python ./src/kyudoApp.py  -d -case $import  -import
+        python ./src/kyudoApp.py  -d -case $import  -import -f0 0
     }    
     elseif ($case -ne '') {
         python ./src/kyudoApp.py -d   -case $case  -f0 0  -m 
     }
     elseif ($train -ne '') {
-        $model = "-modelm"
         $idx = $args.IndexOf($model)
         $len = $args.Length
         if (-not $section ) {
             if ($train -ne 'list') {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/kyudoApp.py -d -case $train classes=3 -hparam "($s,$b,$e,,)" -train $model  $args[$idx+1] -f0 0     
+                    python ./src/kyudoApp.py -d -case $train classes=3 -hparam "$hparam" -train $modelx $args[$idx+1] -f0 0     
                 }
                 else {
-                    python ./src/kyudoApp.py -d -case $train  classes=3 -hparam "($s,$b,$e,,)" -train $model -f0 0   
+                    python ./src/kyudoApp.py -d -case $train  classes=3 -hparam "$hparam" -train $modelx -f0 0   
                 }
             }
             else {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
                     foreach ( $case_name in $cases_list ) {
-                        python ./src/kyudoApp.py -d -case $case_name classes=3 -hparam "($s,$b,$e,,)" -train $model  $args[$idx+1] -f0 0 -n     
+                        python ./src/kyudoApp.py -d -case $case_name classes=3 -hparam "$hparam" -train $modelx $args[$idx+1] -f0 0 -n     
                     }
                 }
                 else {
@@ -186,7 +203,7 @@ function kyudo {
         }
         elseif ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
             for( $i=0; $i -lt 10; $i++) {
-                python ./src/kyudoApp.py -d -case $train  classes=3 -hparam "($s,$b,$e,,)" section=$i  -train $model $args[$idx+1] -f0 0 -n 
+                python ./src/kyudoApp.py -d -case $train  classes=3 -hparam "$hparam" section=$i  -train $modelx $args[$idx+1] -f0 0 -n 
             } 
         }
         else{
@@ -194,11 +211,10 @@ function kyudo {
         }
     }
     elseif ($predict -ne '') {
-        $model = "-modelm"
         $idx = $args.IndexOf($model)
         $len = $args.Length
         if ($idx -ge 0 -and $len -gt $idx) {
-            python ./src/kyudoApp.py -d -case $predict -hparam "($s,$b,$e,,)" -predict $model $args[$idx+1] -f0 0 -m    
+            python ./src/kyudoApp.py -d -case $predict -hparam "$hparam" -predict $modelx $args[$idx+1] -f0 0 -m    
         }
         else {
             write-output '学習済モデルファイル名を指定してください' 
