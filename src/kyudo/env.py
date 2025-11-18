@@ -62,14 +62,18 @@ Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle']
 Sample_frames:int = 1
 Sample_lag:int = 7
 # ハイパーパラメータのデフォルト値設定
-Sequence_frames:int = 128       # 入力シーケンスのフレーム数
+Sequence_frames:int = 128    # 入力シーケンスのフレーム数
 Batch_size:int = 256
-N_epoch:int = 501
+N_epoch:int = 301
 Section_dim:int = 8
 Completed_dim:int = 4
 Hyper_parameters = (Sequence_frames, \
                     Batch_size, N_epoch,\
-                    Section_dim, Completed_dim)    
+                    Section_dim, Completed_dim) 
+Learning_rate:float = 0.001  # 学習率   
+HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
+HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
+
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
