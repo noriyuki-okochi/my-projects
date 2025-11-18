@@ -717,16 +717,17 @@ def section_started(section_no, myResult:MyResult):
         mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
 
         if Step_counter > 90 :  # 離れアラート設定（仮）
-            _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
+            _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
             mylog.log(INFO, f">>>   angER={angER:.1f}°")
             if angER > 145 or angER < -145: 
+                # 右肘の角度が伸展している場合（会なしで離れ）
                 Alart_id = Alart_KaiNasi
                 Step_error = True
             else: Step_counter = Step_counter%10
         else:    
             Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
             if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
-                # 右手首の移動ベクトルの長さが10以上の場合（引分けの完了）
+                # 右手首の移動ベクトルの長さが10以下の場合（引分けの完了）
                 Step_counter = Step_counter + 1
                 Stkp.push( [(4,PRM[4])] )  
                 if Step_counter == PRM[4]: started = True    #  停止状態の５回保持で完了
@@ -894,34 +895,38 @@ def section_completed(section_no, myResult:MyResult):
         if Step_counter == 0: Step_counter = 1  # 初期化（矢番え動作開始）
         
         if Step_counter == 10:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[4]))} ]")
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
             
-            Stkp.push( [(4,PRM[4])] )  
-            if normR > thsd(PRM[4]): Step_counter = 20
+            Stkp.push( [(5,PRM[5])] )  
+            if normR > thsd(PRM[5]): Step_counter = 20
             # 右手首の移動ベクトルの長さが大きい場合（取り矢動作開始）
         else:
-            _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
+            _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
+            _, angSE = keyPoints.norm('right_shoulder', 'right_elbow')  # 右肩から右肘へのベクトルの角度を計算
             xy_hipR = keyPoints.xy('right_hip')                         # 右腰の座標
-            mylog.log(INFO, f">>>   x_wristR={int(xy_wristR[0])}, x_hipR={int(xy_hipR[0])}, angER= {angER:.1f}°")
-            mylog.log(INFO, f">>>   [ (x_wristR < x_hipR) and (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) ]")
+            #mylog.log(INFO, f">>>   x_wristR={int(xy_wristR[0])}, x_hipR={int(xy_hipR[0])}, angER= {angER:.1f}°")
+            #mylog.log(INFO, f">>>   [ (x_wristR < x_hipR) and (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) ]")
+            mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°")
+            mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and angSE > {PRM[2]:.1f} ]")
             
-            Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-            if ( (int(xy_wristR[0]) < int(xy_hipR[0])) and (angER > PRM[0] and angER < PRM[1]) ):
+            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
+            #if ( (int(xy_wristR[0]) < int(xy_hipR[0])) and (angER > PRM[0] and angER < PRM[1]) ):
+            if ( (angER > PRM[0] and angER < PRM[1]) and (angSE > PRM[2]) ):
                 # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
-                mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[2]))} ]")
+                mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[3]))} ]")
             
-                Stkp.push( [(2,PRM[2])] )  
-                if ( normR <= thsd(PRM[2]) ) : 
+                Stkp.push( [(3,PRM[3])] )  
+                if ( normR <= thsd(PRM[3]) ) : 
                     if Step_counter < 10:
                         # 右手首と左手首の移動ベクトルの長さが10未満の場合（矢つがえ動作完了）
                         Step_counter += 1
-                        Stkp.push( [(3,PRM[3])] )  
-                        if (Step_counter%10) == PRM[3]: Step_counter = 10        #２回保持
+                        Stkp.push( [(4,PRM[4])] )  
+                        if (Step_counter%10) == PRM[4]: Step_counter = 10        #２回保持
                     elif Step_counter >= 20:
                         # 右手首と左手首の移動ベクトルの長さが10未満の場合（胴作り完了）
                         Step_counter += 1
-                        Stkp.push( [(5,PRM[5])] )  
-                        if (Step_counter%10) == PRM[5]: completed = True         #５回保持
+                        Stkp.push( [(6,PRM[6])] )  
+                        if (Step_counter%10) == PRM[6]: completed = True         #５回保持
             else:
                 Step_counter = int(Step_counter/10)*10 + 1 # 連続回数をリセット
                         
@@ -958,12 +963,14 @@ def section_completed(section_no, myResult:MyResult):
                     Step_error = True                
                 
     # 4-Uti-okosshi        
-    elif section_no == 4:  
-        mylog.log(INFO, f">>>   xy_nose={int(xy_nose[1])}, xy_wristR={int(xy_wristR[1])}, xy_wristL={int(xy_wristL[1])}")
-        mylog.log(INFO, f">>>   [ (xy_wristR[1] < xy_nose[1] and xy_wristL[1] < xy_nose[1] ]")
-
-        if (xy_wristR[1] < xy_nose[1] and xy_wristL[1] < xy_nose[1]):
-            # （右手首と左手首が鼻より高い位置（Y軸は下方が正）
+    elif section_no == 4:
+        if Step_counter < 10:  
+            mylog.log(INFO, f">>>   xy_nose={int(xy_nose[1])}, xy_wristR={int(xy_wristR[1])}, xy_wristL={int(xy_wristL[1])}")
+            mylog.log(INFO, f">>>   [ (xy_wristR[1] < xy_nose[1] and xy_wristL[1] < xy_nose[1] ]")
+            if (xy_wristR[1] < xy_nose[1] and xy_wristL[1] < xy_nose[1]):
+                # （右手首と左手首が鼻より高い位置（Y軸は下方が正）
+                Step_counter = 10
+        else:
             mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
                           + f"normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normEL)}({thsd.ratio(normEL):.3f})")
             mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
@@ -973,7 +980,7 @@ def section_completed(section_no, myResult:MyResult):
                 # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満
                 Step_counter = Step_counter + 1
                 Stkp.push( [(4,PRM[4])] )  
-                if Step_counter == PRM[4]: completed = True   # ３回保持で完了                
+                if (Step_counter%10) == PRM[4]: completed = True   # ３回保持で完了                
     
     # 5-Hiki-wake        
     elif section_no == 5:  
