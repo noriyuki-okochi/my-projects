@@ -54,8 +54,11 @@ def df2csv(df, case_name='none', title=None, file=None):
         f = open(out_csv, CSV_FILE_MODE)
         f.write(f"# {title}: {timestamp}\n")
         f.close()
-    # CSVファイルのデータ出力      
-    df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
+    # CSVファイルのデータ出力  
+    if file is not None:
+        df.to_csv(out_csv, mode='w', float_format='%.4f', na_rep='NaN', sep='\t')
+    else:    
+        df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #
 # ハイパーパラメータの取得関数
 # cmds: コマンドライン引数リスト
