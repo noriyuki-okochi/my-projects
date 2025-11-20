@@ -13,13 +13,15 @@ $modelx = "-models"
 #$s = 128    # シーケンス長
 #$b = 256    # バッチサイズ
 #$e = 301    # エポック数
-$s = 64     # シーケンス長
-$b = 128    # バッチサイズ
+$s = 96     # シーケンス長
+$b = 192    # バッチサイズ
 $e = 301    # エポック数
 $hparam = "($s,$b,$e,,)"
 # 登録ケース名リスト
-$cases_list = "iijima_1.7s1-3","iijima_1.7s2-3",
-              "anbe_1.7s1-3","anbe_1.7s2-3"
+$cases_list = "iijima_1.7s1-3",
+              "anbe_1.7s1-3",
+              "iwata_1.7s1-3",
+              "okochi_1.7s1-3"
 #              "iwata_1.7s1-3","iwata_1.7s2-3"
 function yolo {
     param(
@@ -38,8 +40,8 @@ function yolo {
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
         $no=-1
         if ( [int]::TryParse($args[$idx+1],[ref]$no) ){}
-        if ( $no -lt 1 -or $no -gt 3 ) {
-            $msg = '解析レベルには1～3の数値を指定してください: ' + $args[$idx+1]
+        if ( $no%10 -lt 1 -or $no%10 -gt 3 ) {
+            $msg = '解析レベルには1～3(11～13)の数値を指定してください: ' + $args[$idx+1]
             write-output $msg
             return
         }
@@ -52,7 +54,7 @@ function yolo {
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yolo  -all [-level <no>]：選択した動画の射形を解析しながら再生する（no:解析レベル {1|2|3}）'
         write-output '>yolo  -case "<登録ケース名>" [-level <no>]：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
-        write-output '>yolo  -gru  "<GRUモデルファイル名>|non"：選択した動画の射形を学習済GRUモデルで解析しながら再生する'
+        write-output '>yolo  -gru  "<GRUモデルファイル名>|non" [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（no:解析レベル {11|12|13}）'
         write-output '>yolo  -h		：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
@@ -92,7 +94,7 @@ function yolo {
         if($gru -ne 'non'){
             $model=$gru
         }
-        python ./src/yoloApp.py -d1 -a -m -gru  $model --
+        python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel --
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -123,7 +125,7 @@ function chart {
         python ./src/chart.py  -d -case -L
     } 
     elseif ($import -ne '') {
-        python ./src/chart.py  -d -case $import  -import
+        python ./src/chart.py  -d -case $import  -import -f0 0 -m
     }
     elseif ($case -ne '') {
         python ./src/chart.py -d  right_wrist -case $case  -f0 0  -m -span 
@@ -148,9 +150,9 @@ function kyudo {
     $model = "-model"
     if ($multi) {
         $modelx = "-modelm"
-        $s = 64     # シーケンス長
-        $b = 128    # バッチサイズ
-        $e = 281    # エポック数
+        $s = 96     # シーケンス長
+        $b = 192    # バッチサイズ
+        $e = 301    # エポック数
         $hparam = "($s,$b,$e,,)"
     }
     if ($help) {
@@ -173,7 +175,7 @@ function kyudo {
         python ./src/kyudoApp.py -d   -case $delete  -D
     }
     elseif ($import -ne '') {
-        python ./src/kyudoApp.py  -d -case $import  -import -f0 0
+        python ./src/kyudoApp.py  -d -case $import  -import -f0 0 -m
     }    
     elseif ($case -ne '') {
         python ./src/kyudoApp.py -d   -case $case  -f0 0  -m 
