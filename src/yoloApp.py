@@ -78,6 +78,7 @@ Db.mode = 'csv'                 # 解析結果のトラッキングデータをC
 Num_input:int = Input_dim       # 入力データ次元数
 Num_frames = Sequence_frames    # 入力シーケンスのフレーム数
 Num_classes:int = Output_dim    # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
+Hybrid_model:bool = False       # GRUモデルとロジック解析の併用フラグ
 # YOLOv8モデル
 V8_model:str = 'v8s'            # YOLOv8のモデルファイル名
 # ビデオ出力設定
@@ -512,11 +513,31 @@ class FeaturePdf:
             self.set_kyudo_data_list( zero_data_list )
             self.set_current_pdf(0, 0)
             self.add_previous_pdf()
+
+# ハイブリッドモデルの場合、動作認識結果を補正
+def correct_action_by_rules(action, section, completed):
+    global Step_counter
+    r_action = action
+    if completed == True and action == 1:
+        # 「動作完了」で「動作完了」が認識された場合、
+        r_action = 0
+    elif completed == False and action == 2:
+        # 「動作未完了」で「動作開始」が認識された場合、
+        r_action = 0
+    else:
+        # 動作解析ステップに応じた補正ルール
+        if section == 2:        # 「胴づくり」
+            if action == 1 and Step_counter < 20:
+                r_action = 0
+    #
+    if r_action != action:
+        mylog.log(INFO, f"[correct_action_by_rules]: action corrected {action} to {r_action}")
+    return r_action
             
 #
 # GRUモデルによる動作解析関数
 def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
-    global Split_start, Split_sec, Lap_start, Action_start
+    global Split_start, Split_sec, Lap_start, Action_start, Step_counter
     
     mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
     mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
@@ -528,25 +549,37 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
     y = predict_Kyudo( model, x, s_frames)
     mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
     action = y[0]
+    if action != 0 and Hybrid_model == True:
+        mylog.log(INFO, f"[gru_analize]: not zero action={action}, section={section}, completed={completed}, counter={Step_counter}")
+        # ハイブリッドモデルの場合、動作認識結果を補正
+        action = correct_action_by_rules(action, section, completed)
     # タイマー情報の更新
     if action == 2:
         Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
         Split_sec = 0.0
+        Step_counter = 0
     elif action == 1:
         Action_start = Lap_sec
         if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
             Split_start = 0                                 # スプリット開始時間をリセット
         if section == 9:                                    # 退場動作の場合、解析終了 
             Lap_start = 0
-    
-    rslt = update_section_completed(action, section, completed, output_size=Num_classes)
-    if action != 0:
-        mylog.log(INFO, f"[gru_analize]: frame={Frame_counter}, action={action}")
-        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
+        Step_counter = 0
     #
-    return rslt[0], rslt[1], action
-
+    ival = 1 if completed == True else 0
+    rslt = update_section_completed(action, section, ival, output_size=Num_classes)
+    if action != 0:
+        mylog.log(INFO, f"[gru_analize]: フレーム={Frame_counter}")
+        if action == 1:
+            mylog.log(INFO, f"[gru_analize]: section({section}), completed=True")
+            print(f"[gru_analize]: section({section}), completed=True")
+        else:
+            mylog.log(INFO, f"[gru_analize]: section({section}), strated=True")
+            print(f"[gru_analize]: section({section}), strated=True")
+        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}), completed={rslt[1]}")
+    #
+    return rslt[0], (True if rslt[1] == 1 else False), action
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
@@ -1222,6 +1255,7 @@ def manual_analize_start(section_no, myResult:MyResult):
     
     # 動作の開始を判定
     if section_started(section_no, myResult):
+        print(f"[manual_analize_start]: section({section_no}), strated=True")
         Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
         Split_sec = 0.0
@@ -1266,6 +1300,7 @@ def manual_analize_completed(section_no, myResult:MyResult):
     
     # 動作の完了を判定
     if section_completed(section_no, myResult):
+        print(f"[manual_analize_completed]: section({section_no}), completed=True")
         Action_start = Lap_sec
         Completed = True 
         if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
@@ -1344,7 +1379,9 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                     # GRUモデルによる動作解析
                     Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
                     InputPdf.update_previous_pdf()
-            else:   
+                
+            # ハイブリッドモデルの場合、プログラムロジックによる姿勢解析も行う
+            if not nn_gru or Hybrid_model:
                 # プログラムロジックによる姿勢解析
                 if Section_no == 0 or Completed:
                     # 動作の開始を判定
@@ -1928,7 +1965,7 @@ def main():
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
     global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled
-    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt
+    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Hybrid_model
     global StartAction_param, CompleteAction_param
     global Rect_area
     global InputPdf
@@ -2008,7 +2045,10 @@ def main():
     if len(opt_val) > 0:
         if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
             step_no = int(opt_val[0][2:])
-
+            if step_no > 9:
+                Hybrid_model = True
+                step_no = step_no%10
+    #
     if '-I' in opts:            # 動作開始解析パラメータの初期登録
         param_nms = []
         i = args.index('-I')
