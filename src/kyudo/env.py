@@ -62,8 +62,8 @@ Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle']
 Sample_frames:int = 1
 Sample_lag:int = 7
 # ハイパーパラメータのデフォルト値設定
-Sequence_frames:int = 128    # 入力シーケンスのフレーム数
-Batch_size:int = 256
+Sequence_frames:int = 96    # 入力シーケンスのフレーム数
+Batch_size:int = 192
 N_epoch:int = 301
 Section_dim:int = 8
 Completed_dim:int = 4
