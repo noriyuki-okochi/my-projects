@@ -730,16 +730,11 @@ def section_started(section_no, myResult:MyResult):
     
     # 4-Uti-okosshi  ->  5-Hiki-wake        
     elif section_no == 4:  
-        confL = keyPoints.conf('left_wrist')                             # 左手首の座標の信頼度
-        #mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), conf={confL:.2f}")
-        #mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} or (normL > {int(thsd(PRM[1]))} and confL > {PRM[2]:.2f}]")
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), anglL={int(anglL)}°, anglR={int(anglR)}°")
         mylog.log(INFO, f">>>   [ (normR > {int(thsd(PRM[0]))} and anglR > {PRM[2]:.2f} and anglR < {PRM[3]:.2f})"\
                       + f" or (normL > {int(thsd(PRM[1]))} and anglL > {PRM[2]:.2f} and anglL < {PRM[3]:.2f}) ]")
 
-        #Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
-        #if  normR > thsd(PRM[0]) or (normL > thsd(PRM[1]) and confL > PRM[2]):
         if  (normR > thsd(PRM[0]) and anglR > PRM[2] and anglR < PRM[3]) or \
             (normL > thsd(PRM[1]) and anglL > PRM[2] and anglL < PRM[3]):
             # 右手首の移動ベクトルの長さが15以上の場合（引分け大三への動作開始）
