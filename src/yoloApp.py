@@ -558,14 +558,12 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
         Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
         Split_sec = 0.0
-        Step_counter = 0
     elif action == 1:
         Action_start = Lap_sec
         if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
             Split_start = 0                                 # スプリット開始時間をリセット
         if section == 9:                                    # 退場動作の場合、解析終了 
             Lap_start = 0
-        Step_counter = 0
     #
     ival = 1 if completed == True else 0
     rslt = update_section_completed(action, section, ival, output_size=Num_classes)
@@ -578,6 +576,9 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
             mylog.log(INFO, f"[gru_analize]: section({section}), strated=True")
             print(f"[gru_analize]: section({section}), strated=True")
         mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
+        #
+        if section == 9 and action == 2: Step_counter = 30
+        else: Step_counter = 0
     #
     return rslt[0], (True if rslt[1] == 1 else False), action
 #
@@ -2040,35 +2041,6 @@ def main():
         help()
         return
     
-    # 段レベル(step)を取得
-    step_no = 1
-    opt_val  = [opt for opt in opts if opt.startswith('-s')]
-    if len(opt_val) > 0:
-        if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
-            step_no = int(opt_val[0][2:])
-            if step_no > 9:
-                Hybrid_model = True
-                step_no = step_no%10
-    #
-    if '-I' in opts:            # 動作開始解析パラメータの初期登録
-        param_nms = []
-        i = args.index('-I')
-        if i + 1 < len(args) and (not args[i + 1].startswith('-')):
-            param_nms.append( args[i + 1] )  # パラメータテーブルframe名を取得
-        else:
-            param_nms = list(InitAction_param_nms)
-        for nm in param_nms:
-            _,tbl = get_action_param(CompleteAction_params, nm, step_no)
-            if tbl is None:
-                print(f"パラメータ名:{nm},ステップ:{step_no} は不正です")
-                continue
-            Db.insert_act_param(tbl)
-            print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
-            _,tbl = get_action_param(StartAction_params, nm, step_no)
-            Db.insert_act_param(tbl)
-            print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
-        return
-
     if '-z' in opts:
         mosaic = True           # モザイク処理を行うオプション
     #
@@ -2090,6 +2062,8 @@ def main():
     input_dim = Num_input
     output_dim = Num_classes
     seq_frames = Num_frames
+    _, _, _, section_dim, completed_dim = Hyper_parameters
+    
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
         i = args.index('-gru')
@@ -2101,7 +2075,7 @@ def main():
             if os.path.isfile(model_pth) is False:
                 print(f"[yoloApp]error:model-file({model_pth}) not found.")
                 return
-        # モデル名からパラメータを取得
+        # モデル名からパラメータを取得（kyudo_modelse_7-128-3-8-4.pth など）
         i = model_pth.rfind('_')
         if i > 0: 
             paramstr = model_pth[i+1:-3]
@@ -2112,6 +2086,10 @@ def main():
                 input_dim = int(params[0])
                 seq_frames = int(params[1])
                 output_dim = int(params[2])               
+            if len(params) == 5 and \
+               params[3].isnumeric() and params[4].isnumeric():
+                section_dim = int(params[3])
+                completed_dim = int(params[4])
         # モデル入力次元数を設定
         num_opts = [opt for opt in args if opt.startswith('inputdim')]
         if len(num_opts) > 0: 
@@ -2191,6 +2169,34 @@ def main():
     else:               
         param_nm = f"{Sample_frames}-{V8_model[-1:]}"
     
+    # 段レベル(step)を取得
+    step_no = 1
+    opt_val  = [opt for opt in opts if opt.startswith('-s')]
+    if len(opt_val) > 0:
+        if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
+            step_no = int(opt_val[0][2:])
+            if nn_gru:
+                Hybrid_model = True
+    #
+    if '-I' in opts:            # 動作開始解析パラメータの初期登録
+        param_nms = []
+        i = args.index('-I')
+        if i + 1 < len(args) and (not args[i + 1].startswith('-')):
+            param_nms.append( args[i + 1] )  # パラメータテーブルframe名を取得
+        else:
+            param_nms = list(InitAction_param_nms)
+        for nm in param_nms:
+            _,tbl = get_action_param(CompleteAction_params, nm, step_no)
+            if tbl is None:
+                print(f"パラメータ名:{nm},ステップ:{step_no} は不正です")
+                continue
+            Db.insert_act_param(tbl)
+            print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
+            _,tbl = get_action_param(StartAction_params, nm, step_no)
+            Db.insert_act_param(tbl)
+            print(f"パラメータ:{nm} step={tbl['step']},act={tbl['act']} テーブル登録完了")
+        return
+
     if manual_plot:
         # 動作解析パラメータをDBからロードする
         CompleteAction_param['frame'] = param_nm
@@ -2403,7 +2409,6 @@ def main():
         if nn_gru:
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
-            _, _, _, section_dim, completed_dim = Hyper_parameters
             print(f"input_dim={input_dim}")            
             # KyudoGRUモデルの読み込み（事前学習済みモデル）
             parts =model_pth.split('_') 
