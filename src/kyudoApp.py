@@ -30,14 +30,15 @@ m_flg:bool = False           # not display section/conf
 slider:bool = False          # display slider
 predict:bool = False         # predict mode
 plot_loss:bool = False       # loss-file data
-plot_pred:bool = False       # predicted-file data
+plot_pred:bool = False       # predicted-file data 
+prompt:bool = True           # change csv-file name
 #
 # connect db
 db = MyDb(DB_PATH)
 #
 # print command line(arguments)
 args = sys.argv
-cmdline = ""
+cmdline = "python "
 for arg in args:
     cmdline += f" {arg}"
 #    
@@ -61,13 +62,15 @@ if '-h' in opts:        #debug write
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [{-train|-predict}  [<classes>=<num>] [<section>=<no>]  {-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
-         + "        [-h(elp)] [-d(ebug)]")
+         + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
 #
 if '-d' in opts:        #debug write
     verbose = True   
+if '-n' in opts:        #no prompt
+    prompt = False   
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
@@ -168,6 +171,7 @@ if model_opt is not None:
 hyper_parameters = Hyper_parameters   
 if '-hparam' in cmds:
     hyper_parameters = get_hyper_parameters( cmds, hyper_parameters )
+    log_write(f"[kyudoApp]:hyper_parameters={hyper_parameters}")
 
 # section=<no>の解析（指定セクションのデータのみ学習、またはプロット）
 df_k = None     # 予測結果データフレーム
@@ -189,6 +193,8 @@ if len(num_opts) > 0:
     params = num_opts[0].split('=')
     if len(params) == 2 and params[1].isnumeric():
         num_classes = int(params[1])
+#
+# <<< GRUモデルの学習、または予測の実行 >>>
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #
@@ -216,13 +222,17 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
             df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測値(NaN)に置換する
     df_x.ffill(inplace=True)    # 欠測値を直前の値に置換する
     df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する    
-    if verbose: df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
-    
+    if verbose:
+        # debug write 
+        df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
+    # 教師ラベルデータの読み込み
     if section is None:
         df_y = db.pandas_read_kyudo( ['label as label'] )    # 教師ラベル(input_frames, 1)
     else:    
         df_y = db.pandas_read_kyudo_section( ['label as label'], section )  # section={section,section+1}を選択
-    if verbose: df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
+    if verbose:
+        # debug write 
+        df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
 
     # 学習データの使用範囲の指定がある場合の処理
     pf_vals = None
@@ -247,20 +257,21 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     s_frames, batch_size, n_epoch, section_dim, completed_dim = hyper_parameters
     log_write(f"[kyudoApp]:num_classes:{num_classes}")
     log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
-    log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
     log_write(f"[kyudoApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
-    log_write(f"[kyudoApp]:section-option={section}")
     #
     # GRUモデルのインスタンスを生成する
     #
     if model_opt == '-models':
+        log_write(f"[kyudoApp]:hidden_size={HiddenS_size}")
         model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
+                          hidden_size = HiddenS_size,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
     elif model_opt == '-modelm':
+        log_write(f"[kyudoApp]:hidden_size={HiddenM_size}")
         model = KyudoGRUm( input_size = input_dim, output_size = num_classes,
-                          hidden_size = 32,
+                          hidden_size = HiddenM_size,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
@@ -276,11 +287,19 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         if os.path.isfile(model_pth):
             model.load_state_dict(torch.load(model_pth, map_location=get_device()))
             log_write(f"[kyudoApp]:model loaded from {model_pth}")
-        else:
+        elif predict:
             print(f"[kyudoApp]error:model-file({model_pth}) not found.")
+            exit(0)
+        else:
+            print(f"[kyudoApp]:model-file({model_pth}) will be created.")
+    # 学習、または予測の実行
     if not predict:      
+        log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
+        log_write(f"[kyudoApp]:section-option={section}")
         # 学習実行(train)
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
+
+        # 学習結果のlossデータの読み込み、プロット準備
         csvfile = model.csvpath
         plot_loss = True
         df = pd.read_csv(csvfile, sep='\t')
@@ -292,7 +311,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     else:
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
-        # 入力、ラベル、予測結果データフレームの作成
+
+        # 入力、ラベル、予測結果データフレームの作成、保存、プロット準備
         #  （dtype='Int64'の指定でconcat後もintの型が保持された）
         df_yp = pd.DataFrame(y_pred, columns=['predicted'], dtype='Int64')
         df_p = pd.concat( [df_x, df_y, df_yp], axis=1 )
@@ -403,7 +423,7 @@ if case_compare and second_name is not None:
     print("[kyudoApp]info:'-second' was ignored.")
     second_name = None
 #
-# プロットのサブプロット領域の定義、作成
+#  <<< プロットのサブプロット領域の定義、作成 >>>
 #
 if selnum == 4:
     fig = make_subplots(rows=2, cols=2, vertical_spacing=0.1,
@@ -449,7 +469,7 @@ if verbose:
     print(f"[kyudoApp]selnum:{selnum}")           
     fig.print_grid()
 #
-#  データのプロット実行メイン
+# <<< データのプロット実行メイン >>>
 #
 for icount, key in enumerate(selkeys, start=1):
     print(f"[kyudoApp]info:Plot icount={icount},key={key}")
@@ -679,7 +699,7 @@ for icount, key in enumerate(selkeys, start=1):
     #
     #next symbol
 #
-# レイアウト詳細設定
+# <<< レイアウト詳細設定 >>>
 #
 main_title = "GRU - Model-Chart"
 if not case_compare:
@@ -752,19 +772,21 @@ else:
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
 #
-# プロットの表示(open the figure in  web-browser)
+# <<< プロットの表示(open the figure in  web-browser) >>>
 #
 fig.show()
 # 
 #fig.write_html('candle_figure.html', auto_open=True)
 #
-if plot_loss or predict:
+# <<< CSVファイルのリネーム処理 >>>
+#
+if prompt and (plot_loss or predict):
     while True:
         value = ''
         if predict: csvfile = out_csv
-        prompt = csvfile[-18:-4] if plot_loss else csvfile[8:-4]
+        promptStr = csvfile[-18:-4] if plot_loss else csvfile[8:-4]
         print(f">Please input new-file-name( {csvfile} ).!: [/:cancle]")
-        value = input(f"{prompt} -> :")
+        value = input(f"{promptStr} -> :")
         if value == '/' or len(value) == 0: break
         prefix = csvfile[:-18] if plot_loss else csvfile[:8]
         newfile = f"{prefix}{value}.csv" 

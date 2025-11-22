@@ -11,6 +11,8 @@ import logging
 DEBUG = logging.DEBUG
 INFO = logging.INFO
 ERROR = logging.ERROR
+# local package
+from kyudo.env import * 
 
 LOG_FILE_MODE = 'a'
 CSV_FILE_MODE = 'a'
@@ -52,8 +54,11 @@ def df2csv(df, case_name='none', title=None, file=None):
         f = open(out_csv, CSV_FILE_MODE)
         f.write(f"# {title}: {timestamp}\n")
         f.close()
-    # CSVファイルのデータ出力      
-    df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
+    # CSVファイルのデータ出力  
+    if file is not None:
+        df.to_csv(out_csv, mode='w', float_format='%.4f', na_rep='NaN', sep='\t')
+    else:    
+        df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #
 # ハイパーパラメータの取得関数
 # cmds: コマンドライン引数リスト
@@ -67,6 +72,7 @@ def get_hyper_parameters(cmds, def_parameters):
         if len(params) > 0:
           values = [None] * len(def_parameters)
           for i, p in enumerate(params):
+            p = p.strip()
             if not p.isnumeric(): values[i] = def_parameters[i]
             else: values[i] = int(p)
           parameters = tuple( values )
@@ -118,17 +124,16 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
     input_frames, input_size = np_x.shape
     log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")   
     # 訓練データ
-    input_frames -= s_frames
     x = np_x
     y_act = np_yact
     #
+    #input_frames -= s_frames
     # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
-    '''
     x_zeros = np.zeros( (s_frames, input_size) )
     y_zeros = np.zeros( (s_frames, 1) )
     x = np.vstack( [x_zeros, np_x] )
     y_act = np.vstack( [y_zeros, np_yact] )
-    '''
+    #
     log_write(f"[train_Kyudo]:x={x.shape}, y_act={y_act.shape}")   
     #
     x_data = np.zeros( (input_frames, s_frames, input_size) )
@@ -147,7 +152,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
 
     # 損失関数と最適化手法の定義
     criterion = nn.CrossEntropyLoss()
-    optimaizer = optim.Adam(model.parameters(), lr=0.001 )
+    optimaizer = optim.Adam(model.parameters(), lr=Learning_rate)
     
     #record_loss_train = []  # list to record loss value
     model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
