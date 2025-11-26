@@ -950,14 +950,10 @@ def section_completed(section_no, myResult:MyResult):
         else:
             _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
             _, angSE = keyPoints.norm('right_shoulder', 'right_elbow')  # 右肩から右肘へのベクトルの角度を計算
-            xy_hipR = keyPoints.xy('right_hip')                         # 右腰の座標
-            #mylog.log(INFO, f">>>   x_wristR={int(xy_wristR[0])}, x_hipR={int(xy_hipR[0])}, angER= {angER:.1f}°")
-            #mylog.log(INFO, f">>>   [ (x_wristR < x_hipR) and (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) ]")
             mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°")
             mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and angSE > {PRM[2]:.1f} ]")
             
             Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
-            #if ( (int(xy_wristR[0]) < int(xy_hipR[0])) and (angER > PRM[0] and angER < PRM[1]) ):
             if ( (angER > PRM[0] and angER < PRM[1]) and (angSE > PRM[2]) ):
                 # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
                 mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[3]))} ]")
