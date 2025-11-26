@@ -69,8 +69,13 @@ cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()
 #
 if '-d' in opts:        #debug write
     verbose = True   
-if '-n' in opts:        #no prompt
-    prompt = False   
+
+prompt_val:int = 0
+nvals = [opt[1:] for opt in opts if opt.startswith('-n')]
+if len(nvals) > 0:        #no prompt
+    prompt = False
+    if len(nvals[0]) > 1 and  nvals[0][1:].isnumeric(): prompt_val = int(nvals[0][1:])
+    print(f"[kyudoApp]info:prompt:{prompt},val={prompt_val}")
 #
 # 表示範囲のindexを指定するコマンドオプションの解析
 #
@@ -292,6 +297,13 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
             exit(0)
         else:
             print(f"[kyudoApp]:model-file({model_pth}) will be created.")
+    
+    # 学習、または予測の実行前の確認プロンプト
+    if prompt or (prompt_val == 1):
+        print(f">Are you sure?: [y/n]")
+        value = input(f">")
+        if value != 'y' or len(value) == 0: exit(1)
+    
     # 学習、または予測の実行
     if not predict:      
         log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
@@ -615,7 +627,7 @@ for icount, key in enumerate(selkeys, start=1):
                                         mode="lines"),
                                 row = irow, 
                                 col = icol,   
-                                secondary_y=True
+                                secondary_y=False
                             )
         #              
         elif key == 'predicted':    # CSVファイル入力の予測結果データのプロット
