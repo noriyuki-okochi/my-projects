@@ -444,6 +444,8 @@ class MyResult(Keypoint):
 
 ##    特徴量のデータフレームクラス
 class FeaturePdf:
+    # 入力データ次元数に応じた特徴量のカラム名リスト
+    # ・env.py定義の読み込みリストの別名と一致させる
     Features_list_8 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg', 'act_sec', 'section','completed' ]
     Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
@@ -620,22 +622,32 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         Db.csvfile2.flush()
     else:    
         # 姿勢解析データ
-        rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                # 右手首移動ベクトルの長さと角度
-        lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                 # 左手首移動ベクトルの長さと角度
-        rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')  # 右手首と左手首のベクトルの長さと角度を計算
-        hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')   # 右腰と右手首のベクトルの長さと角度を計算
-        _, er_angle = keyPoints.norm('right_elbow','right_wrist')       # 右肘と右手首のベクトルの長さと角度を計算
-        _, sl_angle = keyPoints.norm('left_shoulder','left_wrist')      # 左肩と左手首のベクトルの長さと角度を計算
-        eyes_norm, _ = keyPoints.norm('right_eye','left_eye')           # 右目と左目のベクトルの長さと角度を計算
-        hips_norm, _ = keyPoints.norm('right_hip','left_hip')           # 右腰と左腰のベクトルの長さと角度を計算        
+        rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                    # 右手首移動ベクトルの長さと角度
+        lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                     # 左手首移動ベクトルの長さと角度
+        rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')      # 右手首から左手首のベクトルの長さと角度を計算
+        hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')       # 右腰から右手首のベクトルの長さと角度を計算
+        sr_norm, sr_angle = keyPoints.norm('right_shoulder','right_wrist')  # 右肩から右手首ベクトルの長さと角度を計算
+        sl_norm, sl_angle = keyPoints.norm('left_shoulder','left_wrist')    # 左肩から左手首ベクトルの長さと角度を計算
+        _, rew_angle = keyPoints.norm('right_elbow','right_wrist')          # 右肘から右手首のベクトルの長さと角度を計算
+        _, lew_angle = keyPoints.norm('left_elbow','left_wrist')            # 左肘から左手首のベクトルの長さと角度を計算
+        _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
+        _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
+        eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
+        hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         # アクション発生後の経過時間（x10秒）
         act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
         #print(f"act_sec={act_sec}")                   
         
         data_list = [box_id, box_conf, box_w, box_h,\
-                    rw_norm, rw_angle, lw_norm, lw_angle,\
-                    rl_norm, rl_angle, hr_norm, hr_angle,\
-                    er_angle, sl_angle, eyes_norm, hips_norm,\
+                    rw_norm, rw_angle,\
+                    lw_norm, lw_angle,\
+                    rl_norm, rl_angle,\
+                    hr_norm, hr_angle,\
+                    sr_norm, sr_angle,\
+                    sl_norm, sl_angle,\
+                    rew_angle, rse_angle,\
+                    lew_angle, lse_angle,\
+                    eyes_norm, hips_norm,\
                     act_sec]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  

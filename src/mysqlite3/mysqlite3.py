@@ -47,9 +47,15 @@ class MyDb:
         # カラム名を出力
         names ="case_name,frame_no,"\
             +  "box_id,box_conf,box_w,box_h,"\
-            +  "rw_norm,rw_angle,lw_norm,lw_angle,"\
-            +  "rl_norm,rl_angle,hr_norm,hr_angle,"\
-            +  "er_angle,sl_angle,eyes_norm,hips_norm,"\
+            +  "rw_norm,rw_angle,"\
+            +  "lw_norm,lw_angle,"\
+            +  "rl_norm,rl_angle,"\
+            +  "hr_norm,hr_angle,"\
+            +  "sr_norm,sr_angle,"\
+            +  "sl_norm,sl_angle,"\
+            +  "rew_angle,rse_angle,"\
+            +  "lew_angle,lse_angle,"\
+            +  "eyes_norm,hips_norm,"\
             +  "tag1,"\
             +  "section,completed,label,inserted_at,time_epoch\n"
         self.csvfile2.write(names)
@@ -243,22 +249,6 @@ class MyDb:
         values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"            
         self.csvfile2.write(f"{values}\n")
 #
-# convert tracking_data to kyudo_data
-# （未使用：旧スキーマ）
-    def conv_tracking2kyudo(self):
-        sql = f"insert into kyudo_data( case_name, frame_no, HW_ratio, HW_angle, RW_ratio, RW_angle, LW_ratio, LW_angle, Eyes_span, Hips_span, label, tag1, tag2, inserted_at, time_epoch)"\
-            + f" select R.case_name, R.frame_no, R.hw_ratio, R.hw_angle, R.ratio, R.angle, L.ratio, L.angle, R.eyes_span, R.hips_span, (R.section*2-1+R.completed), R.tag1, R.tag2, R.inserted_at,R.time_epoch"\
-            + f" from "\
-            + f" (select * from tracking_data where case_name = '{self.case_name}' and key_name ='right_wrist') as R"\
-            + f" left join "\
-            + f" (select * from tracking_data where case_name = '{self.case_name}' and key_name ='left_wrist') as L"\
-            + f" on R.frame_no = L.frame_no order by R.frame_no asc"
-        try:
-            self.cur.execute(sql)
-        except Exception as e:
-            print(f"[conv_tracking2kyudo]:error:{e}")        
-        else:
-            self.conn.commit()
 # select FPS from balance-table
 #
     def get_fps(self, case_name=None):

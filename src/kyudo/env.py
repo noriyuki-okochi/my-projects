@@ -22,25 +22,29 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
         'left_wrist':9, 'right_wrist':10, 'left_hip':11, 'right_hip':12,
         'left_knee':13, 'right_knee':14, 'left_ankle':15, 'right_ankle':16}  # キーポイント名
 
-# Kyudo_dataテーブルの項目名
-Kyudo_data_names = ['box_id', 'box_conf',\
-                'box_w', 'box_h',\
+# Kyudo_dataテーブルの登録データ項目名リスト
+# ・tracking_result()関数でセットするデータ項目名リスト(data_listの順序)
+Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'rw_norm', 'rw_angle',\
                 'lw_norm', 'lw_angle',\
                 'rl_norm', 'rl_angle',\
                 'hr_norm', 'hr_angle',\
-                'er_angle', 'sl_angle',\
+                'sr_norm', 'sr_angle',\
+                'sl_norm', 'sl_angle',\
+                'rew_angle', 'rse_angle',\
+                'lew_angle', 'lse_angle',\
                 'eyes_norm', 'hips_norm'\
                 'tag1'
                 ]
 
 # 学習用データの読み込みリスト
+# ・データベースから読み込むSQL文のデータ項目名と別名
 Features_list_8 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
-                'hr_angle/180.0 as hr_deg',\
-                'tag1 as act_sec',\
+                'rl_norm/box_h as rl_ratio',\
+                'rse_angle/180.0 as se_deg',\
                 'section','completed'
                 ]
 
@@ -52,7 +56,8 @@ Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 # 入力データの次元数
-Input_dim = len(Features_list_7)
+#Input_dim = len(Features_list_7)
+Input_dim = len(Features_list_8)
 # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 Output_dim = 3 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
