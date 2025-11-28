@@ -60,7 +60,7 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-         + "        [{-train|-predict}  [<classes>=<num>] [<section>=<no>]  {-models|-modelm} ['<model-path>']]\n"\
+         + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>]  {-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
     exit(0)
@@ -167,7 +167,8 @@ if model_opt is not None:
     i = cmds.index( model_opt )
     if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' : 
         model_pth = cmds[i +1]
-        if model_pth.startswith('classes') or model_pth.startswith('section'): 
+        if model_pth.startswith('classes') or \
+           model_pth.startswith('section') or model_pth.startswith('inputkey'): 
             model_pth = None
 
 # ハイパーパラメータの設定
@@ -191,13 +192,22 @@ if len(sect_opts) > 0:
 # class=<num>の解析(出力クラス数の指定)
 #num_classes = 3    # 0:完了への移行, 1:動作完了, 2:動作開始
 #num_classes = 19   # (8セクションx2+2)=0~18 
-num_classes:int = 3
+num_classes:int = Output_dim
 num_opts = [opt for opt in args if opt.startswith('classes')]
 if len(num_opts) > 0: 
     # classes=<no>の解析
     params = num_opts[0].split('=')
     if len(params) == 2 and params[1].isnumeric():
         num_classes = int(params[1])
+        
+# inputkey=<num>の解析(使用する特徴量の抽出パターンの指定)
+input_key:int = Current_feature_key
+num_opts = [opt for opt in args if opt.startswith('inputkey')]
+if len(num_opts) > 0: 
+    # classes=<no>の解析
+    params = num_opts[0].split('=')
+    if len(params) == 2 and params[1].isnumeric():
+        input_key = int(params[1])
 #
 # <<< GRUモデルの学習、または予測の実行 >>>
 #
@@ -210,7 +220,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
         exit(0)
     #  学習用データの読み込み
-    features = Features_list_7 if Input_dim == 7 else Features_list_8
+    features = Features_lists[input_key]
     input_dim = len(features)
     log_write(f"[kyudoApp]:input_dim={input_dim}")
     log_write(f"[kyudoApp]:features:{features}")
@@ -598,57 +608,75 @@ for icount, key in enumerate(selkeys, start=1):
         #
         if key == 'all':        # 学習データの入力項目プロット
             # < rw_ratio >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="rw_ratio",
-                                        y=mdfk["rw_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
-            # < eyes_ratio >            
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="eyes_ratio",
-                                        y=mdfk["eyes_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol   
-                            )
+            try :
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                            name="rw_ratio",
+                                            y=mdfk["rw_ratio"], 
+                                            mode="lines"),
+                                    row = irow, 
+                                    col = icol   
+                                )
+            except KeyError:
+                print(f"[kyudoApp]warning:'rw_ratio' not found.")            
+            # < eyes_ratio >
+            try :            
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                            name="eyes_ratio",
+                                            y=mdfk["eyes_ratio"], 
+                                            mode="lines"),
+                                    row = irow, 
+                                    col = icol   
+                                )
+            except KeyError:
+                print(f"[kyudoApp]warning:'eyes_ratio' not found.")
             # < rl_ratio >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="rl_ratio",
-                                        y=mdfk["rl_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol,   
-                                secondary_y=False
-                            )
+            try :
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                            name="rl_ratio",
+                                            y=mdfk["rl_ratio"], 
+                                            mode="lines"),
+                                    row = irow, 
+                                    col = icol,   
+                                    secondary_y=False
+                                )
+            except KeyError:
+                print(f"[kyudoApp]warning:'rl_ratio' not found.")   
             # < hr_ratio >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="hr_ratio",
-                                        y=mdfk["hr_ratio"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol,   
-                                secondary_y=False
-                            )
+            try :
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                            name="hr_ratio",
+                                            y=mdfk["hr_ratio"], 
+                                            mode="lines"),
+                                    row = irow, 
+                                    col = icol,   
+                                    secondary_y=False
+                                )
+            except KeyError:
+                print(f"[kyudoApp]warning:'hr_ratio' not found.")
             # < sr_deg >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="sr_deg",
-                                        y=mdfk["sr_deg"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol,   
-                                secondary_y=True
-                            )
+            try :
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                            name="sr_deg",
+                                            y=mdfk["sr_deg"], 
+                                            mode="lines"),
+                                    row = irow, 
+                                    col = icol,   
+                                    secondary_y=True
+                                )
+            except KeyError:
+                print(f"[kyudoApp]warning:'sr_deg' not found.") 
             # < se_deg >
-            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                        name="se_deg",
-                                        y=mdfk["se_deg"], 
-                                        mode="lines"),
-                                row = irow, 
-                                col = icol,   
-                                secondary_y=True
-                            )
+            try :
+                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                            name="se_deg",
+                                            y=mdfk["se_deg"], 
+                                            mode="lines"),
+                                    row = irow, 
+                                    col = icol,   
+                                    secondary_y=True
+                                )
+            except KeyError:
+                print(f"[kyudoApp]warning:'se_deg' not found.")
         #              
         elif key == 'predicted':    # CSVファイル入力の予測結果データのプロット
             #< label >
