@@ -39,12 +39,10 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
 
 # 学習用データの読み込みリスト
 # ・データベースから読み込むSQL文のデータ項目名と別名
-Features_list_8 = ['rw_norm/box_h as rw_ratio',\
+Features_list_6 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
-                'hr_norm/box_h as hr_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
-                'sr_angle/180.0 as sr_deg',\
-                'rse_angle/180.0 as se_deg',\
+                'hr_norm/box_h as hr_ratio',\
                 'section','completed'
                 ]
 
@@ -55,9 +53,25 @@ Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
+
+Features_list_8 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'sr_angle/180.0 as sr_deg',\
+                'rse_angle/180.0 as se_deg',\
+                'section','completed'
+                ]
+#
+Features_lists = {
+    6: Features_list_6,
+    7: Features_list_7,
+    8: Features_list_8
+    }
+
 # 入力データの次元数
-Input_dim = len(Features_list_7)
-#Input_dim = len(Features_list_8)
+Current_feature_key = 6   # 使用する特徴量の個数(6,7,8)
+Input_dim = len(Features_lists[Current_feature_key])
 # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 Output_dim = 3 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
