@@ -563,10 +563,12 @@ for icount, key in enumerate(selkeys, start=1):
             # データの正規化
             dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"] 
             dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"] 
-            dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
+            dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
             dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
             dfk['hr_deg'] = dfk["hr_angle"]/180.0
-            dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
+            dfk['sr_deg'] = dfk["sr_angle"]/180.0
+            dfk['se_deg'] = dfk["rse_angle"]/180.0
+            dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
         # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
@@ -618,7 +620,7 @@ for icount, key in enumerate(selkeys, start=1):
                                         mode="lines"),
                                 row = irow, 
                                 col = icol,   
-                                secondary_y=True
+                                secondary_y=False
                             )
             # < hr_ratio >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
@@ -628,6 +630,24 @@ for icount, key in enumerate(selkeys, start=1):
                                 row = irow, 
                                 col = icol,   
                                 secondary_y=False
+                            )
+            # < sr_deg >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name="sr_deg",
+                                        y=mdfk["sr_deg"], 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol,   
+                                secondary_y=True
+                            )
+            # < se_deg >
+            fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                        name="se_deg",
+                                        y=mdfk["se_deg"], 
+                                        mode="lines"),
+                                row = irow, 
+                                col = icol,   
+                                secondary_y=True
                             )
         #              
         elif key == 'predicted':    # CSVファイル入力の予測結果データのプロット
