@@ -446,15 +446,26 @@ class MyResult(Keypoint):
 class FeaturePdf:
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
-    Features_list_8 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
-                        'hr_ratio', 'hr_deg', 'act_sec', 'section','completed' ]
     Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
-                        'hr_ratio', 'hr_deg', 'section','completed' ]
+                        'hr_ratio', 'hr_deg',\
+                        'section','completed' ]
+    Kyudo_index_7   = { 4:'h', 6:'h', 20:'w',\
+                        10:'h', 11:'d'}
+
+    Features_list_8 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'eyes_ratio', 'sr_deg', 'se_deg',\
+                        'section','completed' ]
+    Kyudo_index_8   = { 4:'h', 8:'h', 10:'h',\
+                        20:'w', 13:'d', 17:'d' }
+    
+    Features_index = [(Features_list_7, Kyudo_index_7), (Features_list_8, Kyudo_index_8)]
+    
     def __init__(self, input_dim:int=Input_dim, seq_frames:int=Num_frames):
         self.seq_size = seq_frames
         self.input_size = input_dim
         self.kyudo_data_list = [None]*len(Kyudo_data_names)
         self.features_list = [None]*self.input_size
+        self.list_index = self.input_size - 7   # 0 or 1
         self.curPdf:pd.DataFrame = None
         self.prePdf:pd.DataFrame = None
     
@@ -465,29 +476,26 @@ class FeaturePdf:
         return self.kyudo_data_list
 
     def set_current_pdf(self, section_no, completed):
+        column_names, kyudo_index = FeaturePdf.Features_index[self.list_index]
+        #
+        box_w = self.kyudo_data_list[2]    # box_width 
         box_h = self.kyudo_data_list[3]    # box_height 
         i = 0
-        self.features_list[i] = self.kyudo_data_list[4] / box_h     # rw_ratio
-        i += 1
-        self.features_list[i] = self.kyudo_data_list[6] / box_h     # lw_ratio
-        i += 1
-        self.features_list[i] = self.kyudo_data_list[14] / box_h    # eyes_ratio
-        i += 1
-        self.features_list[i] = self.kyudo_data_list[10] / box_h    # hr_ratio
-        i += 1
-        self.features_list[i] = self.kyudo_data_list[11] /180.0     # hr_deg
-        i += 1
-        if self.input_size == 8:
-            self.features_list[i] = self.kyudo_data_list[16]        # act_sec
+        for idx, c in kyudo_index.items():
+            if c == 'h':   # heightで正規化
+                self.features_list[i] = self.kyudo_data_list[idx]/box_h
+            elif c == 'w': # widthで正規化
+                self.features_list[i] = self.kyudo_data_list[idx]/box_w
+            elif c == 'd': # degreeで正規化
+                self.features_list[i] = self.kyudo_data_list[idx]/180.0
             i += 1
+        #
         self.features_list[i] = section_no                          # section
         i += 1
         self.features_list[i] = completed                           # completed   
         
         narray = np.array(self.features_list).reshape(1, -1)
-        if self.input_size == 7:    columns_list = FeaturePdf.Features_list_7
-        elif self.input_size == 8:  columns_list = FeaturePdf.Features_list_8
-        self.curPdf = pd.DataFrame(narray, columns=columns_list)
+        self.curPdf = pd.DataFrame(narray, columns=column_names)
 
     def add_previous_pdf(self):
         if self.prePdf is None:
