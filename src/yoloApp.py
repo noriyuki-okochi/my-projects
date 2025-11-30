@@ -504,8 +504,14 @@ class FeaturePdf:
             #  正規化後の値が1.0を超えた場合、エラーコード（リスト番号）を返す
             #  ー＞　直前の特徴量データを採用する
             if self.features_list[i] > 1.0:
-                self.features_list[i] = pre_features_list[i]    # 直前の特徴量データを採用する
-                #return i + 1 
+                if pre_features_list[i] is None or pre_features_list[i] > 1.0:
+                    # 直前の特徴量データも不正な場合、エラーコード（リスト番号）を返す
+                    return (i + 1)   
+                else:
+                    mylog.log(INFO, f"[set_current_pdf]: "\
+                        + f"invalid_value({i}) {self.features_list[i]:.4f} replaced by {pre_features_list[i]:.4f}")
+                    # 直前の特徴量データを採用する
+                    self.features_list[i] = pre_features_list[i]                     
             i += 1
         #
         self.features_list[i] = section_no                          # section
@@ -744,10 +750,12 @@ def section_started(section_no, myResult:MyResult):
     
     # 2-Dou-zukuri  ->  3-Yu-gamae        
     elif section_no == 2:  
+        if Step_counter == 0: Step_counter = 30 # 初期化（弦調べ）
+
         lenY, _ = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算       
         mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f})")
-
-        if Step_counter == 0: Step_counter = 30 # 初期化（弦調べ）
+        if thsd.ratio(lenY) > 1.0:
+            return started   # 目の間隔が異常に広い場合、開始判定しない
 
         if Step_counter == 30 and lenY < thsd(PRM[0]) :
             # 目の間隔が狭くなる（箆調べ）
@@ -1428,8 +1436,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                         Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
                         InputPdf.update_previous_pdf()
                 else:
-                    invalidValue = InputPdf.features_list[n-1]
-                    mylog.log(INFO, f"inputPdf:フレーム={Frame_counter}:skip invalid-value({n-1}={invalidValue:.2f}) in input features")
+                    mylog.log(INFO, f"[plot]: set_current_pdf returned n={n}")
                 
             # ハイブリッドモデルの場合、プログラムロジックによる姿勢解析も行う
             if not nn_gru or Hybrid_model:
