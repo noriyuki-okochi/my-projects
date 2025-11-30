@@ -478,7 +478,7 @@ class FeaturePdf:
         self.input_key = input_key                          # 6 or 7 or 8
         features, _ = FeaturePdf.Features_index[input_key]
         self.input_dim = len(features)                      # 入力データ次元数
-        self.features_list = [None]*self.input_dim          # 特徴量リスト
+        self.features_list = [None]*self.input_dim          # 特徴量データリスト
     
     def set_kyudo_data_list(self, data_list):
         self.kyudo_data_list = data_list
@@ -487,6 +487,7 @@ class FeaturePdf:
         return self.kyudo_data_list
 
     def set_current_pdf(self, section_no, completed):
+        pre_features_list = self.features_list.copy()       # 直前の特徴量リストを保存
         column_names, kyudo_index = FeaturePdf.Features_index[self.input_key]
         #
         box_w = self.kyudo_data_list[2]    # box_width 
@@ -499,6 +500,12 @@ class FeaturePdf:
                 self.features_list[i] = self.kyudo_data_list[idx]/box_w
             elif c == 'd': # degreeで正規化
                 self.features_list[i] = self.kyudo_data_list[idx]/180.0
+                
+            #  正規化後の値が1.0を超えた場合、エラーコード（リスト番号）を返す
+            #  ー＞　直前の特徴量データを採用する
+            if self.features_list[i] > 1.0:
+                self.features_list[i] = pre_features_list[i]    # 直前の特徴量データを採用する
+                #return i + 1 
             i += 1
         #
         self.features_list[i] = section_no                          # section
@@ -507,7 +514,8 @@ class FeaturePdf:
         
         narray = np.array(self.features_list).reshape(1, -1)
         self.curPdf = pd.DataFrame(narray, columns=column_names)
-
+        return 0
+    
     def add_previous_pdf(self):
         if self.prePdf is None:
             self.prePdf = self.curPdf.copy()                        # カレントデータで初期作成
@@ -1294,7 +1302,7 @@ def manual_analize_start(section_no, myResult:MyResult):
     
     # 動作の開始を判定
     if section_started(section_no, myResult):
-        print(f"[man_analize]: Section({section_no}), strated=True")
+        print(f"[man_analize]: section({section_no}), strated=True")
         Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
         Split_sec = 0.0
@@ -1339,7 +1347,7 @@ def manual_analize_completed(section_no, myResult:MyResult):
     
     # 動作の完了を判定
     if section_completed(section_no, myResult):
-        print(f"[man_analize]: Section({section_no}), completed=True")
+        print(f"[man_analize]: section({section_no}), completed=True")
         Action_start = Lap_sec
         Completed = True 
         if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
@@ -1404,20 +1412,24 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             if nn_gru:
                 # GRUモデルによる姿勢解析
                 # カレントのデータフレームを作成、保存
-                InputPdf.set_current_pdf(Section_no, Completed)
-                mylog.log(DEBUG, f"[plot]: curPdf.shape={InputPdf.curPdf.shape}")
-                mylog.log(DEBUG, f"[plot]: {InputPdf.curPdf.tail()}")
-                if not InputPdf.is_ready():
-                    # シーケンスデータの準備をする
-                    InputPdf.add_previous_pdf()
-                    mylog.log(DEBUG, f"[plot]: prePdf.shape={InputPdf.prePdf.shape}")
-                    mylog.log(DEBUG, f"[plot]: {InputPdf.prePdf.tail()}")
+                n = InputPdf.set_current_pdf(Section_no, Completed)
+                if n == 0:
+                    mylog.log(DEBUG, f"[plot]: curPdf.shape={InputPdf.curPdf.shape}")
+                    mylog.log(DEBUG, f"[plot]: {InputPdf.curPdf.tail()}")
+                    if not InputPdf.is_ready():
+                        # シーケンスデータの準備をする
+                        InputPdf.add_previous_pdf()
+                        mylog.log(DEBUG, f"[plot]: prePdf.shape={InputPdf.prePdf.shape}")
+                        mylog.log(DEBUG, f"[plot]: {InputPdf.prePdf.tail()}")
+                    else:
+                        # 入力データフレームを取得
+                        input_pdf = InputPdf.get_input_pdf()
+                        # GRUモデルによる動作解析
+                        Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
+                        InputPdf.update_previous_pdf()
                 else:
-                    # 入力データフレームを取得
-                    input_pdf = InputPdf.get_input_pdf()
-                    # GRUモデルによる動作解析
-                    Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
-                    InputPdf.update_previous_pdf()
+                    invalidValue = InputPdf.features_list[n-1]
+                    mylog.log(INFO, f"inputPdf:フレーム={Frame_counter}:skip invalid-value({n-1}={invalidValue:.2f}) in input features")
                 
             # ハイブリッドモデルの場合、プログラムロジックによる姿勢解析も行う
             if not nn_gru or Hybrid_model:
