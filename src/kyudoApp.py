@@ -208,7 +208,7 @@ if len(num_opts) > 0:
     params = num_opts[0].split('=')
     if len(params) == 2 and params[1].isnumeric():
         input_key = int(params[1])
-#
+print(f"[kyudoApp]info:Input_feature_key = {input_key}")
 # <<< GRUモデルの学習、または予測の実行 >>>
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
