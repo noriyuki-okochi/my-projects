@@ -1,6 +1,10 @@
 f:
 set-location share/YOLO
+# プロファイルの表示
 write-output $profile
+# 環境変数の設定
+$env:INPUT_KEY="7"
+#
 write-output 'Hellow YOLO!!'
 write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンスが表示されます。'
 write-output '> yolo   -help		：動画再生・解析ツール'
@@ -22,16 +26,19 @@ $d_c = 4    # 埋め込み次元数(completed)
 $hparam = "($s,$b,$e,$d_s,$d_c)"
 #
 # 学習済モデルファイル名
-$model='./kyudoA_modelme_7-96-3.pt'
+$model='./kyudoA_modelse_7-96-3.pt'
 # 登録ケース名リスト
 #$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
 #$cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
 #$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3", "okochi_1.7s2-8-3", "kanoda_1.7s2-8-3", "tuneyoshi_1.7s2-8-3"
-$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3"
+#$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3"
+$cases_list = "iijima_1.7s1-6-3", "anbe_1.7s2-6-3","iwata_1.7s1-6-3"
 write-output '>>' 
 $str = '・ハイパーパラメータ： ' + $hparam
 write-output $str
 $str = '・学習済モデル      ： ' + $model
+write-output $str
+$str = '・入力データキー    ： ' + $env:INPUT_KEY
 write-output $str
 $str = '・登録済ケース名一覧： ' + $cases_list 
 Write-Output $str
@@ -41,10 +48,10 @@ function yolo {
         [switch]$help,
         [switch]$h,
         [switch]$all,
-        [string]$case,
-        [string]$gru,
         [switch]$raw,
-        [switch]$clip
+        [switch]$clip,
+        [string]$case,
+        [string]$gru
     )
     $no=1
     $slevel=''
@@ -60,14 +67,24 @@ function yolo {
         }
         $slevel = '-s' + $no
     } 
+    if ($gru -eq '-level'){
+        write-output 'GRUモデルファイル名を指定してください' 
+        return
+    }
+    if ($case -eq '-level'){
+        write-output 'GRUモデルファイル名を指定してください' 
+        return
+    }
     #
+    #write-output $gru
+    #write-output $case
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>yolo  -raw		：選択した動画ファイルを再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yolo  -all [-level <no>]：選択した動画の射形を解析しながら再生する（no:解析レベル {1|2|3}）'
         write-output '>yolo  -case "<登録ケース名>" [-level <no>]：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
-        write-output '>yolo  -gru  "<GRUモデルファイル名>|non" [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
+        write-output '>yolo  -gru  "<GRUモデルファイル名>|-" [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output '>yolo  -h		：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
@@ -103,8 +120,14 @@ function yolo {
     elseif ($gru -ne '') {
         #$cmdline = 'python ./src/yoloApp.py -d1 -a -m -gru  ' + $gru + ' --' 
         #write-output $cmdline
-        if($gru -ne 'non'){
-            $model=$gru
+        if ($gru -ne '-') {
+            if ($gru -eq '-level'){
+                write-output 'GRUモデルファイル名を指定してください' 
+                return
+            }
+            else{
+                $model=$gru
+            }
         }
         python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel --
     }
@@ -121,13 +144,14 @@ function chart {
         [switch]$h,
         [switch]$list,
         [string]$import,
-        [string]$case
+        [string]$case,
+        [string]$key
     )
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>chart  -list				：登録済ケース名の一覧を表示する'
-        write-output '>chart  -import  "<登録ケース名>"       ：解析結果データファイルのデータをデータベースに登録する'
-        write-output '>chart  -case "<登録ケース名>" [データ名]：解析結果データをグラフ表示する'
+        write-output '>chart  -import "<登録ケース名>"                ：解析結果ポイントデータファイルのデータをデータベースに登録する'
+        write-output '>chart  -case "<登録ケース名>" [-key <データ名>] ：解析結果ポイントデータをグラフ表示する'
         write-output '>chart  -h				：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -137,16 +161,14 @@ function chart {
         python ./src/chart.py  -d -case -L
     } 
     elseif ($import -ne '') {
-        python ./src/chart.py  -d right_wrist -case $import  -import -f0 0 -m
+        python ./src/chart.py  -d -case $import  -import -f0 0 -m
     }
     elseif ($case -ne '') {
-        $len = $args.Length
-        write-output $len
-        if ($len -eq 0) {
-            python ./src/chart.py -d  right_wrist -case $case  -f0 0  -m -span 
+        if ($key -ne '') {
+            python ./src/chart.py -d  $key -case $case  -f0 0  -m -span 
         }
         else {
-            python ./src/chart.py -d  $args[0] -case $case  -f0 0  -m -span     
+            python ./src/chart.py -d  right_wrist left_wrist right_elbow left_elbow -case $case  -f0 0      
         }
     }
     else{
@@ -179,8 +201,8 @@ function kyudo {
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>kyudo  -list				：登録済ケース名の一覧を表示する'
-        write-output '>kyudo  -import  "<登録ケース名>" 	：解析結果データファイルのデータをデータベースに登録する'
         write-output '>kyudo  -deletet  "<登録ケース名>"	：登録ケース名、データファイルを削除する'
+        write-output '>kyudo  -import  "<登録ケース名>" 	：解析結果データファイルのデータをデータベースに登録する'
         write-output '>kyudo  -case "<登録ケース名>"		：解析結果データをグラフ表示する'
         write-output '>kyudo  -train "<登録ケース名>" [-section] [-multi] -model [<モデルファイル>]	：解析結果データで学習する'
         write-output '>kyudo  -predict "<登録ケース名>" [-multi] -model <モデルファイル>        	：解析結果データで予測する'
