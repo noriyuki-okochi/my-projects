@@ -11,7 +11,7 @@ PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/'
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
-Step_names = { 201: '矢番え', 221: '取矢', 231: '矢番え', 240: '弦調べ・箆調べ',\
+Step_names = { 201: '矢番え', 221: '取矢', 222: '取矢', 230: '弦調べ', 240:'箆調べ',\
                310: '取掛け・手の内', 311: '物見',\
                510: '大三', 511: '押し', 512: '引き', 601: '口割',\
                901: '弓倒し', 922: '退場'}          # ステップ名
@@ -22,25 +22,27 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
         'left_wrist':9, 'right_wrist':10, 'left_hip':11, 'right_hip':12,
         'left_knee':13, 'right_knee':14, 'left_ankle':15, 'right_ankle':16}  # キーポイント名
 
-# Kyudo_dataテーブルの項目名
-Kyudo_data_names = ['box_id', 'box_conf',\
-                'box_w', 'box_h',\
+# Kyudo_dataテーブルの登録データ項目名リスト
+# ・tracking_result()関数でセットするデータ項目名リスト(data_listの順序)
+Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'rw_norm', 'rw_angle',\
                 'lw_norm', 'lw_angle',\
                 'rl_norm', 'rl_angle',\
                 'hr_norm', 'hr_angle',\
-                'er_angle', 'sl_angle',\
+                'sr_norm', 'sr_angle',\
+                'sl_norm', 'sl_angle',\
+                'rew_angle', 'rse_angle',\
+                'lew_angle', 'lse_angle',\
                 'eyes_norm', 'hips_norm'\
                 'tag1'
                 ]
 
 # 学習用データの読み込みリスト
-Features_list_8 = ['rw_norm/box_h as rw_ratio',\
-                'lw_norm/box_h as lw_ratio',\
+# ・データベースから読み込むSQL文のデータ項目名と別名
+Features_list_6 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
-                'hr_angle/180.0 as hr_deg',\
-                'tag1 as act_sec',\
                 'section','completed'
                 ]
 
@@ -51,8 +53,31 @@ Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
+
+Features_list_8 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'sr_angle/180.0 as sr_deg',\
+                'rse_angle/180.0 as se_deg',\
+                'section','completed'
+                ]
+#
+Features_lists = {
+    6: Features_list_6,
+    7: Features_list_7,
+    8: Features_list_8
+    }
+
 # 入力データの次元数
-Input_dim = len(Features_list_7)
+Current_feature_key = 7   # 使用する特徴量の個数(6,7,8)
+# 環境変数 'INPUT_KEY' が設定されていれば、それを使用する
+input_key = os.getenv('INPUT_KEY')
+if input_key != None:
+    Current_feature_key = int(input_key)
+    #print(f"Environment variable 'INPUT_KEY' found: Using Current_feature_key = {Current_feature_key}")
+#
+Input_dim = len(Features_lists[Current_feature_key])
 # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 Output_dim = 3 
 # 2軸に指定できる'tracking_dat'テーブルのカラム名
