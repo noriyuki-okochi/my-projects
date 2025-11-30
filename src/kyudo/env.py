@@ -11,7 +11,7 @@ PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/'
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
-Step_names = { 201: '矢番え', 221: '取矢', 231: '矢番え', 240: '弦調べ・箆調べ',\
+Step_names = { 201: '矢番え', 221: '取矢', 222: '取矢', 230: '弦調べ', 240:'箆調べ',\
                310: '取掛け・手の内', 311: '物見',\
                510: '大三', 511: '押し', 512: '引き', 601: '口割',\
                901: '弓倒し', 922: '退場'}          # ステップ名
@@ -70,7 +70,13 @@ Features_lists = {
     }
 
 # 入力データの次元数
-Current_feature_key = 6   # 使用する特徴量の個数(6,7,8)
+Current_feature_key = 7   # 使用する特徴量の個数(6,7,8)
+# 環境変数 'INPUT_KEY' が設定されていれば、それを使用する
+input_key = os.getenv('INPUT_KEY')
+if input_key != None:
+    Current_feature_key = int(input_key)
+    #print(f"Environment variable 'INPUT_KEY' found: Using Current_feature_key = {Current_feature_key}")
+#
 Input_dim = len(Features_lists[Current_feature_key])
 # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
 Output_dim = 3 
