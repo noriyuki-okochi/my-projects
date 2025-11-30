@@ -15,18 +15,27 @@ $modelx = "-models"
 #$e = 301    # エポック数
 $s = 96     # シーケンス長
 $b = 192    # バッチサイズ
-$e = 301    # エポック数
+$e = 281    # エポック数
 $d_s = 8    # 埋め込み次元数(section)
-#$d_c = 4    # 埋め込み次元数(completed)
-$d_c = 6    # 埋め込み次元数(completed)
+$d_c = 4    # 埋め込み次元数(completed)
+#$d_c = 6    # 埋め込み次元数(completed)
 $hparam = "($s,$b,$e,$d_s,$d_c)"
+#
+# 学習済モデルファイル名
+$model='./kyudoA_modelme_7-96-3.pt'
 # 登録ケース名リスト
-$cases_list = "iijima_1.7s1-3","iijima_1.7s2-3",
-              "anbe_1.7s1-3","anbe_1.7s2-3"
-#              "iwata_1.7s1-3"
-#              "okochi_1.7s1-3",
-#              "kanode_1.7s2-3",
-#              "tuneyoshi_1.7s2-3"
+#$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
+#$cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
+#$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3", "okochi_1.7s2-8-3", "kanoda_1.7s2-8-3", "tuneyoshi_1.7s2-8-3"
+$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3"
+write-output '>>' 
+$str = '・ハイパーパラメータ： ' + $hparam
+write-output $str
+$str = '・学習済モデル      ： ' + $model
+write-output $str
+$str = '・登録済ケース名一覧： ' + $cases_list 
+Write-Output $str
+
 function yolo {
     param(
         [switch]$help,
@@ -38,7 +47,7 @@ function yolo {
         [switch]$clip
     )
     $no=1
-    $slevel='-s'
+    $slevel=''
     $idx = $args.IndexOf("-level")
     $len = $args.Length
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
@@ -49,8 +58,8 @@ function yolo {
             write-output $msg
             return
         }
+        $slevel = '-s' + $no
     } 
-    $slevel = $slevel + $no
     #
     if ($help) {
         write-output '・コマンド -オプション'
@@ -94,7 +103,6 @@ function yolo {
     elseif ($gru -ne '') {
         #$cmdline = 'python ./src/yoloApp.py -d1 -a -m -gru  ' + $gru + ' --' 
         #write-output $cmdline
-        $model='./kyudo_modelme_7-80-3A.pt'
         if($gru -ne 'non'){
             $model=$gru
         }
@@ -118,8 +126,8 @@ function chart {
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>chart  -list				：登録済ケース名の一覧を表示する'
-        write-output '>chart  -import  "<登録ケース名>" 	：解析結果データファイルのデータをデータベースに登録する'
-        write-output '>chart  -case "<登録ケース名>"		：解析結果データをグラフ表示する'
+        write-output '>chart  -import  "<登録ケース名>"       ：解析結果データファイルのデータをデータベースに登録する'
+        write-output '>chart  -case "<登録ケース名>" [データ名]：解析結果データをグラフ表示する'
         write-output '>chart  -h				：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -129,10 +137,17 @@ function chart {
         python ./src/chart.py  -d -case -L
     } 
     elseif ($import -ne '') {
-        python ./src/chart.py  -d -case $import  -import -f0 0 -m
+        python ./src/chart.py  -d right_wrist -case $import  -import -f0 0 -m
     }
     elseif ($case -ne '') {
-        python ./src/chart.py -d  right_wrist -case $case  -f0 0  -m -span 
+        $len = $args.Length
+        write-output $len
+        if ($len -eq 0) {
+            python ./src/chart.py -d  right_wrist -case $case  -f0 0  -m -span 
+        }
+        else {
+            python ./src/chart.py -d  $args[0] -case $case  -f0 0  -m -span     
+        }
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -200,8 +215,14 @@ function kyudo {
             }
             else {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
+                    $i = 1
                     foreach ( $case_name in $cases_list ) {
-                        python ./src/kyudoApp.py -d -case $case_name classes=3 -hparam "$hparam" -train $modelx $args[$idx+1] -f0 0 -n     
+                        python ./src/kyudoApp.py -d -case $case_name classes=3 -hparam "$hparam" -train $modelx $args[$idx+1] -f0 0 -n"$i" 
+                        #Write-Output $LASTEXITCODE
+                        if ( $LASTEXITCODE -ne 0 ) {
+                            break
+                        }
+                        $i++    
                     }
                 }
                 else {
