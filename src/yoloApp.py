@@ -549,75 +549,6 @@ class FeaturePdf:
             self.set_current_pdf(0, 0)
             self.add_previous_pdf()
 
-# ハイブリッドモデルの場合、動作予測結果を補正
-def correct_action_by_rules(action, section, completed):
-    global Step_counter
-    r_action = action
-    if completed == True and action == 1:
-        # 「動作完了」で「動作完了」が認識された場合、
-        r_action = 0
-    elif completed == False and action == 2:
-        # 「動作未完了」で「動作開始」が認識された場合、
-        r_action = 0
-    else:
-        # 動作解析ステップに応じた補正ルール
-        if section == 2:        # 「胴づくり」
-            if action == 1 and Step_counter < 20:   # 動作完了が早すぎる（一回目の腰）
-                r_action = 0
-            if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
-                r_action = 0
-    #
-    if r_action != action:
-        mylog.log(INFO, f"[correct_action_by_rules]: action corrected {action} to {r_action}")
-    return r_action
-            
-#
-# GRUモデルによる動作予測関数
-def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
-    global Split_start, Split_sec, Lap_start, Action_start, Step_counter
-    
-    mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
-    mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
-    
-    x = input_pdf.to_numpy(dtype=np.float32)
-    s_frames = len(input_pdf)
-    
-    # GRUモデルによる動作解析
-    y = predict_Kyudo( model, x, s_frames)
-    mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
-    action = y[0]
-    if action != 0 and Hybrid_model == True:
-        mylog.log(INFO, f"[gru_analize]: not zero action={action} ( section={section}, completed={completed}, counter={Step_counter} )")
-        # ハイブリッドモデルの場合、動作認識結果を補正
-        action = correct_action_by_rules(action, section, completed)
-    # タイマー情報の更新
-    if action == 2:
-        Action_start = Lap_sec
-        Split_start = Frame_counter                         # スプリット開始時間を記録
-        Split_sec = 0.0
-    elif action == 1:
-        Action_start = Lap_sec
-        if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
-            Split_start = 0                                 # スプリット開始時間をリセット
-        if section == 9:                                    # 退場動作の場合、解析終了 
-            Lap_start = 0
-    #
-    ival = 1 if completed == True else 0
-    rslt = update_section_completed(action, section, ival, output_size=Num_classes)
-    if action != 0:
-        mylog.log(INFO, f"[gru_analize]: フレーム={Frame_counter}")
-        if action == 1:
-            mylog.log(INFO, f"[gru_analize]: section({section}), completed=True")
-            print(f"[gru_analize]: section({section}), completed=True")
-        else:
-            mylog.log(INFO, f"[gru_analize]: section({section}), strated=True")
-            print(f"[gru_analize]: section({section}), strated=True")
-        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
-        #
-        if section == 9 and action == 2: Step_counter = 30
-        else: Step_counter = 0
-    #
-    return rslt[0], (True if rslt[1] == 1 else False), action
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
@@ -755,6 +686,8 @@ def section_started(section_no, myResult:MyResult):
         lenY, _ = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算       
         mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f})")
         if thsd.ratio(lenY) > 1.0:
+            mylog.log(INFO, f"started({section_no}): lenY.ratio={thsd.ratio(lenY):.3f}, "\
+                      + f" skip....")
             return started   # 目の間隔が異常に広い場合、開始判定しない
 
         if Step_counter == 30 and lenY < thsd(PRM[0]) :
@@ -872,14 +805,14 @@ def section_started(section_no, myResult:MyResult):
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
         if Step_counter == 0: Step_counter = 10
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), normSR={int(normS)}({thsd.ratio(normS):.3f})")
+        mylog.log(INFO, f">>>   normS={int(normS)}({thsd.ratio(normS):.3f})")
 
         mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[0]))} ]")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
 
         Stkp.push( [(0,PRM[0])] )  
         if normS > thsd(PRM[0]):
-            # 右腰の移動ベクトルの長さが大きい場合（退場）
+            # 右肩の移動ベクトルの長さが大きい場合（退場）
             if Step_counter/10 == 1: Step_counter = 20
             Step_counter += 1
             Stkp.push( [(1,PRM[1])] )  
@@ -887,7 +820,7 @@ def section_started(section_no, myResult:MyResult):
         else:
             Stkp.push( [(2,PRM[2])] )  
             if normR > thsd(PRM[2]):
-                # 右手首と左手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
+                # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
                 if Step_counter/10 == 2: Step_counter = 10
                 Step_counter += 1
                 Stkp.push( [(3,PRM[3])] )  
@@ -1300,6 +1233,75 @@ def edit_section_name(no, counter):
         if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
 
     return name, color
+# ハイブリッドモデルの場合、動作予測結果を補正
+def correct_action_by_rules(action, section, completed):
+    global Step_counter
+    r_action = action
+    if completed == True and action == 1:
+        # 「動作完了」で「動作完了」が認識された場合、
+        r_action = 0
+    elif completed == False and action == 2:
+        # 「動作未完了」で「動作開始」が認識された場合、
+        r_action = 0
+    else:
+        # 動作解析ステップに応じた補正ルール
+        if section == 2:        # 「胴づくり」
+            if action == 1 and Step_counter < 20:   # 動作完了が早すぎる（一回目の腰）
+                r_action = 0
+            if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
+                r_action = 0
+    #
+    if r_action != action:
+        mylog.log(INFO, f"[correct_action_by_rules]: action corrected {action} to {r_action}")
+    return r_action
+            
+#
+# GRUモデルによる動作予測関数
+def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
+    global Split_start, Split_sec, Lap_start, Action_start, Step_counter
+    
+    mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
+    mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
+    
+    x = input_pdf.to_numpy(dtype=np.float32)
+    s_frames = len(input_pdf)
+    
+    # GRUモデルによる動作解析
+    y = predict_Kyudo( model, x, s_frames)
+    mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
+    action = y[0]
+    if action != 0 and Hybrid_model == True:
+        mylog.log(INFO, f"[gru_analize]: not zero action={action} ( section={section}, completed={completed}, counter={Step_counter} )")
+        # ハイブリッドモデルの場合、動作認識結果を補正
+        action = correct_action_by_rules(action, section, completed)
+    # タイマー情報の更新
+    if action == 2:
+        Action_start = Lap_sec
+        Split_start = Frame_counter                         # スプリット開始時間を記録
+        Split_sec = 0.0
+    elif action == 1:
+        Action_start = Lap_sec
+        if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
+            Split_start = 0                                 # スプリット開始時間をリセット
+        if section == 9 and Step_counter == 0:              # 退場動作の場合、解析終了 
+            Lap_start = 0
+    #
+    ival = 1 if completed == True else 0
+    rslt = update_section_completed(action, section, ival, output_size=Num_classes)
+    if action != 0:
+        mylog.log(INFO, f"[gru_analize]: フレーム={Frame_counter}")
+        if action == 1:
+            mylog.log(INFO, f"[gru_analize]: section({section}), completed=True")
+            print(f"[gru_analize]: section({section}), completed=True")
+        else:
+            mylog.log(INFO, f"[gru_analize]: section({section}), strated=True")
+            print(f"[gru_analize]: section({section}), strated=True")
+        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
+        #
+        if section == 9 and action == 2: Step_counter = 30
+        else: Step_counter = 0
+    #
+    return rslt[0], (True if rslt[1] == 1 else False), action
 #
 # 動作の開始を判定する関数
 #  
