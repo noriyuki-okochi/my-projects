@@ -250,7 +250,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
 
     # 学習データの使用範囲の指定がある場合の処理
-    pf_vals = None
+    pf_vals = (df_x.shape[0],df_x.shape[0])   # (max_frames, display_frames)
     if len(pf_opt) > 0:
         print(f"[kyudoApp]df_x.shape={df_x.shape}")   
         print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")    # 表示フレーム数   
