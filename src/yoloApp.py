@@ -112,7 +112,7 @@ def help():
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check")
-    print(" -s(kill):skill-level default=1")
+    print(" -s(kill):skill-level default=1(0-3)")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
     print(" -h(elp)")
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
@@ -452,6 +452,11 @@ class FeaturePdf:
                         'section','completed' ]
     Kyudo_index_6   = { 4:'h', 8:'h', 20:'w',\
                         10:'h'}
+    Features_list_61 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+                        'hr_ratio',\
+                        'section','completed' ]
+    Kyudo_index_61   = { 4:'h', 6:'h', 20:'w',\
+                        10:'h'}
 
     Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
@@ -459,15 +464,32 @@ class FeaturePdf:
     Kyudo_index_7   = { 4:'h', 6:'h', 20:'w',\
                         10:'h', 11:'d'}
 
+    Features_list_71 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+                        'sr_ratio', 'sr_deg',\
+                        'section','completed' ]
+    Kyudo_index_71   = { 4:'h', 6:'h', 20:'w',\
+                        12:'h', 13:'d'}
+
+
     Features_list_8 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'eyes_ratio', 'sr_deg', 'se_deg',\
                         'section','completed' ]
     Kyudo_index_8   = { 4:'h', 8:'h', 10:'h',\
                         20:'w', 13:'d', 17:'d' }
+
+    Features_list_81 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+                        'rl_ratio', 'hr_ratio', 'hr_deg',\
+                        'section','completed' ]
+    Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
+                        8:'h', 10:'h', 11:'d' }
     
     Features_index = { 6: (Features_list_6, Kyudo_index_6),
+                       61: (Features_list_61, Kyudo_index_61), 
                        7: (Features_list_7, Kyudo_index_7), 
-                       8: (Features_list_8, Kyudo_index_8) }
+                       71: (Features_list_71, Kyudo_index_71), 
+                       8: (Features_list_8, Kyudo_index_8), 
+                       81: (Features_list_81, Kyudo_index_81) 
+                       }
     
     def __init__(self, input_key:int=Input_key, seq_frames:int=Num_frames):
         self.seq_size = seq_frames

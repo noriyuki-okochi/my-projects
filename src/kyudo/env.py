@@ -45,12 +45,25 @@ Features_list_6 = ['rw_norm/box_h as rw_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'section','completed'
                 ]
+Features_list_61 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'section','completed'
+                ]
 
 Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
+                'section','completed'
+                ]
+Features_list_71 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'sr_norm/box_h as sr_ratio',\
+                'sr_angle/180.0 as sr_deg',\
                 'section','completed'
                 ]
 
@@ -62,11 +75,22 @@ Features_list_8 = ['rw_norm/box_h as rw_ratio',\
                 'rse_angle/180.0 as se_deg',\
                 'section','completed'
                 ]
+Features_list_81 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'section','completed'
+                ]
 #
 Features_lists = {
     6: Features_list_6,
+    61: Features_list_61,
     7: Features_list_7,
-    8: Features_list_8
+    71: Features_list_71,
+    8: Features_list_8,
+    81: Features_list_81
     }
 
 # 入力データの次元数
