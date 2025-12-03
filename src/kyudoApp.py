@@ -202,13 +202,15 @@ if len(num_opts) > 0:
         
 # inputkey=<num>の解析(使用する特徴量の抽出パターンの指定)
 input_key:int = Current_feature_key
+input_key_opt = False
 num_opts = [opt for opt in args if opt.startswith('inputkey')]
 if len(num_opts) > 0: 
-    # classes=<no>の解析
+    # inputkey=<no>の解析
     params = num_opts[0].split('=')
     if len(params) == 2 and params[1].isnumeric():
         input_key = int(params[1])
-print(f"[kyudoApp]info:Input_feature_key = {input_key}")
+        input_key_opt = True
+print(f"[kyudoApp]info:{input_key_opt}:Input_feature_key = {input_key}")
 # <<< GRUモデルの学習、または予測の実行 >>>
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
@@ -513,6 +515,7 @@ for icount, key in enumerate(selkeys, start=1):
         #
         # 'kyudo-data'テーブルからのデータ読み込み
         # (-lossオプション指定時はCSVファイルから読み込み)
+        cols:list = []
         db.case_name = case_name
         if plot_loss:
             # CSVファイル読み込みのlossデータ
@@ -558,27 +561,49 @@ for icount, key in enumerate(selkeys, start=1):
                 mdf = mdf.head(pf_vals[1])
                 print(f"[kyudoApp]info:mdf{mdf.shape}")
         else:
-            if section is not None:
-                dfk = db.pandas_read_kyudo_section(section = section)
-            else:  dfk = db.pandas_read_kyudo()
+            if input_key_opt:
+                features = Features_lists[input_key]
+                features.append('label')
+                cols = get_feature_colnames( features )
+                if section is None:
+                    dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
+                else:
+                    dfk = db.pandas_read_kyudo_section( features, section = section )
+            else:
+                if section is None: 
+                    dfk = db.pandas_read_kyudo()
+                else:
+                    dfk = db.pandas_read_kyudo_section(section = section)
             df = dfk
             print(f"[kyudoApp]info:dfk{dfk.shape}")
+            if not input_key_opt:
+                # データの正規化
+                dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"]
+                cols.append('rw_ratio') 
+                dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"]
+                cols.append('lw_ratio') 
+                dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"]
+                cols.append('eyes_ratio') 
+                dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
+                cols.append('rl_ratio')
+                dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
+                cols.append('hr_ratio')
+                dfk['hr_deg'] = dfk["hr_angle"]/180.0
+                cols.append('hr_deg')
+                '''
+                dfk['sr_deg'] = dfk["sr_angle"]/180.0
+                cols.append('sr_deg')
+                dfk['se_deg'] = dfk["rse_angle"]/180.0
+                cols.append('se_deg')
+                '''
             # 特異値の補正
             for col in dfk.columns:
-                if '_norm' in col :
-                    # box_w以上は欠測地(NaN)に置換する
-                    dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])
+                if '_ratio' in col :
+                    # 1.0以上は欠測地(NaN)に置換する
+                    dfk[col] = dfk[col].where(dfk[col] < 1.0)
             dfk.ffill(inplace=True)    # 欠測値を直前の値に置換する
             dfk.bfill(inplace=True)    # 欠測値を直後の値に置換する
-            # データの正規化
-            dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"] 
-            dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"] 
-            dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
-            dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
-            dfk['hr_deg'] = dfk["hr_angle"]/180.0
-            dfk['sr_deg'] = dfk["sr_angle"]/180.0
-            dfk['se_deg'] = dfk["rse_angle"]/180.0
-            dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
+        #
         # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
@@ -607,76 +632,19 @@ for icount, key in enumerate(selkeys, start=1):
         # データのプロット
         #
         if key == 'all':        # 学習データの入力項目プロット
-            # < rw_ratio >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="rw_ratio",
-                                            y=mdfk["rw_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol   
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'rw_ratio' not found.")            
-            # < eyes_ratio >
-            try :            
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="eyes_ratio",
-                                            y=mdfk["eyes_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol   
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'eyes_ratio' not found.")
-            # < rl_ratio >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="rl_ratio",
-                                            y=mdfk["rl_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=False
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'rl_ratio' not found.")   
-            # < hr_ratio >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="hr_ratio",
-                                            y=mdfk["hr_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=False
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'hr_ratio' not found.")
-            # < sr_deg >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="sr_deg",
-                                            y=mdfk["sr_deg"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=True
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'sr_deg' not found.") 
-            # < se_deg >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="se_deg",
-                                            y=mdfk["se_deg"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=True
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'se_deg' not found.")
+            for name in cols:
+                secondary:bool = True if 'deg' in name else False
+                try :
+                    fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                                name = name,
+                                                y = mdfk[name], 
+                                                mode = "lines"),
+                                        row = irow, 
+                                        col = icol,   
+                                        secondary_y = secondary
+                                    )
+                except KeyError:
+                    print(f"[kyudoApp]warning:{name} not found.")            
         #              
         elif key == 'predicted':    # CSVファイル入力の予測結果データのプロット
             #< label >

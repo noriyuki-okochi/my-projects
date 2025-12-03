@@ -79,6 +79,21 @@ def get_hyper_parameters(cmds, def_parameters):
           parameters = tuple( values )
     
     return parameters
+#
+# 特徴量カラム名取得関数
+# features: 特徴量リスト
+def get_feature_colnames( features ):
+    colnames = []
+    for f in features:
+        items = f.split(' ')
+        try:
+            idx = items.index('as')
+            if idx > 0 and (idx + 1) < len(items):
+                colname = items[idx + 1]
+                colnames.append( colname )
+        except ValueError:
+            pass
+    return colnames
 #    
 # デバイスの取得
 # 戻り値: device
