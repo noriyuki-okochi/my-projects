@@ -520,6 +520,10 @@ class FeaturePdf:
                 self.features_list[i] = self.kyudo_data_list[idx]/box_h
             elif c == 'w': # widthで正規化
                 self.features_list[i] = self.kyudo_data_list[idx]/box_w
+                if Eyes_ratio_threshold > 0.0 and column_names[i] == 'eyes_ratio':
+                    # 目の横幅を0.01/0.1に補正
+                    self.features_list[i] = Eyes_ratio_min if self.features_list[i] < Eyes_ratio_threshold \
+                                            else Eyes_ratio_max
             elif c == 'd': # degreeで正規化
                 self.features_list[i] = self.kyudo_data_list[idx]/180.0
                 

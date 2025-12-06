@@ -238,7 +238,10 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         if '_ratio' in col :
             df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測値(NaN)に置換する
     df_x.ffill(inplace=True)    # 欠測値を直前の値に置換する
-    df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する    
+    df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する 
+    if Eyes_ratio_threshold > 0.0:
+        df_x['eyes_ratio'] = df_x['eyes_ratio'].where(df_x['eyes_ratio'] > Eyes_ratio_threshold, Eyes_ratio_min)
+        df_x['eyes_ratio'] = df_x['eyes_ratio'].where(df_x['eyes_ratio'] == Eyes_ratio_min, Eyes_ratio_max)
     if verbose:
         # debug write 
         df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
@@ -388,10 +391,23 @@ if '-second' in args:
         if name in Kyudo_data_names: second_names.append(name)
         idx += 1
 #
+m_compare:bool = False
+if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
+#    if case_compare is False and plot_loss is False:
+    if plot_loss is False:
+        m_flg = True
+        if case_compare: m_compare = True
+print(f"[kyudoApp]info:m_flg={m_flg}, m_compare={m_compare}")    
+#
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
 selkeys:str = [key for key in args if key in key_names]
 selnum:int = len(selkeys)
+if m_compare:
+    selnum = 1
+    selkeys.clear()
+    selkeys.append('m_compare')
+# 二軸指定のキーポイントは表示対象から除外する
 for name in second_names:
     if name in selkeys:
         selkeys.remove(name)
@@ -424,10 +440,6 @@ print(f"[kyudoApp]info:range_min={range_min},range_max={range_max}.")
 #
 # その他、コマンドオプションの解析
 #
-if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
-    if case_compare is False and plot_loss is False:
-        m_flg = True
-#
 if '-b' in opts:        #凡例の表示位置
     legend_dict = dict(x=0.01,y=0.01,xanchor='left',yanchor='bottom',orientation='h')
 else:
@@ -455,7 +467,7 @@ if selnum == 4:
                         specs=[[{"secondary_y": True}, {"secondary_y": True}],
                                [{"secondary_y": True}, {"secondary_y": True}]])
 elif selnum == 1:
-    if m_flg == True :
+    if m_flg == True and not m_compare:
         if len(selkeys) > 0 :
             if selkeys[0] == 'all':\
                 titles = ['features','predicted label'] if predict else ['features','section/completed/label']
@@ -550,6 +562,8 @@ for icount, key in enumerate(selkeys, start=1):
             print(f"[kyudoApp]info:df{df.shape}")
         elif predict:
             # 予測結果データフレームの読み込み
+            features = Features_lists[input_key]
+            cols = get_feature_colnames( features )
             dfk = df_p  
             dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
             mdfk = dfk
@@ -580,8 +594,6 @@ for icount, key in enumerate(selkeys, start=1):
                 # データの正規化
                 dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"]
                 cols.append('rw_ratio') 
-                dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"]
-                cols.append('lw_ratio') 
                 dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"]
                 cols.append('eyes_ratio') 
                 dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
@@ -591,6 +603,8 @@ for icount, key in enumerate(selkeys, start=1):
                 dfk['hr_deg'] = dfk["hr_angle"]/180.0
                 cols.append('hr_deg')
                 '''
+                dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"]
+                cols.append('lw_ratio') 
                 dfk['sr_deg'] = dfk["sr_angle"]/180.0
                 cols.append('sr_deg')
                 dfk['se_deg'] = dfk["rse_angle"]/180.0
@@ -603,6 +617,9 @@ for icount, key in enumerate(selkeys, start=1):
                     dfk[col] = dfk[col].where(dfk[col] < 1.0)
             dfk.ffill(inplace=True)    # 欠測値を直前の値に置換する
             dfk.bfill(inplace=True)    # 欠測値を直後の値に置換する
+            if Eyes_ratio_threshold > 0.0:
+                dfk['eyes_ratio'] = dfk['eyes_ratio'].where(dfk['eyes_ratio'] > Eyes_ratio_threshold, Eyes_ratio_min)
+                dfk['eyes_ratio'] = dfk['eyes_ratio'].where(dfk['eyes_ratio'] == Eyes_ratio_min, Eyes_ratio_max)
         #
         # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
@@ -674,7 +691,7 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
-        else:                       # 学習用生データ
+        elif not m_compare:             # 学習用生データ
             # <one of kyudo_data >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name=key,
@@ -698,13 +715,14 @@ for icount, key in enumerate(selkeys, start=1):
                             )
         # < section/conf >
         if m_flg == True:
+            irow = irow if m_compare else 2
             #< label >
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                     name="label",
                                     y=mdf["label"], 
                                     marker_color= 'black',
                                     mode="markers"),
-                            row = 2, 
+                            row = irow,
                             col = 1   
                         )
             # < section >
@@ -712,7 +730,7 @@ for icount, key in enumerate(selkeys, start=1):
                                     name="section",
                                     y=mdf["section"],
                                     marker_color='grey'),
-                            row = 2, 
+                            row = irow, 
                             col = 1,
                             secondary_y=True
                         )
@@ -721,7 +739,7 @@ for icount, key in enumerate(selkeys, start=1):
                                     name="completed",
                                     y=mdf["completed"],
                                     marker_color='black'),
-                            row = 2, 
+                            row = irow, 
                             col = 1,
                             secondary_y=True
                         )
@@ -732,7 +750,7 @@ for icount, key in enumerate(selkeys, start=1):
                                         y=mdfk["predicted"], 
                                         marker_color= 'red',
                                         mode="markers"),
-                                row = 2, 
+                                row = irow, 
                                 col = 1   
                             )
         #signal
@@ -809,13 +827,20 @@ else:
         )
         if len(second_names) > 0:
             fig.update_yaxes(title_text=second_names[0], secondary_y=True, showgrid=False,
-                            row=1, col=1)
+                            row=2, col=1)
         fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
                             row=2, col=1)
         fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
+        if m_compare:
+            fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
+                                row=1, col=1)
+            fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
+                                row=1, col=1)
+            fig.update_traces(dict(showlegend = False), 
+                                row=1, col=1)
 #
 # <<< プロットの表示(open the figure in  web-browser) >>>
 #

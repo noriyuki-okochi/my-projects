@@ -122,7 +122,12 @@ Hyper_parameters = (Sequence_frames, \
 Learning_rate:float = 0.001  # 学習率   
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
-
+#
+Eyes_ratio_threshold:float = 0.0    # 目幅比率の閾値（補正しない場合は0.0に設定）
+Eyes_ratio_threshold = 0.055        # 目幅比率の閾値
+Eyes_ratio_max:float = 0.1          # 目幅比率の最大値
+Eyes_ratio_min:float = 0.01         # 目幅比率の最小値
+#
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
