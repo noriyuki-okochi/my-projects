@@ -447,10 +447,10 @@ class MyResult(Keypoint):
 class FeaturePdf:
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
-    Features_list_6 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
+    Features_list_60 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
                         'hr_ratio',\
                         'section','completed' ]
-    Kyudo_index_6   = { 4:'h', 8:'h', 20:'w',\
+    Kyudo_index_60   = { 4:'h', 8:'h', 20:'w',\
                         10:'h'}
     Features_list_61 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio',\
@@ -464,6 +464,12 @@ class FeaturePdf:
     Kyudo_index_7   = { 4:'h', 6:'h', 20:'w',\
                         10:'h', 11:'d'}
 
+    Features_list_70 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
+                        'hr_ratio', 'hr_deg',\
+                        'section','completed' ]
+    Kyudo_index_70   = { 4:'h', 8:'h', 20:'w',\
+                        10:'h', 11:'d'}
+
     Features_list_71 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'sr_ratio', 'sr_deg',\
                         'section','completed' ]
@@ -471,10 +477,10 @@ class FeaturePdf:
                         12:'h', 13:'d'}
 
 
-    Features_list_8 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+    Features_list_80 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'eyes_ratio', 'sr_deg', 'se_deg',\
                         'section','completed' ]
-    Kyudo_index_8   = { 4:'h', 8:'h', 10:'h',\
+    Kyudo_index_80   = { 4:'h', 8:'h', 10:'h',\
                         20:'w', 13:'d', 17:'d' }
 
     Features_list_81 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
@@ -483,11 +489,12 @@ class FeaturePdf:
     Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
                         8:'h', 10:'h', 11:'d' }
     
-    Features_index = { 6: (Features_list_6, Kyudo_index_6),
+    Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
                        7: (Features_list_7, Kyudo_index_7), 
+                       70: (Features_list_70, Kyudo_index_70), 
                        71: (Features_list_71, Kyudo_index_71), 
-                       8: (Features_list_8, Kyudo_index_8), 
+                       80: (Features_list_80, Kyudo_index_80), 
                        81: (Features_list_81, Kyudo_index_81) 
                        }
     
@@ -2168,7 +2175,7 @@ def main():
             params = paramstr.split('-')
             if len(params) == 3 and \
                params[0].isnumeric() and params[1].isnumeric() and params[2].isnumeric():
-                input_key = int(params[0])
+                input_dim = int(params[0])
                 seq_frames = int(params[1])
                 output_dim = int(params[2])               
             if len(params) == 5 and \

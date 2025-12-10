@@ -39,7 +39,7 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
 
 # 学習用データの読み込みリスト
 # ・データベースから読み込むSQL文のデータ項目名と別名
-Features_list_6 = ['rw_norm/box_h as rw_ratio',\
+Features_list_60 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
@@ -59,6 +59,13 @@ Features_list_7 = ['rw_norm/box_h as rw_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
+Features_list_70 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'section','completed'
+                ]
 Features_list_71 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
@@ -67,7 +74,7 @@ Features_list_71 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 
-Features_list_8 = ['rw_norm/box_h as rw_ratio',\
+Features_list_80 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
@@ -85,11 +92,12 @@ Features_list_81 = ['rw_norm/box_h as rw_ratio',\
                 ]
 #
 Features_lists = {
-    6: Features_list_6,
+    60: Features_list_60,
     61: Features_list_61,
     7: Features_list_7,
+    70: Features_list_70,
     71: Features_list_71,
-    8: Features_list_8,
+    80: Features_list_80,
     81: Features_list_81
     }
 
