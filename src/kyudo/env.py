@@ -34,7 +34,7 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
                 'eyes_norm', 'hips_norm'\
-                'tag1'
+                'tag1', 'tag2'
                 ]
 
 # 学習用データの読み込みリスト
@@ -131,8 +131,8 @@ Learning_rate:float = 0.001  # 学習率
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
 #
+Face_front_threshold:float = 0.055  # 顔の向きの閾値(tag1=1:正面,0:横)
 Eyes_ratio_threshold:float = 0.0    # 目幅比率の閾値（補正しない場合は0.0に設定）
-Eyes_ratio_threshold = 0.055        # 目幅比率の閾値
 Eyes_ratio_max:float = 0.1          # 目幅比率の最大値
 Eyes_ratio_min:float = 0.01         # 目幅比率の最小値
 #

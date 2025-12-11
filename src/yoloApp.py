@@ -458,22 +458,22 @@ class FeaturePdf:
     Kyudo_index_61   = { 4:'h', 6:'h', 20:'w',\
                         10:'h'}
 
-    Features_list_7 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+    Features_list_70 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
                         'section','completed' ]
-    Kyudo_index_7   = { 4:'h', 6:'h', 20:'w',\
+    Kyudo_index_70   = { 4:'h', 6:'h', 20:'w',\
                         10:'h', 11:'d'}
 
-    Features_list_70 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
+    Features_list_71 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
                         'section','completed' ]
-    Kyudo_index_70   = { 4:'h', 8:'h', 20:'w',\
+    Kyudo_index_71   = { 4:'h', 8:'h', 20:'w',\
                         10:'h', 11:'d'}
 
-    Features_list_71 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+    Features_list_72 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'sr_ratio', 'sr_deg',\
                         'section','completed' ]
-    Kyudo_index_71   = { 4:'h', 6:'h', 20:'w',\
+    Kyudo_index_72   = { 4:'h', 6:'h', 20:'w',\
                         12:'h', 13:'d'}
 
 
@@ -487,13 +487,13 @@ class FeaturePdf:
                         'rl_ratio', 'hr_ratio', 'hr_deg',\
                         'section','completed' ]
     Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
-                        8:'h', 10:'h', 11:'d' }
+                         8:'h', 10:'h', 11:'d' }
     
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
-                       7: (Features_list_7, Kyudo_index_7), 
                        70: (Features_list_70, Kyudo_index_70), 
                        71: (Features_list_71, Kyudo_index_71), 
+                       72: (Features_list_72, Kyudo_index_72), 
                        80: (Features_list_80, Kyudo_index_80), 
                        81: (Features_list_81, Kyudo_index_81) 
                        }
@@ -635,8 +635,11 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         # アクション発生後の経過時間（x10秒）
         act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
-        #print(f"act_sec={act_sec}")                   
-        
+        # 顔の向き（1/0=正面／横）
+        eyes_ratio = eyes_norm/box_w
+        face_front:int = 0 if eyes_ratio > 0.5 else \
+                    (1 if eyes_ratio > Face_front_threshold else 2)    
+        # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\
                     rw_norm, rw_angle,\
                     lw_norm, lw_angle,\
@@ -647,7 +650,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                     rew_angle, rse_angle,\
                     lew_angle, lse_angle,\
                     eyes_norm, hips_norm,\
-                    act_sec]
+                    face_front, act_sec]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  
     

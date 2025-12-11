@@ -578,6 +578,7 @@ for icount, key in enumerate(selkeys, start=1):
             if input_key_opt:
                 features = Features_lists[input_key]
                 features.append('label')
+                features.append('tag1')
                 cols = get_feature_colnames( features )
                 if section is None:
                     dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
@@ -725,6 +726,15 @@ for icount, key in enumerate(selkeys, start=1):
                             row = irow,
                             col = 1   
                         )
+            # < tag1:face>
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name = "face",
+                                        y = mdf["tag1"], 
+                                        mode = "lines"),
+                                row = irow, 
+                                col = 1,   
+                                secondary_y = False
+                        )
             # < section >
             fig = fig.add_trace( go.Bar(x=mdf.index, 
                                     name="section",
@@ -828,14 +838,14 @@ else:
         if len(second_names) > 0:
             fig.update_yaxes(title_text=second_names[0], secondary_y=True, showgrid=False,
                             row=2, col=1)
-        fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
+        fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
                             row=2, col=1)
         fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
         if m_compare:
-            fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
+            fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
                                 row=1, col=1)
             fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                                 row=1, col=1)
