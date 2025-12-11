@@ -52,21 +52,21 @@ Features_list_61 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 
-Features_list_7 = ['rw_norm/box_h as rw_ratio',\
+Features_list_70 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
-Features_list_70 = ['rw_norm/box_h as rw_ratio',\
+Features_list_71 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
-Features_list_71 = ['rw_norm/box_h as rw_ratio',\
+Features_list_72 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'sr_norm/box_h as sr_ratio',\
@@ -94,9 +94,9 @@ Features_list_81 = ['rw_norm/box_h as rw_ratio',\
 Features_lists = {
     60: Features_list_60,
     61: Features_list_61,
-    7: Features_list_7,
     70: Features_list_70,
     71: Features_list_71,
+    72: Features_list_72,
     80: Features_list_80,
     81: Features_list_81
     }
