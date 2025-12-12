@@ -46,9 +46,9 @@ Features_list_60 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 Features_list_61 = ['rw_norm/box_h as rw_ratio',\
-                'lw_norm/box_h as lw_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
+                'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -122,6 +122,7 @@ Sample_lag:int = 7
 Sequence_frames:int = 96    # 入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
+Face_dim:int = 4       # 顔向き埋め込みベクトルの次元数
 Section_dim:int = 8
 Completed_dim:int = 4
 Hyper_parameters = (Sequence_frames, \
