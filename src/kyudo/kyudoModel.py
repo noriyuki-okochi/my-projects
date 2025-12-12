@@ -32,8 +32,10 @@ class KyudoRNN(nn.Module):
 #
 class KyudoGRU(nn.Module):
   def __init__(self, input_size, hidden_size, n_layers,
+               face_vocab_size=3,
                section_vocab_size=10,
                completed_vocab_size=3,
+               face_embed_dim=4,
                section_embed_dim=8,
                completed_embed_dim=4):
     super(KyudoGRU, self).__init__() 
@@ -46,14 +48,17 @@ class KyudoGRU(nn.Module):
     self.hidden_size = hidden_size 
     self.embed = False
     if section_embed_dim is not None:
-      self.embed = True
-      self.section_embed = nn.Embedding(section_vocab_size, section_embed_dim)
-      self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
-
-      # GRU入力サイズ：YOLO解析ベクトル + section埋め込み + completed埋め込み
-      self.gru_input_size = (input_size - 2) + section_embed_dim + completed_embed_dim
+        self.embed = True
+        self.face_embed = None
+        self.section_embed = nn.Embedding(section_vocab_size, section_embed_dim)
+        self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
+        # GRU入力サイズ：YOLO解析ベクトル + section埋め込み + completed埋め込み
+        self.gru_input_size = (input_size - 2) + section_embed_dim + completed_embed_dim
+        if face_embed_dim is not None:
+            self.face_embed = nn.Embedding(face_vocab_size, face_embed_dim)
+            self.gru_input_size = (self.gru_input_size - 1) + face_embed_dim
     else:
-      self.gru_input_size = input_size
+        self.gru_input_size = input_size
     #    
     self.gru = nn.GRU(self.gru_input_size, hidden_size, n_layers, batch_first=True)
   
@@ -107,11 +112,13 @@ class KyudoGRU(nn.Module):
 #
 class KyudoGRUs(KyudoGRU):
   def __init__(self, input_size=7, hidden_size=64, output_size=3, n_layers=1,
-                section_vocab_size=10, completed_vocab_size=3,
-                section_embed_dim=8, completed_embed_dim=4):
+                face_vocab_size=3, section_vocab_size=10, completed_vocab_size=3,
+                face_embed_dim=4, section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers,
+                                    face_vocab_size=face_vocab_size,
                                     section_vocab_size=section_vocab_size,
                                     completed_vocab_size=completed_vocab_size,
+                                    face_embed_dim=face_embed_dim,
                                     section_embed_dim=section_embed_dim,
                                     completed_embed_dim=completed_embed_dim) 
     #
@@ -130,23 +137,35 @@ class KyudoGRUs(KyudoGRU):
 
     #section_no = int(x[0, -1, -2])          # section
     if self.embed is True:
-      section_ids   = x[:, -1, -2].long()     # [batch]
-      completed_ids = x[:, -1, -1].long()     # [batch]
+        section_ids   = x[:, -1, -2].long()     # [batch]
+        completed_ids = x[:, -1, -1].long()     # [batch]
 
-      # 埋め込み 
-      section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
-      completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
-      # 時系列全体に複製
-      section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
-      completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
+        # 埋め込み 
+        section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
+        completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
+        # 時系列全体に複製
+        section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
+        completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
 
-      # YOLO解析ベクトルのみ抽出
-      featues_size -= 2
-      yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
-      # 結合してGRUへ
-      x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+        if self.face_embed is not None:
+            face_ids = x[:, -1, -3].long()               # [batch]
+            face_emb = self.face_embed(face_ids)         # [batch, face_embed_dim]
+            face_emb_expanded = face_emb.unsqueeze(1).repeat(1, seq_len, 1)
+            # YOLO解析ベクトルのみ抽出
+            featues_size -= 3
+            yolo_features = x[:, :, :featues_size]       # [batch, seq_len, 4]
+            # 結合してGRUへ
+            x_concat = torch.cat([yolo_features, face_emb_expanded, \
+                                  section_emb_expanded, completed_emb_expanded], dim=-1)
+        else:
+            # YOLO解析ベクトルのみ抽出
+            featues_size -= 2
+            yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
+            # 結合してGRUへ
+            x_concat = torch.cat([yolo_features, \
+                                  section_emb_expanded, completed_emb_expanded], dim=-1)
     else:
-      x_concat = x
+        x_concat = x
     #
     inith = self.init_hidden(batch_size)
     _, hidden = self.gru( x_concat, inith )
@@ -158,11 +177,13 @@ class KyudoGRUs(KyudoGRU):
 #
 class KyudoGRUm(KyudoGRU):
   def __init__(self, input_size=7, hidden_size=64, output_size=3, n_layers=1,
-               section_vocab_size=10, completed_vocab_size=3,
-               section_embed_dim=8, completed_embed_dim=4):
+               face_vocab_size=3, section_vocab_size=10, completed_vocab_size=3,
+               face_embed_dim=4, section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers,
+                                    face_vocab_size=face_vocab_size, 
                                     section_vocab_size=section_vocab_size, 
                                     completed_vocab_size=completed_vocab_size,
+                                    face_embed_dim=face_embed_dim, 
                                     section_embed_dim=section_embed_dim, 
                                     completed_embed_dim=completed_embed_dim) 
     self.output_size = output_size
@@ -185,23 +206,35 @@ class KyudoGRUm(KyudoGRU):
 
     #
     if self.embed is True:
-      section_ids   = x[:, -1, -2].long()     # [batch]
-      completed_ids = x[:, -1, -1].long()     # [batch]
+        section_ids   = x[:, -1, -2].long()     # [batch]
+        completed_ids = x[:, -1, -1].long()     # [batch]
 
-      # 埋め込み 
-      section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
-      completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
-      # 時系列全体に複製
-      section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
-      completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
-
-      # YOLO解析ベクトルのみ抽出
-      featues_size -= 2
-      yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
-      # 結合してGRUへ
-      x_concat = torch.cat([yolo_features, section_emb_expanded, completed_emb_expanded], dim=-1)
+        # 埋め込み 
+        section_emb = self.section_embed(section_ids)       # [batch, section_embed_dim]
+        completed_emb = self.completed_embed(completed_ids) # [batch, completed_embed_dim]
+        # 時系列全体に複製
+        section_emb_expanded = section_emb.unsqueeze(1).repeat(1, seq_len, 1)
+        completed_emb_expanded = completed_emb.unsqueeze(1).repeat(1, seq_len, 1)
+        
+        if self.face_embed is not None:
+            face_ids = x[:, -1, -3].long()               # [batch]
+            face_emb = self.face_embed(face_ids)         # [batch, face_embed_dim]
+            face_emb_expanded = face_emb.unsqueeze(1).repeat(1, seq_len, 1)
+            # YOLO解析ベクトルのみ抽出
+            featues_size -= 3
+            yolo_features = x[:, :, :featues_size]       # [batch, seq_len, 4]
+            # 結合してGRUへ
+            x_concat = torch.cat([yolo_features, face_emb_expanded, \
+                                  section_emb_expanded, completed_emb_expanded], dim=-1)
+        else:
+            # YOLO解析ベクトルのみ抽出
+            featues_size -= 2
+            yolo_features = x[:, :, :featues_size]  # [batch, seq_len, 5]
+            # 結合してGRUへ
+            x_concat = torch.cat([yolo_features, \
+                                  section_emb_expanded, completed_emb_expanded], dim=-1)
     else:
-      x_concat = x   
+        x_concat = x   
     #
     # 連続するセクション（ブロック単位）情報を作成   
     blocks =[]
