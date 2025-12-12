@@ -452,11 +452,11 @@ class FeaturePdf:
                         'section','completed' ]
     Kyudo_index_60   = { 4:'h', 8:'h', 20:'w',\
                         10:'h'}
-    Features_list_61 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
-                        'hr_ratio',\
+    Features_list_61 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'face',\
                         'section','completed' ]
-    Kyudo_index_61   = { 4:'h', 6:'h', 20:'w',\
-                        10:'h'}
+    Kyudo_index_61   = { 4:'h', 8:'h', 10:'h',\
+                        22:''}
 
     Features_list_70 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
@@ -533,10 +533,12 @@ class FeaturePdf:
                                             else Eyes_ratio_max
             elif c == 'd': # degreeで正規化
                 self.features_list[i] = self.kyudo_data_list[idx]/180.0
+            else:          # 正規化なし
+                self.features_list[i] = self.kyudo_data_list[idx]
                 
             #  正規化後の値が1.0を超えた場合、エラーコード（リスト番号）を返す
             #  ー＞　直前の特徴量データを採用する
-            if self.features_list[i] > 1.0:
+            if c != '' and self.features_list[i] > 1.0:
                 if pre_features_list[i] is None or pre_features_list[i] > 1.0:
                     # 直前の特徴量データも不正な場合、エラーコード（リスト番号）を返す
                     return (i + 1)   
@@ -549,7 +551,9 @@ class FeaturePdf:
         #
         self.features_list[i] = section_no                          # section
         i += 1
-        self.features_list[i] = completed                           # completed   
+        self.features_list[i] = 1 if completed else 0               # completed 
+          
+        mylog.log(DEBUG, f"[set_current_pdf]: {self.features_list}")
         
         narray = np.array(self.features_list).reshape(1, -1)
         self.curPdf = pd.DataFrame(narray, columns=column_names)
@@ -635,7 +639,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         # アクション発生後の経過時間（x10秒）
         act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
-        # 顔の向き（1/0=正面／横）
+        # 顔の向き（0/1/2=不定／正面／横）
         eyes_ratio = eyes_norm/box_w
         face_front:int = 0 if eyes_ratio > 0.5 else \
                     (1 if eyes_ratio > Face_front_threshold else 2)    
@@ -2154,11 +2158,12 @@ def main():
     
     model_pth = None
     input_key = Input_key
+    face_embed = False
     input_dim = Num_input
     output_dim = Num_classes
     seq_frames = Num_frames
     _, _, _, section_dim, completed_dim = Hyper_parameters
-    
+        
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
         i = args.index('-gru')
@@ -2192,11 +2197,13 @@ def main():
             params = num_opts[0].split('=')
             if len(params) == 2 and params[1].isnumeric():
                 input_key = int(params[1])
-                if input_key < 6 or input_key > 8:
-                    print("入力次元数は6～8の範囲で指定してください")
+                if input_key <= 60 or input_key >= 99:
+                    print("入力次元数は60～99範囲で指定してください")
                     return
+        face_embed = True if 'face' in get_feature_colnames(Features_lists[input_key]) else False
+        print(f"[main]:Input_feature_key = {input_key}, face_embed={face_embed}")
+        
         # 特徴量データフレームのインスタンス作成
-        print(f"[main]:Input_feature_key = {input_key}")
         InputPdf = FeaturePdf(input_key, seq_frames)
         input_dim = InputPdf.input_dim
         # ゼロデータで初期化
@@ -2511,11 +2518,13 @@ def main():
             parts =model_pth.split('_') 
             if 'modelse' in parts:
                 model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
+                                face_embed_dim = Face_dim if face_embed else None,
                                 section_embed_dim = section_dim,
                                 completed_embed_dim = completed_dim )
             elif 'modelme' in parts:
                 model_gru = KyudoGRUm( input_size = input_dim, output_size = output_dim,
                                 hidden_size=32,
+                                face_embed_dim = Face_dim if face_embed else None,
                                 section_embed_dim = section_dim,
                                 completed_embed_dim = completed_dim )
             else:

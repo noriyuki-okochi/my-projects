@@ -224,7 +224,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #  学習用データの読み込み
     features = Features_lists[input_key]
     input_dim = len(features)
-    log_write(f"[kyudoApp]:input_dim={input_dim}")
+    face_embed:bool = True if 'face' in get_feature_colnames(features) else False
+    log_write(f"[kyudoApp]:input_dim={input_dim}, face_embed={face_embed}")
     log_write(f"[kyudoApp]:features:{features}")
     if section is None:
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
@@ -237,6 +238,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     for col in df_x.columns:
         if '_ratio' in col :
             df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測値(NaN)に置換する
+        
     df_x.ffill(inplace=True)    # 欠測値を直前の値に置換する
     df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する 
     if Eyes_ratio_threshold > 0.0:
@@ -285,6 +287,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         log_write(f"[kyudoApp]:hidden_size={HiddenS_size}")
         model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
                           hidden_size = HiddenS_size,
+                          face_embed_dim = Face_dim if face_embed else None,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
@@ -292,6 +295,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         log_write(f"[kyudoApp]:hidden_size={HiddenM_size}")
         model = KyudoGRUm( input_size = input_dim, output_size = num_classes,
                           hidden_size = HiddenM_size,
+                          face_embed_dim = Face_dim if face_embed else None,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
