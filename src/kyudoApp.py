@@ -655,6 +655,7 @@ for icount, key in enumerate(selkeys, start=1):
         #
         if key == 'all':        # 学習データの入力項目プロット
             for name in cols:
+                if name == 'face': continue    # faceは除外
                 secondary:bool = True if 'deg' in name else False
                 try :
                     fig = fig.add_trace( go.Scatter(x=mdfk.index, 
