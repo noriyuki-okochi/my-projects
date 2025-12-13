@@ -14,17 +14,18 @@ ERROR = logging.ERROR
 # local package
 from kyudo.env import * 
 
-LOG_FILE_MODE = 'a'
+LOG_FILE_MODE = 'w'
 CSV_FILE_MODE = 'a'
 LOSS_FILE_MODE = 'w'
 
 ulog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('kyudo_util.log', mode=LOG_FILE_MODE)  # ログファイルの設定
+filehandler = logging.FileHandler('kyudoApp.log', mode=LOG_FILE_MODE)  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
 ulog.addHandler(filehandler)  # ログハンドラを追加
-ulog.setLevel(DEBUG)  # ログレベルの設定
+ulog.setLevel(DEBUG)    # ログレベルの設定
+ulog.setLevel(INFO)     # ログレベルの設定
 DF2CSV_enabled = True
 
 # モデル保存用のファイル名
