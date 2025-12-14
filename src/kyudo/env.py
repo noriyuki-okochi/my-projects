@@ -61,9 +61,9 @@ Features_list_70 = ['rw_norm/box_h as rw_ratio',\
                 ]
 Features_list_71 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 Features_list_72 = ['rw_norm/box_h as rw_ratio',\

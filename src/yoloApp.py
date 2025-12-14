@@ -464,11 +464,11 @@ class FeaturePdf:
     Kyudo_index_70   = { 4:'h', 6:'h', 20:'w',\
                         10:'h', 11:'d'}
 
-    Features_list_71 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
-                        'hr_ratio', 'hr_deg',\
+    Features_list_71 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'hr_deg', 'face',\
                         'section','completed' ]
-    Kyudo_index_71   = { 4:'h', 8:'h', 20:'w',\
-                        10:'h', 11:'d'}
+    Kyudo_index_71   = { 4:'h', 8:'h', 10:'h',\
+                        11:'d', 22:''}
 
     Features_list_72 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'sr_ratio', 'sr_deg',\
@@ -921,7 +921,6 @@ def section_completed(section_no, myResult:MyResult):
     # 1-Asi-bumi
     if section_no == 1:  
         if Step_counter == 0:
-            lenY, _ = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算
             conf= keyPoints.conf('left_eye')       
             mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f}), conf={conf:.2f}")
             mylog.log(INFO, f">>>   [  lenY > {int(thsd(PRM[0]))} and conf > {PRM[1]:.2f} ]")
@@ -990,6 +989,13 @@ def section_completed(section_no, myResult:MyResult):
                         if (Step_counter%10) == PRM[6]: completed = True         #５回保持
             else:
                 Step_counter = int(Step_counter/10)*10 + 1 # 連続回数をリセット
+        #
+        if not completed and Step_counter >= 10:
+            mylog.log(INFO, f">>>   [ lenY < {int(thsd(PRM[7]))} ]")            
+            Stkp.push( [(7,PRM[7])] )  
+            if lenY < thsd(PRM[7]):
+                # 目の間隔が狭くなる（箆調べ）
+                completed = True
                         
     # 3-Yu-gamae            
     elif section_no == 3:  
@@ -1490,7 +1496,8 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                     # 動作の完了を判定
                     Section_no, Completed = manual_analize_completed(Section_no, myResult)
             #
-            Db.section = Section_no        # トラッキングデータのセクション番号を設定              
+            Db.section = Section_no                 # トラッキングデータのセクション番号を設定 
+            Db.step_counter = Step_counter          # トラッキングデータのセクション内の動作カウンターを設定             
             Db.completed = 1 if Completed else 0
 
             if Tracking_enabled:
