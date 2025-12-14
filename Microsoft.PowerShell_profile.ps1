@@ -2,18 +2,18 @@ f:
 set-location share/YOLO
 # プロファイルの表示
 write-output $profile
-# 環境変数の設定
-$env:INPUT_KEY="60"
-$inputkey = $env:INPUT_KEY
 #
 write-output 'Hellow YOLO!!'
 write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンスが表示されます。'
 write-output '> yolo   -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／プロットツール'
 write-output '> kyudo  -help		：解析学習・予測／プロットツール'
+# 環境変数の設定
+$env:INPUT_KEY="61"
+$inputkey = $env:INPUT_KEY
 # モデルオプション設定
-$modelx = "-models"
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
+$modelx = "-models"
 $modelx = "-modelm"
 #
 # ハイパーパラメータ設定
@@ -35,6 +35,7 @@ $cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3"
 $cases_list = "iijima_1.7s1-6-3", "anbe_1.7s2-6-3","iwata_1.7s1-6-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
 $cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
+$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
 write-output '>>' 
 $str = '・モデルオプション  ：  ' + $modelx
 write-output $str
@@ -49,12 +50,14 @@ function yolo {
     param(
         [switch]$help,
         [switch]$h,
-        [switch]$all,
+        [switch]$update,
+        [switch]$man,
         [switch]$raw,
         [switch]$clip,
         [string]$case,
         [string]$gru
     )
+    $param_id = '1.7-s'
     $no=1
     $slevel=''
     $idx = $args.IndexOf("-level")
@@ -82,9 +85,10 @@ function yolo {
     #
     if ($help) {
         write-output '・コマンド -オプション'
+        write-output '>yolo  -update -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -raw		：選択した動画ファイルを再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yolo  -all [-level <no>]：選択した動画の射形を解析しながら再生する（no:解析レベル {1|2|3}）'
+        write-output '>yolo  -man [-level <no>]：選択した動画の射形を解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -case "<登録ケース名>" [-level <no>]：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
         write-output '>yolo  -gru  "<GRUモデルファイル名>|-" [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output '>yolo  -h		：コマンドの詳細パラメータを表示する'
@@ -107,7 +111,10 @@ function yolo {
     elseif ($h) {
         python ./src/yoloApp.py -h
     } 
-    elseif ($all) {
+    elseif ($update) {
+        python ./src/yoloApp.py -d1 -I $param_id $slevel
+    }
+    elseif ($man) {
         python ./src/yoloApp.py -d1 -a -m $slevel --
     }
     elseif ($raw) {
@@ -222,7 +229,7 @@ function kyudo {
         python ./src/kyudoApp.py -d   -case $delete  -D
     }
     elseif ($import -ne '') {
-        python ./src/kyudoApp.py -d inputkey=8 -case $import -import -f0 0 -m
+        python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -f0 0 -m
     }    
     elseif ($case -ne '') {
         python ./src/kyudoApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m 
