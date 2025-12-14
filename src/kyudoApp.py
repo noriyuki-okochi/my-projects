@@ -845,7 +845,7 @@ else:
                             row=2, col=1)
         fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
                             row=2, col=1)
-        fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
+        fig.update_yaxes(title_text="section-no/completed", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
