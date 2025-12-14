@@ -21,8 +21,10 @@ class MyDb:
         self.case_name = 'none'
         self.frame_no = 0
         self._section = 0
+        self._step_counter = 0
         self._completed = 0
         self.section = 0
+        self.step_counter = 0
         self.completed = 0
         self.csvpath1 = ''        # trcking_data用CSV出力ファイルパス
         self.csvfile1 = None
