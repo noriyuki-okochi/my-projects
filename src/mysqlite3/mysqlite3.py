@@ -12,7 +12,7 @@ from  kyudo.env import *
 # Private API Class for sqlite3from env import *
 #
 class MyDb:
-    def __init__(self, dbpath='./yolo-tracking.db'):
+    def __init__(self, dbpath='./yolo-kyudo.db'):
         self.dbpath = dbpath
         self.conn = sqlite3.connect(dbpath, check_same_thread=False)    # open database
         self.conn.row_factory = sqlite3.Row

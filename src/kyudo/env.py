@@ -4,7 +4,7 @@ import numpy as np
 ##############################
 # 共通定数
 ##############################
-DB_PATH = './yolo-tracking.db'
+DB_PATH = './yolo-kyudo.db'
 PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
 #   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
 
