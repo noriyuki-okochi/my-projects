@@ -56,7 +56,7 @@ key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
+    print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>'] [-D(elete)|-R(name)]}  [-import [<csv-file-path>]] \n"\
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -134,6 +134,13 @@ if len(case_names) > 0 and '-D' in opts:
     #
     for name in case_names:
         delete_frame_info(db, name)
+    exit(0)
+
+if case_compare and '-R' in opts:
+    #
+    # 登録済ケース名の変更(関連テーブルも変更)
+    #
+    rename_frame_info(db, case_names[0], case_names[1])
     exit(0)
     
 if len(case_names) == 0:

@@ -128,6 +128,42 @@ class MyDb:
             ret = True
         return ret
  
+#
+# delete records from any table by case_name without commit
+#
+    def delete_case_records(self, tbl, case_name):
+        rcnt = None
+        sql = f"delete from {tbl} where case_name = '{case_name}'"
+        try:
+            self.cur.execute(sql)
+            rcnt = self.cur.rowcount
+            self.conn.commit()
+        except Exception as e:
+            print(f"[delete_case_records]:error: {e}")
+        return rcnt
+#
+# copy records from any table by case_name, and rename to to_name
+#
+    def copy_case(self, tbl, from_name, to_name):
+        df = pandas.read_sql_query(f"SELECT * FROM {tbl} WHERE case_name='{from_name}'", self.conn)
+        i = -1
+        print(f"[copy_case]:info: {tbl} df:{df.shape}")
+        rcnt = df.shape[0]
+        if rcnt > 0:
+            try:
+                df['case_name'] = to_name
+                i = df.to_sql(tbl, self.conn, if_exists='append', index=None, method='multi', chunksize=1024)
+            except Exception as e:
+                print(f"[copy_case]:error: {e}")
+                i = -1
+            else:
+                print(f"[copy_case]:info: copied {i} records.")
+                if i != rcnt:
+                    print(f"[copy_case]:error: copy count mismatch. from='{from_name}' to='{to_name}'")
+        else:
+            print(f"[copy_case]:info: case_name='{from_name}' not found.")
+        return None if i == -1 else i if i == rcnt else (-1)*i 
+#
 # insert tracking-data.(db)
 #
     def insert_tracking_data(self, data_list):
@@ -411,5 +447,4 @@ class MyDb:
             #
             act_param_tbl['param'].append(raw_vals)
         return rec_count
-#
 #eof
