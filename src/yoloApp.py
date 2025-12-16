@@ -2258,7 +2258,8 @@ def main():
         if fps is not None:
             print(f"> '{case_name}' already registered. Are you sure?[y/n].")
             ans = input('>>')
-            if ans != 'y': Tracking_only = False
+            if ans == 'y': delete_frame_info(Db, case_name)                
+            else: Tracking_only = False
     #
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
