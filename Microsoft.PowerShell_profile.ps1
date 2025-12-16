@@ -9,12 +9,12 @@ write-output '> yolo   -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／プロットツール'
 write-output '> kyudo  -help		：解析学習・予測／プロットツール'
 # 環境変数の設定
-$env:INPUT_KEY="61"
+$env:INPUT_KEY="81"
 $inputkey = $env:INPUT_KEY
 # モデルオプション設定
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
-$modelx = "-models"
 $modelx = "-modelm"
+$modelx = "-models"
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -88,10 +88,10 @@ function yolo {
         write-output '>yolo  -update -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -raw		：選択した動画ファイルを再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yolo  -man [-level <no>]：選択した動画の射形を解析しながら再生する（no:解析レベル {0|1|2|3}）'
-        write-output '>yolo  -case "<登録ケース名>" [-level <no>]：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
-        write-output '>yolo  -gru  "<GRUモデルファイル名>|-" [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
-        write-output '>yolo  -h		：コマンドの詳細パラメータを表示する'
+        write-output '>yolo  -man  [-level <no>]                ：選択した動画の射形を解析しながら再生する（no:解析レベル {0|1|2|3}）'
+        write-output '>yolo  -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
+        write-output '>yolo  -gru  {<GRUモデルファイル名>|-} [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
+        write-output '>yolo  -h         ：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
         write-output ' 0 :解析開始'
@@ -159,9 +159,9 @@ function chart {
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>chart  -list				：登録済ケース名の一覧を表示する'
-        write-output '>chart  -import "<登録ケース名>"                ：解析結果ポイントデータファイルのデータをデータベースに登録する'
-        write-output '>chart  -case "<登録ケース名>" [-key <データ名>] ：解析結果ポイントデータをグラフ表示する'
-        write-output '>chart  -h				：コマンドの詳細パラメータを表示する'
+        write-output '>chart  -import <登録ケース名>                ：解析結果ポイントデータファイルのデータをデータベースに登録する'
+        write-output '>chart  -case   <登録ケース名> [-key <データ名>] ：解析結果ポイントデータをグラフ表示する'
+        write-output '>chart  -h	  ：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
         python ./src/chart.py -h
@@ -191,6 +191,8 @@ function kyudo {
         [switch]$multi,
         [switch]$list,
         [string]$delete,
+        [string]$rename='',
+        [string]$to='',
         [string]$import,
         [string]$case,
         [string]$train,
@@ -211,13 +213,14 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list				：登録済ケース名の一覧を表示する'
-        write-output '>kyudo  -deletet  "<登録ケース名>"	：登録ケース名、データファイルを削除する'
-        write-output '>kyudo  -import  "<登録ケース名>" 	：解析結果データファイルのデータをデータベースに登録する'
-        write-output '>kyudo  -case "<登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]"   ：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train "<登録ケース名>" [-section] [-multi] [-model <モデルファイル>]         ：解析結果データで学習する'
-        write-output '>kyudo  -predict "<登録ケース名>" [-multi] -model <モデルファイル>        	      ：解析結果データで予測する'
-        write-output '>kyudo  -h				：コマンドの詳細パラメータを表示する'
+        write-output '>kyudo  -list		：登録済ケース名の一覧を表示する'
+        write-output '>kyudo  -deletet <登録ケース名>	                   ：登録ケース名、データファイルを削除する'
+        write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>    ：登録ケース名をリネームする'
+        write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
+        write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]   ：解析結果データをグラフ表示する'
+        write-output '>kyudo  -train   <登録ケース名> [-section] [-multi] [-model <モデルファイル>]         ：解析結果データで学習する'
+        write-output '>kyudo  -predict <登録ケース名> [-multi] -model <モデルファイル>        	      ：解析結果データで予測する'
+        write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
         python ./src/kyudoApp.py -h
@@ -226,7 +229,10 @@ function kyudo {
         python ./src/kyudoApp.py  -d -case -L
     } 
     elseif ($delete -ne '') {
-        python ./src/kyudoApp.py -d   -case $delete  -D
+        python ./src/kyudoApp.py -d -case $delete -D
+    }
+    elseif ($rename -ne '' -and $to -ne '') {
+        python ./src/kyudoApp.py -d -case $rename,$to -R
     }
     elseif ($import -ne '') {
         python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -f0 0 -m
