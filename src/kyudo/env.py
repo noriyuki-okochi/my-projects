@@ -90,6 +90,16 @@ Features_list_81 = ['rw_norm/box_h as rw_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
+
+Features_list_90 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'tag1 as face',\
+                'section','completed'
+                ]
 #
 Features_lists = {
     60: Features_list_60,
@@ -98,7 +108,8 @@ Features_lists = {
     71: Features_list_71,
     72: Features_list_72,
     80: Features_list_80,
-    81: Features_list_81
+    81: Features_list_81,
+    90: Features_list_90
     }
 
 # 入力データの次元数

@@ -488,6 +488,14 @@ class FeaturePdf:
                         'section','completed' ]
     Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
                          8:'h', 10:'h', 11:'d' }
+
+    Features_list_90 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
+                        'rl_ratio', 'hr_ratio', 'hr_deg', \
+                        'face', \
+                        'section','completed' ]
+    Kyudo_index_90   = { 4:'h', 6:'h', 20:'w',\
+                         8:'h', 10:'h', 11:'d',\
+                         22:'' }
     
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
@@ -495,7 +503,8 @@ class FeaturePdf:
                        71: (Features_list_71, Kyudo_index_71), 
                        72: (Features_list_72, Kyudo_index_72), 
                        80: (Features_list_80, Kyudo_index_80), 
-                       81: (Features_list_81, Kyudo_index_81) 
+                       81: (Features_list_81, Kyudo_index_81), 
+                       90: (Features_list_90, Kyudo_index_90) 
                        }
     
     def __init__(self, input_key:int=Input_key, seq_frames:int=Num_frames):
@@ -643,6 +652,9 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         eyes_ratio = eyes_norm/box_w
         face_front:int = 0 if eyes_ratio > 0.5 else \
                     (1 if eyes_ratio > Face_front_threshold else 2)    
+        if Section_no >= 4 and Section_no <= 8:
+            # 打ちお越しー＞残身は顔の向きを横に固定
+            face_front = 2
         # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\
                     rw_norm, rw_angle,\
