@@ -9,8 +9,8 @@ write-output '> yolo   -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／プロットツール'
 write-output '> kyudo  -help		：解析学習・予測／プロットツール'
 # 環境変数の設定
-$env:INPUT_KEY="81"
-$inputkey = $env:INPUT_KEY
+$env:INPUT_KEY="90"
+$global:inputkey = $env:INPUT_KEY
 # モデルオプション設定
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
 $modelx = "-modelm"
@@ -35,6 +35,8 @@ $cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3"
 $cases_list = "iijima_1.7s1-6-3", "anbe_1.7s2-6-3","iwata_1.7s1-6-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
 $cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
+$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
+$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
 write-output '>>' 
 $str = '・モデルオプション  ：  ' + $modelx
@@ -46,6 +48,30 @@ write-output $str
 $str = '・登録済ケース名一覧： ' + $cases_list 
 Write-Output $str
 
+function inputkey {
+    param(
+        [switch]$help,
+        [int]$set=0
+    )
+    if ($help) {
+        write-output '・コマンド -オプション'
+        write-output '>inputkey -set <input_key>    ：データ入力キーを設定する'
+        write-output '>inputkey		    ：データ入力キー（環境変数）、ケースリスト（グローバル変数）を表示する'
+    }
+    else {
+        if ( $set -le 0 ) {
+            $str =  'INPUT_KEY : ' + $env:INPUT_KEY 
+            write-output $str
+            $str = 'cases_list: ' + $cases_list
+            write-output $str
+            return
+        }
+        $env:INPUT_KEY="$set"
+        $inputkey = $env:INPUT_KEY
+        $str = '・入力データキーが ' + $inputkey + ' に設定されました。'
+        write-output $str
+    }   
+}
 function yolo {
     param(
         [switch]$help,
