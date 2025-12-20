@@ -9,12 +9,12 @@ write-output '> yolo   -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／プロットツール'
 write-output '> kyudo  -help		：解析学習・予測／プロットツール'
 # 環境変数の設定
-$env:INPUT_KEY="90"
-$global:inputkey = $env:INPUT_KEY
+$env:INPUT_KEY="71"
+$inputkey = $env:INPUT_KEY
 # モデルオプション設定
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
-$modelx = "-modelm"
-$modelx = "-models"
+$env:MODEL_TYPE="-models"
+$modelx = $env:MODEL_TYPE
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -48,28 +48,51 @@ write-output $str
 $str = '・登録済ケース名一覧： ' + $cases_list 
 Write-Output $str
 
-function inputkey {
+function model {
     param(
         [switch]$help,
-        [int]$set=0
+        [string]$type='',
+        [int]$key=0
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>inputkey -set <input_key>    ：データ入力キーを設定する'
-        write-output '>inputkey		    ：データ入力キー（環境変数）、ケースリスト（グローバル変数）を表示する'
+        write-output '>model -type <model_type>  ：モデルタイプ(s/m)を設定する'
+        write-output '>model -key <input_key>    ：データ入力キーを設定する'
+        write-output '>model		    ：モデルタイプ（グローバル変数）、データ入力キー（環境変数）、ケースリスト（グローバル変数）を表示する'
     }
     else {
-        if ( $set -le 0 ) {
+        if ( $type -ne '' ) {
+            if ( $type -eq 's' ) {
+                $env:MODEL_TYPE="-models"
+                $modelx = $env:MODEL_TYPE
+                $str = '・モデルタイプがシングルヘッド(' + $modelx + ')に設定されました。'
+                write-output $str
+            }
+            elseif ( $type -eq 'm' ) {
+                $env:MODEL_TYPE="-modelm"
+                $modelx = $env:MODEL_TYPE
+                $str = '・モデルタイプがマルチヘッド(' + $modelx + ')に設定されました。'
+                write-output $str
+            }
+            else {
+                $str = '不正なモデルタイプが指定されました。：' + $type
+                write-output $str
+            }
+        }
+        elseif ( $key -gt 0 ) {
+            $env:INPUT_KEY="$key"
+            $inputkey = $env:INPUT_KEY
+            $str = '・入力データキーが ' + $inputkey + ' に設定されました。'
+            write-output $str
+        }
+        else{
+            $str =  'model-type: ' + $env:MODEL_TYPE 
+            write-output $str
             $str =  'INPUT_KEY : ' + $env:INPUT_KEY 
             write-output $str
             $str = 'cases_list: ' + $cases_list
             write-output $str
-            return
         }
-        $env:INPUT_KEY="$set"
-        $inputkey = $env:INPUT_KEY
-        $str = '・入力データキーが ' + $inputkey + ' に設定されました。'
-        write-output $str
     }   
 }
 function yolo {
@@ -91,8 +114,8 @@ function yolo {
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
         $no=-1
         if ( [int]::TryParse($args[$idx+1],[ref]$no) ){}
-        if ( $no -lt 1 -or $no -gt 3 ) {
-            $msg = '解析レベルには1～3の数値を指定してください: ' + $args[$idx+1]
+        if ( $no -lt 0 -or $no -gt 3 ) {
+            $msg = '解析レベルには0～3の数値を指定してください: ' + $args[$idx+1]
             write-output $msg
             return
         }
@@ -225,8 +248,12 @@ function kyudo {
         [switch]$section,
         [string]$predict,
         [int]$input_frames = 0,
-        [int]$input_key = $inputkey
+        [string]$input_key = ''
     )
+    if ( $input_key -eq '' ) {
+        $input_key = $env:INPUT_KEY
+    }
+    $modelx = $env:MODEL_TYPE
     if ($multi) {
         $modelx = "-modelm"
         $s = 96     # シーケンス長
