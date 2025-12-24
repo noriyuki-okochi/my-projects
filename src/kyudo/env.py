@@ -4,7 +4,7 @@ import numpy as np
 ##############################
 # 共通定数
 ##############################
-DB_PATH = './yolo-tracking.db'
+DB_PATH = './yolo-kyudo.db'
 PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
 #   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
 
@@ -34,39 +34,82 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
                 'eyes_norm', 'hips_norm'\
-                'tag1'
+                'tag1', 'tag2'
                 ]
 
 # 学習用データの読み込みリスト
 # ・データベースから読み込むSQL文のデータ項目名と別名
-Features_list_6 = ['rw_norm/box_h as rw_ratio',\
+Features_list_60 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'section','completed'
                 ]
+Features_list_61 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'tag1 as face',\
+                'section','completed'
+                ]
 
-Features_list_7 = ['rw_norm/box_h as rw_ratio',\
+Features_list_70 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'section','completed'
                 ]
-
-Features_list_8 = ['rw_norm/box_h as rw_ratio',\
+Features_list_71 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'tag1 as face',\
+                'section','completed'
+                ]
+Features_list_72 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
+                'sr_norm/box_h as sr_ratio',\
                 'sr_angle/180.0 as sr_deg',\
-                'rse_angle/180.0 as se_deg',\
+                'section','completed'
+                ]
+
+Features_list_80 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'section','completed'
+                ]
+Features_list_81 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'section','completed'
+                ]
+
+Features_list_90 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'eyes_norm/box_w as eyes_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 #
 Features_lists = {
-    6: Features_list_6,
-    7: Features_list_7,
-    8: Features_list_8
+    60: Features_list_60,
+    61: Features_list_61,
+    70: Features_list_70,
+    71: Features_list_71,
+    72: Features_list_72,
+    80: Features_list_80,
+    81: Features_list_81,
+    90: Features_list_90
     }
 
 # 入力データの次元数
@@ -90,6 +133,7 @@ Sample_lag:int = 7
 Sequence_frames:int = 96    # 入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
+Face_dim:int = 4       # 顔向き埋め込みベクトルの次元数
 Section_dim:int = 8
 Completed_dim:int = 4
 Hyper_parameters = (Sequence_frames, \
@@ -98,7 +142,14 @@ Hyper_parameters = (Sequence_frames, \
 Learning_rate:float = 0.001  # 学習率   
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
-
+#
+Body_front_threshold:float = 0.180  # 体の向きの閾値(tag2=1:正面,0:横)
+#Face_front_threshold:float = 0.055  # 顔の向きの閾値(tag1=1:正面,2:横)
+Face_front_threshold:float = 0.060  # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)
+Eyes_ratio_threshold:float = 0.0    # 目幅比率の閾値（補正しない場合は0.0に設定）
+Eyes_ratio_max:float = 0.1          # 目幅比率の最大値
+Eyes_ratio_min:float = 0.01         # 目幅比率の最小値
+#
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
