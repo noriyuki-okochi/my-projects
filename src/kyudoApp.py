@@ -56,7 +56,7 @@ key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
+    print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>'] [-D(elete)|-R(name)]}  [-import [<csv-file-path>]] \n"\
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -135,6 +135,13 @@ if len(case_names) > 0 and '-D' in opts:
     for name in case_names:
         delete_frame_info(db, name)
     exit(0)
+
+if case_compare and '-R' in opts:
+    #
+    # 登録済ケース名の変更(関連テーブルも変更)
+    #
+    rename_frame_info(db, case_names[0], case_names[1])
+    exit(0)
     
 if len(case_names) == 0:
     print("[kyudoApp]:error:'-case <name>' must be specified.")
@@ -202,13 +209,15 @@ if len(num_opts) > 0:
         
 # inputkey=<num>の解析(使用する特徴量の抽出パターンの指定)
 input_key:int = Current_feature_key
+input_key_opt = False
 num_opts = [opt for opt in args if opt.startswith('inputkey')]
 if len(num_opts) > 0: 
-    # classes=<no>の解析
+    # inputkey=<no>の解析
     params = num_opts[0].split('=')
     if len(params) == 2 and params[1].isnumeric():
         input_key = int(params[1])
-print(f"[kyudoApp]info:Input_feature_key = {input_key}")
+        input_key_opt = True
+print(f"[kyudoApp]info:{input_key_opt}:Input_feature_key = {input_key}")
 # <<< GRUモデルの学習、または予測の実行 >>>
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
@@ -222,7 +231,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     #  学習用データの読み込み
     features = Features_lists[input_key]
     input_dim = len(features)
-    log_write(f"[kyudoApp]:input_dim={input_dim}")
+    face_embed:bool = True if 'face' in get_feature_colnames(features) else False
+    log_write(f"[kyudoApp]:input_dim={input_dim}, face_embed={face_embed}")
     log_write(f"[kyudoApp]:features:{features}")
     if section is None:
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
@@ -235,8 +245,12 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     for col in df_x.columns:
         if '_ratio' in col :
             df_x[col] = df_x[col].where(df_x[col] < 1.0)    # 1.0以上は欠測値(NaN)に置換する
+        
     df_x.ffill(inplace=True)    # 欠測値を直前の値に置換する
-    df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する    
+    df_x.bfill(inplace=True)    # 欠測値を直後の値に置換する 
+    if Eyes_ratio_threshold > 0.0:
+        df_x['eyes_ratio'] = df_x['eyes_ratio'].where(df_x['eyes_ratio'] > Eyes_ratio_threshold, Eyes_ratio_min)
+        df_x['eyes_ratio'] = df_x['eyes_ratio'].where(df_x['eyes_ratio'] == Eyes_ratio_min, Eyes_ratio_max)
     if verbose:
         # debug write 
         df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
@@ -250,7 +264,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
 
     # 学習データの使用範囲の指定がある場合の処理
-    pf_vals = None
+    pf_vals = (df_x.shape[0],df_x.shape[0])   # (max_frames, display_frames)
     if len(pf_opt) > 0:
         print(f"[kyudoApp]df_x.shape={df_x.shape}")   
         print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")    # 表示フレーム数   
@@ -280,6 +294,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         log_write(f"[kyudoApp]:hidden_size={HiddenS_size}")
         model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
                           hidden_size = HiddenS_size,
+                          face_embed_dim = Face_dim if face_embed else None,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
@@ -287,6 +302,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         log_write(f"[kyudoApp]:hidden_size={HiddenM_size}")
         model = KyudoGRUm( input_size = input_dim, output_size = num_classes,
                           hidden_size = HiddenM_size,
+                          face_embed_dim = Face_dim if face_embed else None,
                           section_embed_dim = section_dim,
                           completed_embed_dim = completed_dim )
         model.to( get_device() )
@@ -386,10 +402,23 @@ if '-second' in args:
         if name in Kyudo_data_names: second_names.append(name)
         idx += 1
 #
+m_compare:bool = False
+if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
+#    if case_compare is False and plot_loss is False:
+    if plot_loss is False:
+        m_flg = True
+        if case_compare: m_compare = True
+print(f"[kyudoApp]info:m_flg={m_flg}, m_compare={m_compare}")    
+#
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
 selkeys:str = [key for key in args if key in key_names]
 selnum:int = len(selkeys)
+if m_compare:
+    selnum = 1
+    selkeys.clear()
+    selkeys.append('m_compare')
+# 二軸指定のキーポイントは表示対象から除外する
 for name in second_names:
     if name in selkeys:
         selkeys.remove(name)
@@ -422,10 +451,6 @@ print(f"[kyudoApp]info:range_min={range_min},range_max={range_max}.")
 #
 # その他、コマンドオプションの解析
 #
-if '-m' in opts :       # 信頼度データとセクション移行グラフを表示
-    if case_compare is False and plot_loss is False:
-        m_flg = True
-#
 if '-b' in opts:        #凡例の表示位置
     legend_dict = dict(x=0.01,y=0.01,xanchor='left',yanchor='bottom',orientation='h')
 else:
@@ -453,7 +478,7 @@ if selnum == 4:
                         specs=[[{"secondary_y": True}, {"secondary_y": True}],
                                [{"secondary_y": True}, {"secondary_y": True}]])
 elif selnum == 1:
-    if m_flg == True :
+    if m_flg == True and not m_compare:
         if len(selkeys) > 0 :
             if selkeys[0] == 'all':\
                 titles = ['features','predicted label'] if predict else ['features','section/completed/label']
@@ -513,6 +538,7 @@ for icount, key in enumerate(selkeys, start=1):
         #
         # 'kyudo-data'テーブルからのデータ読み込み
         # (-lossオプション指定時はCSVファイルから読み込み)
+        cols:list = []
         db.case_name = case_name
         if plot_loss:
             # CSVファイル読み込みのlossデータ
@@ -547,6 +573,8 @@ for icount, key in enumerate(selkeys, start=1):
             print(f"[kyudoApp]info:df{df.shape}")
         elif predict:
             # 予測結果データフレームの読み込み
+            features = Features_lists[input_key]
+            cols = get_feature_colnames( features )
             dfk = df_p  
             dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
             mdfk = dfk
@@ -558,27 +586,54 @@ for icount, key in enumerate(selkeys, start=1):
                 mdf = mdf.head(pf_vals[1])
                 print(f"[kyudoApp]info:mdf{mdf.shape}")
         else:
-            if section is not None:
-                dfk = db.pandas_read_kyudo_section(section = section)
-            else:  dfk = db.pandas_read_kyudo()
+            if input_key_opt:
+                features = Features_lists[input_key]
+                features.append('label')
+                features.append('tag1')
+                features.append('tag2')
+                cols = get_feature_colnames( features )
+                if section is None:
+                    dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
+                else:
+                    dfk = db.pandas_read_kyudo_section( features, section = section )
+            else:
+                if section is None: 
+                    dfk = db.pandas_read_kyudo()
+                else:
+                    dfk = db.pandas_read_kyudo_section(section = section)
             df = dfk
             print(f"[kyudoApp]info:dfk{dfk.shape}")
+            if not input_key_opt:
+                # データの正規化
+                dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"]
+                cols.append('rw_ratio') 
+                dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"]
+                cols.append('eyes_ratio') 
+                dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
+                cols.append('rl_ratio')
+                dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
+                cols.append('hr_ratio')
+                dfk['hr_deg'] = dfk["hr_angle"]/180.0
+                cols.append('hr_deg')
+                '''
+                dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"]
+                cols.append('lw_ratio') 
+                dfk['sr_deg'] = dfk["sr_angle"]/180.0
+                cols.append('sr_deg')
+                dfk['se_deg'] = dfk["rse_angle"]/180.0
+                cols.append('se_deg')
+                '''
             # 特異値の補正
             for col in dfk.columns:
-                if '_norm' in col :
-                    # box_w以上は欠測地(NaN)に置換する
-                    dfk[col] = dfk[col].where(dfk[col] < dfk['box_w'])
+                if '_ratio' in col :
+                    # 1.0以上は欠測地(NaN)に置換する
+                    dfk[col] = dfk[col].where(dfk[col] < 1.0)
             dfk.ffill(inplace=True)    # 欠測値を直前の値に置換する
             dfk.bfill(inplace=True)    # 欠測値を直後の値に置換する
-            # データの正規化
-            dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"] 
-            dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"] 
-            dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
-            dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
-            dfk['hr_deg'] = dfk["hr_angle"]/180.0
-            dfk['sr_deg'] = dfk["sr_angle"]/180.0
-            dfk['se_deg'] = dfk["rse_angle"]/180.0
-            dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"] 
+            if Eyes_ratio_threshold > 0.0:
+                dfk['eyes_ratio'] = dfk['eyes_ratio'].where(dfk['eyes_ratio'] > Eyes_ratio_threshold, Eyes_ratio_min)
+                dfk['eyes_ratio'] = dfk['eyes_ratio'].where(dfk['eyes_ratio'] == Eyes_ratio_min, Eyes_ratio_max)
+        #
         # フレーム範囲の取得    
         start_frame_no = dfk.index[0]
         last_frame_no = dfk.index[-1]
@@ -607,76 +662,21 @@ for icount, key in enumerate(selkeys, start=1):
         # データのプロット
         #
         if key == 'all':        # 学習データの入力項目プロット
-            # < rw_ratio >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="rw_ratio",
-                                            y=mdfk["rw_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol   
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'rw_ratio' not found.")            
-            # < eyes_ratio >
-            try :            
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="eyes_ratio",
-                                            y=mdfk["eyes_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol   
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'eyes_ratio' not found.")
-            # < rl_ratio >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="rl_ratio",
-                                            y=mdfk["rl_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=False
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'rl_ratio' not found.")   
-            # < hr_ratio >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="hr_ratio",
-                                            y=mdfk["hr_ratio"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=False
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'hr_ratio' not found.")
-            # < sr_deg >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="sr_deg",
-                                            y=mdfk["sr_deg"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=True
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'sr_deg' not found.") 
-            # < se_deg >
-            try :
-                fig = fig.add_trace( go.Scatter(x=mdfk.index, 
-                                            name="se_deg",
-                                            y=mdfk["se_deg"], 
-                                            mode="lines"),
-                                    row = irow, 
-                                    col = icol,   
-                                    secondary_y=True
-                                )
-            except KeyError:
-                print(f"[kyudoApp]warning:'se_deg' not found.")
+            for name in cols:
+                if name == 'face' or name == 'body': 
+                    continue    # faceは除外
+                secondary:bool = True if 'deg' in name else False
+                try :
+                    fig = fig.add_trace( go.Scatter(x=mdfk.index, 
+                                                name = name,
+                                                y = mdfk[name], 
+                                                mode = "lines"),
+                                        row = irow, 
+                                        col = icol,   
+                                        secondary_y = secondary
+                                    )
+                except KeyError:
+                    print(f"[kyudoApp]warning:{name} not found.")            
         #              
         elif key == 'predicted':    # CSVファイル入力の予測結果データのプロット
             #< label >
@@ -706,7 +706,7 @@ for icount, key in enumerate(selkeys, start=1):
                             col = 1,
                             secondary_y=True
                         )
-        else:                       # 学習用生データ
+        elif not m_compare:             # 学習用生データ
             # <one of kyudo_data >
             fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                         name=key,
@@ -730,21 +730,40 @@ for icount, key in enumerate(selkeys, start=1):
                             )
         # < section/conf >
         if m_flg == True:
+            irow = irow if m_compare else 2
             #< label >
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                     name="label",
                                     y=mdf["label"], 
                                     marker_color= 'black',
                                     mode="markers"),
-                            row = 2, 
+                            row = irow,
                             col = 1   
+                        )
+            # < tag1:face>
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name = "face",
+                                        y = mdf["tag1"], 
+                                        mode = "lines"),
+                                row = irow, 
+                                col = 1,   
+                                secondary_y = False
+                        )
+            # < tag2:body>
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name = "body",
+                                        y = mdf["tag2"], 
+                                        mode = "lines"),
+                                row = irow, 
+                                col = 1,   
+                                secondary_y = False
                         )
             # < section >
             fig = fig.add_trace( go.Bar(x=mdf.index, 
                                     name="section",
                                     y=mdf["section"],
                                     marker_color='grey'),
-                            row = 2, 
+                            row = irow, 
                             col = 1,
                             secondary_y=True
                         )
@@ -753,7 +772,7 @@ for icount, key in enumerate(selkeys, start=1):
                                     name="completed",
                                     y=mdf["completed"],
                                     marker_color='black'),
-                            row = 2, 
+                            row = irow, 
                             col = 1,
                             secondary_y=True
                         )
@@ -764,7 +783,7 @@ for icount, key in enumerate(selkeys, start=1):
                                         y=mdfk["predicted"], 
                                         marker_color= 'red',
                                         mode="markers"),
-                                row = 2, 
+                                row = irow, 
                                 col = 1   
                             )
         #signal
@@ -841,13 +860,20 @@ else:
         )
         if len(second_names) > 0:
             fig.update_yaxes(title_text=second_names[0], secondary_y=True, showgrid=False,
-                            row=1, col=1)
-        fig.update_yaxes(title_text="label", range=(0, 3), secondary_y=False,
                             row=2, col=1)
-        fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
+        fig.update_yaxes(title_text="label/face/body", range=(0, 3), secondary_y=False,
+                            row=2, col=1)
+        fig.update_yaxes(title_text="section-no/completed", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
         fig.update_traces(dict(showlegend = False), 
                             row=2, col=1)
+        if m_compare:
+            fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
+                                row=1, col=1)
+            fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
+                                row=1, col=1)
+            fig.update_traces(dict(showlegend = False), 
+                                row=1, col=1)
 #
 # <<< プロットの表示(open the figure in  web-browser) >>>
 #

@@ -12,7 +12,7 @@ from  kyudo.env import *
 # Private API Class for sqlite3from env import *
 #
 class MyDb:
-    def __init__(self, dbpath='./yolo-tracking.db'):
+    def __init__(self, dbpath='./yolo-kyudo.db'):
         self.dbpath = dbpath
         self.conn = sqlite3.connect(dbpath, check_same_thread=False)    # open database
         self.conn.row_factory = sqlite3.Row
@@ -21,8 +21,10 @@ class MyDb:
         self.case_name = 'none'
         self.frame_no = 0
         self._section = 0
+        self._step_counter = 0
         self._completed = 0
         self.section = 0
+        self.step_counter = 0
         self.completed = 0
         self.csvpath1 = ''        # trcking_data用CSV出力ファイルパス
         self.csvfile1 = None
@@ -56,7 +58,7 @@ class MyDb:
             +  "rew_angle,rse_angle,"\
             +  "lew_angle,lse_angle,"\
             +  "eyes_norm,hips_norm,"\
-            +  "tag1,"\
+            +  "tag1,tag2,"\
             +  "section,completed,label,inserted_at,time_epoch\n"
         self.csvfile2.write(names)
         self.csvfile2.flush()
@@ -126,6 +128,42 @@ class MyDb:
             ret = True
         return ret
  
+#
+# delete records from any table by case_name without commit
+#
+    def delete_case_records(self, tbl, case_name):
+        rcnt = None
+        sql = f"delete from {tbl} where case_name = '{case_name}'"
+        try:
+            self.cur.execute(sql)
+            rcnt = self.cur.rowcount
+            self.conn.commit()
+        except Exception as e:
+            print(f"[delete_case_records]:error: {e}")
+        return rcnt
+#
+# copy records from any table by case_name, and rename to to_name
+#
+    def copy_case(self, tbl, from_name, to_name):
+        df = pandas.read_sql_query(f"SELECT * FROM {tbl} WHERE case_name='{from_name}'", self.conn)
+        i = -1
+        print(f"[copy_case]:info: {tbl} df:{df.shape}")
+        rcnt = df.shape[0]
+        if rcnt > 0:
+            try:
+                df['case_name'] = to_name
+                i = df.to_sql(tbl, self.conn, if_exists='append', index=None, method='multi', chunksize=1024)
+            except Exception as e:
+                print(f"[copy_case]:error: {e}")
+                i = -1
+            else:
+                print(f"[copy_case]:info: copied {i} records.")
+                if i != rcnt:
+                    print(f"[copy_case]:error: copy count mismatch. from='{from_name}' to='{to_name}'")
+        else:
+            print(f"[copy_case]:info: case_name='{from_name}' not found.")
+        return None if i == -1 else i if i == rcnt else (-1)*i 
+#
 # insert tracking-data.(db)
 #
     def insert_tracking_data(self, data_list):
@@ -232,7 +270,7 @@ class MyDb:
         values = f"{self.case_name},{self.frame_no},"                   # case_name, frame_no
                    
         for i, value in enumerate(data_list): 
-            if i == 0 or i == len(data_list) - 1:                       # 0:box_id, -1:tag1
+            if i == 0 or i >= len(data_list) - 2:                       # 0:box_id, -2:tag1
                 values += f"{value},"
             else:
                 values += f"{value:.6f},"
@@ -245,6 +283,11 @@ class MyDb:
         elif self.completed != self._completed:
             label = 1 if num_classes == 3 else (self.section * 2)
             self._completed = self.completed
+        elif self.step_counter != self._step_counter:
+            if self.section == 1 and self.step_counter == 10:
+                if num_classes == 3 : label = 1
+            #print(f"[csv_kyudo_data]: section={self.section} step_counter={self._step_counter} -> {self.step_counter}, label={label}")
+            self._step_counter = self.step_counter
           
         values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"            
         self.csvfile2.write(f"{values}\n")
@@ -409,5 +452,4 @@ class MyDb:
             #
             act_param_tbl['param'].append(raw_vals)
         return rec_count
-#
 #eof
