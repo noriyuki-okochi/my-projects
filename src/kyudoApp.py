@@ -663,7 +663,8 @@ for icount, key in enumerate(selkeys, start=1):
         #
         if key == 'all':        # 学習データの入力項目プロット
             for name in cols:
-                if name == 'face': continue    # faceは除外
+                if name == 'face' or name == 'body': 
+                    continue    # faceは除外
                 secondary:bool = True if 'deg' in name else False
                 try :
                     fig = fig.add_trace( go.Scatter(x=mdfk.index, 
@@ -860,7 +861,7 @@ else:
         if len(second_names) > 0:
             fig.update_yaxes(title_text=second_names[0], secondary_y=True, showgrid=False,
                             row=2, col=1)
-        fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
+        fig.update_yaxes(title_text="label/face/body", range=(0, 3), secondary_y=False,
                             row=2, col=1)
         fig.update_yaxes(title_text="section-no/completed", range=(0, 10), secondary_y=True, showgrid=True, 
                             row=2, col=1)
