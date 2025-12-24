@@ -590,6 +590,7 @@ for icount, key in enumerate(selkeys, start=1):
                 features = Features_lists[input_key]
                 features.append('label')
                 features.append('tag1')
+                features.append('tag2')
                 cols = get_feature_colnames( features )
                 if section is None:
                     dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
@@ -742,6 +743,15 @@ for icount, key in enumerate(selkeys, start=1):
             fig = fig.add_trace( go.Scatter(x=mdf.index, 
                                         name = "face",
                                         y = mdf["tag1"], 
+                                        mode = "lines"),
+                                row = irow, 
+                                col = 1,   
+                                secondary_y = False
+                        )
+            # < tag2:body>
+            fig = fig.add_trace( go.Scatter(x=mdf.index, 
+                                        name = "body",
+                                        y = mdf["tag2"], 
                                         mode = "lines"),
                                 row = irow, 
                                 col = 1,   
