@@ -283,6 +283,11 @@ class MyDb:
         elif self.completed != self._completed:
             label = 1 if num_classes == 3 else (self.section * 2)
             self._completed = self.completed
+        elif self.step_counter != self._step_counter:
+            if self.section == 1 and self.step_counter == 10:
+                if num_classes == 3 : label = 1
+            #print(f"[csv_kyudo_data]: section={self.section} step_counter={self._step_counter} -> {self.step_counter}, label={label}")
+            self._step_counter = self.step_counter
           
         values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"            
         self.csvfile2.write(f"{values}\n")
