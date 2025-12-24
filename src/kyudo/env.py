@@ -77,9 +77,9 @@ Features_list_72 = ['rw_norm/box_h as rw_ratio',\
 Features_list_80 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
-                'sr_angle/180.0 as sr_deg',\
-                'rse_angle/180.0 as se_deg',\
+                'hr_angle/180.0 as hr_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 Features_list_81 = ['rw_norm/box_h as rw_ratio',\
@@ -143,6 +143,7 @@ Learning_rate:float = 0.001  # 学習率
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
 #
+Body_front_threshold:float = 0.180  # 体の向きの閾値(tag1=1:正面,0:横)
 Face_front_threshold:float = 0.055  # 顔の向きの閾値(tag1=1:正面,0:横)
 Eyes_ratio_threshold:float = 0.0    # 目幅比率の閾値（補正しない場合は0.0に設定）
 Eyes_ratio_max:float = 0.1          # 目幅比率の最大値
