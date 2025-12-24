@@ -143,8 +143,9 @@ Learning_rate:float = 0.001  # 学習率
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
 #
-Body_front_threshold:float = 0.180  # 体の向きの閾値(tag1=1:正面,0:横)
-Face_front_threshold:float = 0.055  # 顔の向きの閾値(tag1=1:正面,0:横)
+Body_front_threshold:float = 0.180  # 体の向きの閾値(tag2=1:正面,0:横)
+#Face_front_threshold:float = 0.055  # 顔の向きの閾値(tag1=1:正面,2:横)
+Face_front_threshold:float = 0.060  # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)
 Eyes_ratio_threshold:float = 0.0    # 目幅比率の閾値（補正しない場合は0.0に設定）
 Eyes_ratio_max:float = 0.1          # 目幅比率の最大値
 Eyes_ratio_min:float = 0.01         # 目幅比率の最小値
