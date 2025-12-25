@@ -2605,7 +2605,7 @@ def main():
     #------------------------------------------------------------------------
     #  メインのループ処理 
     #------------------------------------------------------------------------
-    actStr = ''
+    actStr = 'action :'
     while True:
         # 次のフレームの読み込み
         ret, frame = cap[0].read()
@@ -2738,15 +2738,19 @@ def main():
                 pos = (x, y - 45)
                 comp = 1 if Completed else 0
                 str = f"param({Section_no}-{comp}-{Step_counter:2d}) : "
-                if not nn_gru: 
-                    for i in  range( Stkp.len() ):
-                        no, val = Stkp.get(i)
-                        if i > 0: str += ", "
-                        str += f"{no}={val}"
-                else:
-                    if Action != 0: actStr = f"Action={Action}"
-                    str += actStr
-                cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1)            
+                for i in  range( Stkp.len() ):
+                    no, val = Stkp.get(i)
+                    if i > 0: str += ", "
+                    str += f"{no}={val}"
+                cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.6, WHITE, 1)
+            
+            # GRU動作解析情報            
+            if nn_gru:
+                pos = (x, y - 70)
+                if Action != 0: 
+                    actStr = f"action :{Section_no}"
+                    actStr +=  "c" if Action == 1 else "s"
+                cv2.putText(annotated_frame, actStr, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)            
         #    
         # ウィンドウに表示する   
         cv2.imshow('YOLO Pose Detection', annotated_frame)
