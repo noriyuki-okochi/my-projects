@@ -1552,7 +1552,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     if Section_no == 7 or Section_no == 8:
         cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     # 警告メッセージの描画
-    annotated_frame = draw_text(annotated_frame, Alart_message, (10, 110), RED)
+    annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
     #
     return annotated_frame
 #
