@@ -60,7 +60,7 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-         + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>]  {-models|-modelm} ['<model-path>']]\n"\
+         + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
     exit(0)
@@ -218,6 +218,14 @@ if len(num_opts) > 0:
         input_key = int(params[1])
         input_key_opt = True
 print(f"[kyudoApp]info:{input_key_opt}:Input_feature_key = {input_key}")
+# eta=<rate>の解析(学習率の指定)
+num_opts = [opt for opt in args if opt.startswith('eta')]
+if len(num_opts) > 0: 
+    # inputkey=<no>の解析
+    params = num_opts[0].split('=')
+    if len(params) == 2:
+        Learning_rate = float(params[1])
+print(f"[kyudoApp]info:Learning_rate = {Learning_rate}")
 # <<< GRUモデルの学習、または予測の実行 >>>
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
@@ -333,6 +341,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # 学習、または予測の実行
     if not predict:      
         log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
+        log_write(f"[kyudoApp]:learning_rate={Learning_rate:.4f}")
         log_write(f"[kyudoApp]:section-option={section}")
         # 学習実行(train)
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
