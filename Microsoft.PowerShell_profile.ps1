@@ -40,8 +40,9 @@ $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3"
 $cases_list = "iwata_1.7s1-3","iwata_1.7s2-3"
 $cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3","iwata_1.7s2-3","iwata_1.7s3-3"
 $cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s3-3"
-$cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
+$cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
+$env:CASE_LIST=$cases_list
 write-output '>>' 
 $str = '・モデルオプション  ：  ' + $modelx
 write-output $str
@@ -56,13 +57,15 @@ function model {
     param(
         [switch]$help,
         [string]$head='',
+        [string]$list='',
         [int]$key=0
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output ">model -head s|m          ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
-        write-output '>model -key <input_key>   ：データ入力キーを設定する'
-        write-output '>model		          ：現在のモデルタイプ、データ入力キー（環境変数）、ケースリスト（グローバル変数）を表示する'
+        write-output ">model -head s|m                  ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
+        write-output ">model -key <input_key>           ：データ入力キーを設定する"
+        write-output ">model -list '{<case_name> }...'  ：学習データリストを設定する"
+        write-output ">model		          ：現在のモデルタイプ、データ入力キー、学習データリスト（環境変数）を表示する"
     }
     else {
         if ( $head -ne '' ) {
@@ -83,6 +86,12 @@ function model {
                 write-output $str
             }
         }
+        elseif ( $list -ne '' ) {
+            $env:CASE_LIST="$list"
+            $case_list = $env:CASE_LIST
+            $str = '・学習データのリストが ' + $case_list + ' に設定されました。'
+            write-output $str
+        }
         elseif ( $key -gt 0 ) {
             $env:INPUT_KEY="$key"
             $inputkey = $env:INPUT_KEY
@@ -92,9 +101,9 @@ function model {
         else{
             $str =  'model-head: ' + $env:MODEL_TYPE 
             write-output $str
-            $str =  'INPUT_KEY : ' + $env:INPUT_KEY 
+            $str =  'inputkey : ' + $env:INPUT_KEY 
             write-output $str
-            $str = 'cases_list: ' + $cases_list
+            $str = 'cases_list: ' + $env:CASE_LIST
             write-output $str
         }
     }   
@@ -312,6 +321,9 @@ function kyudo {
             }
             else {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
+                    $case_list = $env:CASE_LIST
+                    $str = '・学習データのリスト： ' + $case_list
+                    write-output $str
                     $i = 1
                     foreach ( $case_name in $cases_list ) {
                         python ./src/kyudoApp.py -d -case $case_name classes=3 eta=$eta -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
