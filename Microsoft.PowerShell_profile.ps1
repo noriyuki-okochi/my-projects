@@ -6,10 +6,10 @@ write-output $profile
 write-output 'Hellow YOLO!!'
 write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンスが表示されます。'
 write-output '> yolo   -help		：動画再生・解析ツール'
-write-output '> chart  -help		：解析データ登録／プロットツール'
-write-output '> kyudo  -help		：解析学習・予測／プロットツール'
+write-output '> chart  -help		：解析データ登録／データ表示ツール'
+write-output '> kyudo  -help		：学習データ登録／学習・予測／データ表示ツール'
 # 環境変数の設定
-$env:INPUT_KEY="71"
+$env:INPUT_KEY="80"
 $inputkey = $env:INPUT_KEY
 # モデルオプション設定
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
@@ -25,7 +25,7 @@ $d_c = 4    # 埋め込み次元数(completed)
 #
 #$s = 128     # シーケンス長
 #$b = 256    # バッチサイズ
-#$e = 301    # エポック数
+#$e = 161    # エポック数
 #$d_c = 6    # 埋め込み次元数(completed)
 $hparam = "($s,$b,$e,$d_s,$d_c)"
 #
@@ -37,6 +37,10 @@ $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
 $cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3"
+$cases_list = "iwata_1.7s1-3","iwata_1.7s2-3"
+$cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3","iwata_1.7s2-3","iwata_1.7s3-3"
+$cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s3-3"
+$cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
 write-output '>>' 
 $str = '・モデルオプション  ：  ' + $modelx
@@ -51,31 +55,31 @@ Write-Output $str
 function model {
     param(
         [switch]$help,
-        [string]$type='',
+        [string]$head='',
         [int]$key=0
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>model -type <model_type>  ：モデルタイプ(s/m)を設定する'
-        write-output '>model -key <input_key>    ：データ入力キーを設定する'
-        write-output '>model		    ：モデルタイプ（グローバル変数）、データ入力キー（環境変数）、ケースリスト（グローバル変数）を表示する'
+        write-output ">model -head s|m          ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
+        write-output '>model -key <input_key>   ：データ入力キーを設定する'
+        write-output '>model		          ：現在のモデルタイプ、データ入力キー（環境変数）、ケースリスト（グローバル変数）を表示する'
     }
     else {
-        if ( $type -ne '' ) {
-            if ( $type -eq 's' ) {
+        if ( $head -ne '' ) {
+            if ( $head -eq 's' ) {
                 $env:MODEL_TYPE="-models"
                 $modelx = $env:MODEL_TYPE
                 $str = '・モデルタイプがシングルヘッド(' + $modelx + ')に設定されました。'
                 write-output $str
             }
-            elseif ( $type -eq 'm' ) {
+            elseif ( $head -eq 'm' ) {
                 $env:MODEL_TYPE="-modelm"
                 $modelx = $env:MODEL_TYPE
                 $str = '・モデルタイプがマルチヘッド(' + $modelx + ')に設定されました。'
                 write-output $str
             }
             else {
-                $str = '不正なモデルタイプが指定されました。：' + $type
+                $str = '不正なモデルタイプが指定されました。：' + $head
                 write-output $str
             }
         }
@@ -86,7 +90,7 @@ function model {
             write-output $str
         }
         else{
-            $str =  'model-type: ' + $env:MODEL_TYPE 
+            $str =  'model-head: ' + $env:MODEL_TYPE 
             write-output $str
             $str =  'INPUT_KEY : ' + $env:INPUT_KEY 
             write-output $str
@@ -108,7 +112,7 @@ function yolo {
     )
     $param_id = '1.7-s'
     $no=1
-    $slevel=''
+    $slevel='s80'
     $idx = $args.IndexOf("-level")
     $len = $args.Length
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
@@ -248,7 +252,8 @@ function kyudo {
         [switch]$section,
         [string]$predict,
         [int]$input_frames = 0,
-        [string]$input_key = ''
+        [string]$input_key = '',
+        [float]$eta = 0.001
     )
     if ( $input_key -eq '' ) {
         $input_key = $env:INPUT_KEY
@@ -266,13 +271,13 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list		：登録済ケース名の一覧を表示する'
-        write-output '>kyudo  -deletet <登録ケース名>	                   ：登録ケース名、データファイルを削除する'
-        write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>    ：登録ケース名をリネームする'
+        write-output '>kyudo  -list		                             ：登録済ケース名の一覧を表示する'
+        write-output '>kyudo  -deletet <登録ケース名>	                     ：登録ケース名、データファイルを削除する'
+        write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
-        write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]   ：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train   <登録ケース名> [-section] [-multi] [-model <モデルファイル>]         ：解析結果データで学習する'
-        write-output '>kyudo  -predict <登録ケース名> [-multi] -model <モデルファイル>        	      ：解析結果データで予測する'
+        write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]          ：解析結果データをグラフ表示する'
+        write-output '>kyudo  -train   <登録ケース名> [-section] [-multi] [-model <モデルファイル>] [-eta <学習率>] ：解析結果データで学習する'
+        write-output '>kyudo  -predict <登録ケース名> [-multi] -model <モデルファイル>        	              ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -299,17 +304,17 @@ function kyudo {
         if (-not $section ) {
             if ($train -ne 'list') {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/kyudoApp.py -d -case $train classes=3 -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames     
+                    python ./src/kyudoApp.py -d -case $train classes=3 eta=$eta -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames     
                 }
                 else {
-                    python ./src/kyudoApp.py -d -case $train  classes=3 -hparam "$hparam" -train $modelx -f0 $input_frames   
+                    python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "$hparam" -train $modelx -f0 $input_frames   
                 }
             }
             else {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
                     $i = 1
                     foreach ( $case_name in $cases_list ) {
-                        python ./src/kyudoApp.py -d -case $case_name classes=3 -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                        python ./src/kyudoApp.py -d -case $case_name classes=3 eta=$eta -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                         #Write-Output $LASTEXITCODE
                         if ( $LASTEXITCODE -ne 0 ) {
                             break
@@ -324,7 +329,7 @@ function kyudo {
         }
         elseif ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
             for( $i=0; $i -lt 10; $i++) {
-                python ./src/kyudoApp.py -d -case $train  classes=3 -hparam "$hparam" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
+                python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "$hparam" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
             } 
         }
         else{
