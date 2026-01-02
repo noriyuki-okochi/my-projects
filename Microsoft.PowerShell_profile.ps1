@@ -251,7 +251,7 @@ function kyudo {
         [switch]$help,
         [switch]$h,
         [switch]$multi,
-        [switch]$list,
+        [string]$list='',
         [string]$delete,
         [string]$rename='',
         [string]$to='',
@@ -280,7 +280,7 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list		                             ：登録済ケース名の一覧を表示する'
+        write-output '>kyudo  -list	case|key                             ：登録済ケース名、または入力データキーの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                     ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
@@ -292,8 +292,13 @@ function kyudo {
     elseif ($h) {
         python ./src/kyudoApp.py -h
     } 
-    elseif ($list) {
-        python ./src/kyudoApp.py  -d -case -L
+    elseif ($list -ne '') {
+        if ( $list -eq 'key' ) {
+            python ./src/kyudoApp.py  -d -inputkey
+        }
+        elseif ( $list -eq 'case' ) {
+            python ./src/kyudoApp.py  -d -case -L
+        }
     } 
     elseif ($delete -ne '') {
         python ./src/kyudoApp.py -d -case $delete -D

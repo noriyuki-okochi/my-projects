@@ -62,7 +62,7 @@ if '-h' in opts:        #debug write
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
-         + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
+         + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
@@ -101,6 +101,15 @@ if len(pf_opt) > 0:
 else:
     last = int(LAST_FRAMES)        # default display frames
     mlast[0] = mlast[1] = last
+#
+if '-inputkey' in cmds:
+    # 入力データキー一覧を表示して終了
+    print(f"[kyudoApp]info:Input-Features-lists: default input_key={Current_feature_key}   ")
+    for key, features in Features_lists.items():
+        print(f"  Input_key={key}:")
+        for feat in features:
+            print(f"    {feat}")
+    exit(0)
 #
 # 対象ケース名を指定するコマンドオプションの解析
 #
