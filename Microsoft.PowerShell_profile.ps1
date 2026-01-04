@@ -15,7 +15,7 @@ $inputkey = $env:INPUT_KEY
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
-$env:MODEL_PT="./kyudo80_modelse_8-96-3.pt"
+$env:MODEL_PT="./kyudo80a_modelse_8-96-3.pt"
 $modelpt = $env:MODEL_PT
 #
 # ハイパーパラメータ設定
@@ -198,14 +198,11 @@ function yolo {
     elseif ($gru -ne '') {
         #$cmdline = 'python ./src/yoloApp.py -d1 -a -m -gru  ' + $gru + ' --' 
         #write-output $cmdline
-        if ($gru -ne '-') {
-            if ($gru -eq '-level'){
-                write-output 'GRUモデルファイル名を指定してください' 
-                return
-            }
-            else{
-                $model=$gru
-            }
+        if ($gru -eq '-') {
+            $model=$modelpt
+        }
+        else{
+            $model=$gru
         }
         python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel --
     }
