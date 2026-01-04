@@ -67,10 +67,10 @@ Features_list_71 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 Features_list_72 = ['rw_norm/box_h as rw_ratio',\
-                'lw_norm/box_h as lw_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
-                'sr_norm/box_h as sr_ratio',\
-                'sr_angle/180.0 as sr_deg',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'tag2 as body',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -112,8 +112,16 @@ Features_lists = {
     90: Features_list_90
     }
 
+# 学習済モデルファイルのデフォルト定義
+Kyudo_model_pt = './kyudo80_modelse_8-96-3.pt'
+# 環境変数 'MODEL_PT' が設定されていれば、それを使用する
+model_pt = os.getenv('MODEL_PT')
+if model_pt != None:
+    Kyudo_model_pt = model_pt
+    #print(f"Environment variable 'INPUT_KEY' found: Using Current_feature_key = {Current_feature_key}")
+
 # 入力データの次元数
-Current_feature_key = 7   # 使用する特徴量の個数(6,7,8)
+Current_feature_key = 80   # 使用する特徴量のキー番号
 # 環境変数 'INPUT_KEY' が設定されていれば、それを使用する
 input_key = os.getenv('INPUT_KEY')
 if input_key != None:
