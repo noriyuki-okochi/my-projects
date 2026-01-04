@@ -15,6 +15,8 @@ $inputkey = $env:INPUT_KEY
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
+$env:MODEL_PT="./kyudo80_modelse_8-96-3.pt"
+$modelpt = $env:MODEL_PT
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -43,29 +45,22 @@ $cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s3-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
 $cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
 $env:CASE_LIST=$cases_list
-write-output '>>' 
-$str = '・モデルオプション  ：  ' + $modelx
-write-output $str
-$str = '・ハイパーパラメータ： ' + $hparam
-write-output $str
-$str = '・入力データキー    ： ' + $inputkey
-write-output $str
-$str = '・登録済ケース名一覧： ' + $cases_list 
-Write-Output $str
-
+# モデル設定関数
 function model {
     param(
         [switch]$help,
         [string]$head='',
-        [string]$list='',
+        [string]$case='',
+        [string]$pt='',
         [int]$key=0
     )
     if ($help) {
         write-output '・コマンド -オプション'
         write-output ">model -head s|m                  ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
-        write-output ">model -list '{<case_name> }...'  ：学習データリストを設定する"
-        write-output ">model		          ：現在のモデルタイプ、データ入力キー、学習データリスト（環境変数）を表示する"
+        write-output ">model -case '{<case_name> }...'  ：学習データリストを設定する"
+        write-output ">model -pt '{<gru_model_pt> }...' ：学習済モデルファイルを設定する"
+        write-output ">model		          ：現在のモデルタイプ、データ入力キー、学習データリスト、GRUモデルファイル（環境変数）を表示する"
     }
     else {
         if ( $head -ne '' ) {
@@ -86,8 +81,8 @@ function model {
                 write-output $str
             }
         }
-        elseif ( $list -ne '' ) {
-            $env:CASE_LIST="$list"
+        elseif ( $case -ne '' ) {
+            $env:CASE_LIST="$case"
             $case_list = $env:CASE_LIST
             $str = '・学習データのリストが ' + $case_list + ' に設定されました。'
             write-output $str
@@ -98,16 +93,28 @@ function model {
             $str = '・入力データキーが ' + $inputkey + ' に設定されました。'
             write-output $str
         }
+        elseif ( $pt -ne '' ) {
+            $env:MODEL_PT="$pt"
+            $modelpt = $env:MODEL_PT
+            $str = '・学習済モデルが ' + $modelpt + ' に設定されました。'
+            write-output $str
+        }
         else{
-            $str =  'model-head: ' + $env:MODEL_TYPE 
+            write-output '>>' 
+            $str = '・モデルオプション  ：  ' + $env:MODEL_TYPE
+            Write-Output $str
+            $str = '・学習済モデル      ： ' + $env:MODEL_PT 
             write-output $str
-            $str =  'inputkey : ' + $env:INPUT_KEY 
+            $str = '・ハイパーパラメータ： ' + $hparam
             write-output $str
-            $str = 'cases_list: ' + $env:CASE_LIST
+            $str = '・入力データキー    ： ' + $env:INPUT_KEY
             write-output $str
+            $str = '・登録済ケースリスト： ' + $env:CASE_LIST 
+            Write-Output $str
         }
     }   
 }
+# 動画再生・解析ツール関数
 function yolo {
     param(
         [switch]$help,
@@ -206,9 +213,11 @@ function yolo {
         write-output '不正なパラメータが指定されました' 
     }
 }
+# YOLO解析レベル0関数
 function yolo0 { 
 	python ./src/yoloApp.py 0 
 }
+# 解析データ登録／データ表示ツール関数
 function chart {
     param(
         [switch]$help,
@@ -246,6 +255,7 @@ function chart {
         write-output '不正なパラメータが指定されました' 
     }	
 }
+# 学習データ登録／学習・予測／データ表示ツール関数
 function kyudo {
     param(
         [switch]$help,
@@ -280,7 +290,7 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list	case|key                             ：登録済ケース名、または入力データキーの一覧を表示する'
+        write-output '>kyudo  -list	case|key|pt                          ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                     ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
@@ -298,6 +308,9 @@ function kyudo {
         }
         elseif ( $list -eq 'case' ) {
             python ./src/kyudoApp.py  -d -case -L
+        }
+        elseif ( $list -eq 'pt' ) {
+            get-childitem ./kyudo*.pt
         }
     } 
     elseif ($delete -ne '') {
@@ -356,8 +369,11 @@ function kyudo {
     elseif ($predict -ne '') {
         $idx = $args.IndexOf($model)
         $len = $args.Length
-        if ($idx -ge 0 -and $len -gt $idx) {
-            python ./src/kyudoApp.py -d -case $predict -hparam "$hparam" -predict $modelx $args[$idx+1] -f0 $input_frames -m    
+        if ($idx -ge 0 ) {
+            if ( $len -gt $idx) {
+                $modelpt = $args[$idx+1]
+            }
+            python ./src/kyudoApp.py -d -case $predict -hparam "$hparam" -predict $modelx $modelpt -f0 $input_frames -m    
         }
         else {
             write-output '学習済モデルファイル名を指定してください' 
@@ -367,3 +383,5 @@ function kyudo {
         write-output '不正なパラメータが指定されました' 
     }	
 }
+# モデル設定関数呼び出し（プロファイル読み込み時）
+model
