@@ -243,8 +243,9 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     if '-predict' in cmds: predict = True
     if predict and model_pth is None:
         #  予測実行時は学習済モデルファイルの指定が必須
-        print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
-        exit(0)
+        #print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
+        #exit(0)
+        model_pth = Kyudo_model_pt      # デフォルトの学習済モデルファイルを使用する
     #  学習用データの読み込み
     features = Features_lists[input_key]
     input_dim = len(features)
