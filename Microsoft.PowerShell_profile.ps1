@@ -293,7 +293,7 @@ function kyudo {
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]          ：解析結果データをグラフ表示する'
         write-output '>kyudo  -train   <登録ケース名> [-section] [-multi] [-model <モデルファイル>] [-eta <学習率>] ：解析結果データで学習する'
-        write-output '>kyudo  -predict <登録ケース名> [-multi] -model <モデルファイル>        	              ：解析結果データで予測する'
+        write-output '>kyudo  -predict <登録ケース名> [-multi] [-model <モデルファイル>]      	              ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -366,15 +366,10 @@ function kyudo {
     elseif ($predict -ne '') {
         $idx = $args.IndexOf($model)
         $len = $args.Length
-        if ($idx -ge 0 ) {
-            if ( $len -gt $idx) {
-                $modelpt = $args[$idx+1]
-            }
-            python ./src/kyudoApp.py -d -case $predict -hparam "$hparam" -predict $modelx $modelpt -f0 $input_frames -m    
+        if ($idx -ge 0 -and $len -gt $idx) {
+            $modelpt = $args[$idx+1]
         }
-        else {
-            write-output '学習済モデルファイル名を指定してください' 
-        }
+        python ./src/kyudoApp.py -d -case $predict -hparam "$hparam" -predict $modelx $modelpt -f0 $input_frames -m    
     }
     else{
         write-output '不正なパラメータが指定されました' 
