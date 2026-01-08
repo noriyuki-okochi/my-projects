@@ -330,7 +330,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # モデル情報の表示
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
-    
+    numel_params = [p.numel() for p in model.parameters() if p.requires_grad]
+    log_write(f"[kyudoApp]:nntrainable parameters={sum(numel_params)}, {numel_params}")   
     # 学習済モデルの読み込み
     if model_pth is not None:
         if os.path.isfile(model_pth):
