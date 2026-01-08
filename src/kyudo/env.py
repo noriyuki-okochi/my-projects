@@ -138,6 +138,11 @@ Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle']
 Sample_frames:int = 1
 Sample_lag:int = 7
 # ハイパーパラメータのデフォルト値設定
+L2_lambda = 1e-5         # L2正則化の強度
+l2_lambda = os.getenv('L2_LAMBDA')
+if l2_lambda != None:
+    L2_lambda = float(l2_lambda)
+    
 Sequence_frames:int = 96    # 入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301

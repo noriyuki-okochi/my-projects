@@ -15,8 +15,11 @@ $inputkey = $env:INPUT_KEY
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
+# 学習済モデルファイル設定
 $env:MODEL_PT="./kyudo80a_modelse_8-96-3.pt"
 $modelpt = $env:MODEL_PT
+$env:L2_LAMBDA="0.0"
+$l2_lambda = $env:L2_LAMBDA
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -52,15 +55,17 @@ function model {
         [string]$head='',
         [string]$case='',
         [string]$pt='',
+        [float]$l2=0.0,
         [int]$key=0
     )
     if ($help) {
         write-output '・コマンド -オプション'
         write-output ">model -head s|m                  ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
+        write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
+        write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -case '{<case_name> }...'  ：学習データリストを設定する"
-        write-output ">model -pt '{<gru_model_pt> }...' ：学習済モデルファイルを設定する"
-        write-output ">model		          ：現在のモデルタイプ、データ入力キー、学習データリスト、GRUモデルファイル（環境変数）を表示する"
+        write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、学習データリスト）を表示する"
     }
     else {
         if ( $head -ne '' ) {
@@ -99,6 +104,12 @@ function model {
             $str = '・学習済モデルが ' + $modelpt + ' に設定されました。'
             write-output $str
         }
+        elseif ( $l2 -gt 0.0 ) {
+            $env:L2_LAMBDA="$l2"
+            $l2_lambda = $env:L2_LAMBDA
+            $str = '・L2正則化係数が ' + $l2_lambda + ' に設定されました。'
+            write-output $str
+        }
         else{
             write-output '>>' 
             $str = '・モデルオプション  ：  ' + $env:MODEL_TYPE
@@ -109,9 +120,11 @@ function model {
             write-output $str
             $str = '・入力データキー    ： ' + $env:INPUT_KEY
             write-output $str
+            $str = '・L2正則化係数      ： ' + $env:L2_LAMBDA
+            write-output $str
             $str = '・登録済ケースリスト： ' + $env:CASE_LIST 
             Write-Output $str
-        }
+            }
     }   
 }
 # 動画再生・解析ツール関数
