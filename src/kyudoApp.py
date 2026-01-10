@@ -352,7 +352,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # 学習、または予測の実行
     if not predict:      
         log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
-        log_write(f"[kyudoApp]:learning_rate={Learning_rate:.4f}")
+        log_write(f"[kyudoApp]:learning_rate={Learning_rate:.5f}")
+        log_write(f"[kyudoApp]:L2_lambda={L2_lambda:.5f}")
         log_write(f"[kyudoApp]:section-option={section}")
         # 学習実行(train)
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )

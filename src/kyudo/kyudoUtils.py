@@ -37,8 +37,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # ログ出力関数
 # fmtmsg: フォーマット済みメッセージ
 # ログは標準出力とログファイルへ出力する
-def log_write(fmtmsg):
-    print(fmtmsg)
+def log_write(fmtmsg, print_enabled=True):
+    if print_enabled: print(fmtmsg)
     ulog.info(fmtmsg)
 #
 # デバッグ用CSV出力関数
@@ -223,7 +223,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
 # s_frames: 1セットのフレーム数
 # 戻り値: 予測データ (input_frames,)
 #
-def predict_Kyudo( model, np_x, s_frames):
+def predict_Kyudo( model, np_x, s_frames, log_print=True):
     # 予測データ
     input_frames, input_size = np_x.shape
     #ulog.debug(f"[predict_Kyudo]:np_x={np_x.shape}") 
@@ -269,7 +269,7 @@ def predict_Kyudo( model, np_x, s_frames):
         #
         if action != 0:
             i += 1
-            log_write(f"[predict_Kyudo]:({i:2d}) not zero action={action}, t={t}")    
+            log_write(f"[predict_Kyudo]:({i:2d}) not zero action={action}, t={t}", log_print)    
         ulog.debug(f"[predict_Kyudo]:action={action}")
         y_data[t] = action
         

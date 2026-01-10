@@ -1331,7 +1331,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
     s_frames = len(input_pdf)
     
     # GRUモデルによる動作解析
-    y = predict_Kyudo( model, x, s_frames)
+    y = predict_Kyudo( model, x, s_frames, log_print=False )
     mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
     action = y[0]
     if action != 0:
