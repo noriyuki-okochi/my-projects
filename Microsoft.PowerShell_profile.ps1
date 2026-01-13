@@ -16,7 +16,7 @@ $inputkey = $env:INPUT_KEY
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo80a_modelse_8-96-3.pt"
+$env:MODEL_PT="./kyudo80_modelse_8-96-3.pt"
 $modelpt = $env:MODEL_PT
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
@@ -24,7 +24,9 @@ $l2_lambda = $env:L2_LAMBDA
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
 $b = 192    # バッチサイズ
-$e = 281    # エポック数
+$e = 301    # エポック数
+$e = 280    # エポック数
+$e = 500    # エポック数
 $d_s = 8    # 埋め込み次元数(section)
 $d_c = 4    # 埋め込み次元数(completed)
 #
@@ -32,21 +34,22 @@ $d_c = 4    # 埋め込み次元数(completed)
 #$b = 256    # バッチサイズ
 #$e = 161    # エポック数
 #$d_c = 6    # 埋め込み次元数(completed)
-$hparam = "($s,$b,$e,$d_s,$d_c)"
+$env:HYPER_PARAM=($s,$b,$e,$d_s,$d_c)
+$hp_vals = @($s,$b,$e,$d_s,$d_c)
+$hparam = $hp_vals[0],$hp_vals[1],$hp_vals[2],$hp_vals[3],$hp_vals[4]
 #
 # 登録ケース名リスト
-$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3", "okochi_1.7s2-8-3", "kanoda_1.7s2-8-3", "tuneyoshi_1.7s2-8-3"
-$cases_list = "iijima_1.7s1-8-3", "anbe_1.7s1-8-3","iwata_1.7s1-8-3"
-$cases_list = "iijima_1.7s1-6-3", "anbe_1.7s2-6-3","iwata_1.7s1-6-3"
-$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
+#
+# 個別ケース設定例
 $cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3"
-$cases_list = "iwata_1.7s1-3","iwata_1.7s2-3"
-$cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3","iwata_1.7s2-3","iwata_1.7s3-3"
-$cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s3-3"
 $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
+$cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s2-3", "nemoto_1.7s3-3"
+$cases_list = "iijima_1.7s1-3","iijima_1.7s2-3", "iwata_1.7s1-3", "iwata_1.7s2-3", "nemoto_1.7s3-3"
 $cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
+# 一括ケース設定例
+$cases_list = "iijima_1.7s3-3,anbe_1.7s3-3,iwata_1.7s3-3,nemoto_1.7s3-3"
 $env:CASE_LIST=$cases_list
 # モデル設定関数
 function model {
@@ -55,6 +58,7 @@ function model {
         [string]$head='',
         [string]$case='',
         [string]$pt='',
+        [string]$hp='',
         [float]$l2=0.0,
         [int]$key=0
     )
@@ -64,8 +68,9 @@ function model {
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
-        write-output ">model -case '{<case_name> }...'  ：学習データリストを設定する"
-        write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、学習データリスト）を表示する"
+        write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータを設定する"
+        write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する"
+        write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
     }
     else {
         if ( $head -ne '' ) {
@@ -104,6 +109,18 @@ function model {
             $str = '・学習済モデルが ' + $modelpt + ' に設定されました。'
             write-output $str
         }
+        elseif ( $hp -ne '' ) {
+            $val_list = $hp.Split(' ')
+            $i = 0
+            foreach ( $val in $val_list ) {
+                $hp_vals[$i] = $val
+                $i++    
+            }
+            $hparam = $hp_vals -join ','
+            $env:HYPER_PARAM="$hparam"
+            $str = '・ハイパーパラメータが ' + $hparam + ' に設定されました。'
+            write-output $str
+        }
         elseif ( $l2 -gt 0.0 ) {
             $env:L2_LAMBDA="$l2"
             $l2_lambda = $env:L2_LAMBDA
@@ -116,7 +133,7 @@ function model {
             Write-Output $str
             $str = '・学習済モデル      ： ' + $env:MODEL_PT 
             write-output $str
-            $str = '・ハイパーパラメータ： ' + $hparam
+            $str = '・ハイパーパラメータ： ' + $env:HYPER_PARAM
             write-output $str
             $str = '・入力データキー    ： ' + $env:INPUT_KEY
             write-output $str
@@ -270,7 +287,6 @@ function kyudo {
     param(
         [switch]$help,
         [switch]$h,
-        [switch]$multi,
         [string]$list='',
         [string]$delete,
         [string]$rename='',
@@ -284,19 +300,20 @@ function kyudo {
         [string]$input_key = '',
         [float]$eta = 0.001
     )
+    # ハイパーパラメータ取得
+    $val_list = $env:HYPER_PARAM.Split(' ')
+    $i = 0
+    foreach ( $val in $val_list ) {
+        $hp_vals[$i] = $val
+        $i++    
+    }
+    $hparam = $hp_vals -join ','
+    # 入力データキー設定
     if ( $input_key -eq '' ) {
         $input_key = $env:INPUT_KEY
     }
+    # モデルタイプ取得
     $modelx = $env:MODEL_TYPE
-    if ($multi) {
-        $modelx = "-modelm"
-        $s = 96     # シーケンス長
-        $b = 192    # バッチサイズ
-        $e = 301    # エポック数
-        $d_s = 8    # 埋め込み次元数(section)
-        $d_c = 4    # 埋め込み次元数(completed)
-        $hparam = "($s,$b,$e,$d_s,$d_c)"
-    }
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
@@ -305,7 +322,7 @@ function kyudo {
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]          ：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train   <登録ケース名> [-section] [-multi] [-model <モデルファイル>] [-eta <学習率>] ：解析結果データで学習する'
+        write-output '>kyudo  -train   <登録ケース名> [-section] [-model <モデルファイル>] [-eta <学習率>]           ：解析結果データで学習する'
         write-output '>kyudo  -predict <登録ケース名> [-multi] [-model <モデルファイル>]      	              ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
@@ -341,10 +358,10 @@ function kyudo {
         if (-not $section ) {
             if ($train -ne 'list') {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/kyudoApp.py -d -case $train classes=3 eta=$eta -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames     
+                    python ./src/kyudoApp.py -d -case $train classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
                 }
                 else {
-                    python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "$hparam" -train $modelx -f0 $input_frames   
+                    python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
                 }
             }
             else {
@@ -354,7 +371,7 @@ function kyudo {
                     write-output $str
                     $i = 1
                     foreach ( $case_name in $cases_list ) {
-                        python ./src/kyudoApp.py -d -case $case_name classes=3 eta=$eta -hparam "$hparam" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                        python ./src/kyudoApp.py -d -case $case_name classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                         #Write-Output $LASTEXITCODE
                         if ( $LASTEXITCODE -ne 0 ) {
                             break
@@ -368,8 +385,9 @@ function kyudo {
             }
         }
         elseif ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
+            # セクション毎（0 -> 9）学習
             for( $i=0; $i -lt 10; $i++) {
-                python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "$hparam" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
+                python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "($hparam)" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
             } 
         }
         else{
