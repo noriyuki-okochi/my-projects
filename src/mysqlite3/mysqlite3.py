@@ -341,20 +341,18 @@ class MyDb:
 #
 #   read kyudo_data of each case_name(return pandas-DataFrame)
 #       
-    def pandas_read_kyudo(self, cols=None):
-        
+    def pandas_read_kyudo(self, cols=None, cases=None):
+        if cases is None:
+            cond_case = f"case_name='{self.case_name}'"
+        else:
+            cond_case = "case_name in (" + ','.join([f"'{c}'" for c in cases]) + ")"
+            
+        #print(f"pandas_read_kyudo: {cases}")
         if cols is None: 
-            sql = f"select * from kyudo_data where case_name='{self.case_name}' order by frame_no asc"
+            sql = f"select * from kyudo_data where {cond_case} order by case_name,frame_no asc"
         else: 
             sql = 'select frame_no,' +  ','.join(cols)                                    
-            sql += f" from kyudo_data where case_name ='{self.case_name}' order by frame_no asc"
-            '''
-            sql = 'select K.frame_no as frame_no,' +  ','.join(cols)                                    
-            sql += f" from (select * from kyudo_data where case_name ='{self.case_name}') as K left join "\
-                   " (select case_name, frame_no, angle from tracking_data "\
-                   f" where case_name ='{self.case_name}' and key_name='right_wrist') as T "\
-                    " on K.frame_no = T.frame_no order by K.frame_no asc"
-            '''
+            sql += f" from kyudo_data where {cond_case} order by case_name,frame_no asc"
         
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
@@ -370,14 +368,7 @@ class MyDb:
             sql =  "select frame_no," +  ','.join(cols) + " from kyudo_data"\
                   f" where section == {section} or section == {section2}"\
                    " order by case_name, frame_no asc" 
-            '''
-            sql += " (select * from kyudo_data where "\
-                   f" section == {section} or section == {section2}) as K left join "\
-                   " (select case_name, frame_no, angle from tracking_data"\
-                   " where key_name='right_wrist') as T "\
-                   " on K.case_name = T.case_name and K.frame_no = T.frame_no"\
-                   " order by K.case_name, K.frame_no asc"
-            '''                               
+                   
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
 #   read frame_info(return pandas-DataFrame)

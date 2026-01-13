@@ -119,10 +119,11 @@ if '-case' in cmds:
     i = cmds.index('-case')
     if len(cmds) > (i + 1):
         names = cmds[i +1].split(',')
-        case_names.append(names[0])
-        if len(names) > 1 :
+        for name in names:
+            name = name.strip()
+            if name != '': case_names.append(name)
+        if len(names) > 1 and '-train' not in cmds:
             # ケース比較時の、比較ケース名を追加
-            case_names.append(names[1])
             case_compare = True
             
 if len(case_names) > 0 and case_names[0] == '-L':
@@ -254,7 +255,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     log_write(f"[kyudoApp]:features:{features}")
     if section is None:
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
-        df_x = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
+        df_x = db.pandas_read_kyudo( features, case_names )        # 学習用特徴量(input_frames, input_dim)                       
     else:
         # 指定セクションのデータを読み込み（frame_noをインデックスに設定）
         # section={section,section+1}を選択
@@ -274,17 +275,17 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
     # 教師ラベルデータの読み込み
     if section is None:
-        df_y = db.pandas_read_kyudo( ['label as label'] )    # 教師ラベル(input_frames, 1)
+        df_y = db.pandas_read_kyudo( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
     else:    
         df_y = db.pandas_read_kyudo_section( ['label as label'], section )  # section={section,section+1}を選択
     if verbose:
         # debug write 
         df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
 
+    print(f"[kyudoApp]df_x.shape={df_x.shape}, df_y.shape={df_y.shape}")   
     # 学習データの使用範囲の指定がある場合の処理
     pf_vals = (df_x.shape[0],df_x.shape[0])   # (max_frames, display_frames)
-    if len(pf_opt) > 0:
-        print(f"[kyudoApp]df_x.shape={df_x.shape}")   
+    if len(pf_opt) > 0 and len(case_names) == 1:
         print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")    # 表示フレーム数   
         if not p_option:   # '-fxxxx' は開始フレームをフレーム数で指定
             frame_length = df_x.index[-1] - df_x.index[0] + 1
@@ -331,7 +332,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
     numel_params = [p.numel() for p in model.parameters() if p.requires_grad]
-    log_write(f"[kyudoApp]:nntrainable parameters={sum(numel_params)}, {numel_params}")   
+    log_write(f"[kyudoApp]: numel parameters={sum(numel_params)}, {numel_params}")   
     # 学習済モデルの読み込み
     if model_pth is not None:
         if os.path.isfile(model_pth):
@@ -367,6 +368,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         last = n_epoch
         key_names.append('loss')
         args.append('loss') 
+        if len(case_names) > 1: 
+            del case_names[1:-1]
     else:
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
