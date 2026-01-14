@@ -2250,7 +2250,8 @@ def main():
         manual_plot = True
         Tracking_only = True    # トラッキングのみを行うオプション
         # トラッキングデータリストのインスタンス作成
-        InputPdf = FeaturePdf()
+        if not nn_gru: 
+            InputPdf = FeaturePdf()
         i = args.index('-t')
     if not raw_video and ( '-u' in opts) :
         manual_plot = True
