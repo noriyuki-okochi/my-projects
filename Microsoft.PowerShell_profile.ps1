@@ -48,8 +48,9 @@ $cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3
 $cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s2-3", "nemoto_1.7s3-3"
 $cases_list = "iijima_1.7s1-3","iijima_1.7s2-3", "iwata_1.7s1-3", "iwata_1.7s2-3", "nemoto_1.7s3-3"
 $cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
+$cases_list = "iijima_1.7s0-3", "anbe_1.7s0-3", "iwata_1.7s0-3", "nemoto_1.7s0-3"
 # 一括ケース設定例
-$cases_list = "iijima_1.7s3-3,anbe_1.7s3-3,iwata_1.7s3-3,nemoto_1.7s3-3"
+#$cases_list = "iijima_1.7s3-3,anbe_1.7s3-3,iwata_1.7s3-3,nemoto_1.7s3-3"
 $env:CASE_LIST=$cases_list
 # モデル設定関数
 function model {
@@ -69,7 +70,7 @@ function model {
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータを設定する"
-        write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する"
+        write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
     }
     else {
@@ -93,8 +94,8 @@ function model {
         }
         elseif ( $case -ne '' ) {
             $env:CASE_LIST="$case"
-            $case_list = $env:CASE_LIST
-            $str = '・学習データのリストが ' + $case_list + ' に設定されました。'
+            $cases_list = $env:CASE_LIST
+            $str = '・学習データのリストが ' + $cases_list + ' に設定されました。'
             write-output $str
         }
         elseif ( $key -gt 0 ) {
@@ -177,10 +178,10 @@ function yolo {
         write-output 'GRUモデルファイル名を指定してください' 
         return
     }
-    if ($gru -ne '' -and $case -ne ''){
-        write-output '不正なパラメータが指定されました' 
-        return
-    }
+    #if ($gru -ne '' -and $case -ne ''){
+    #    write-output '不正なパラメータが指定されました' 
+    #    return
+    #}
     #
     if ($help) {
         write-output '・コマンド -オプション'
@@ -222,7 +223,7 @@ function yolo {
     elseif ($clip) {
         python ./src/yoloApp.py -d1 -a -clip --
     }
-    elseif ($case -ne '') {
+    elseif ($case -ne '' -and $gru -eq '') {
         python ./src/yoloApp.py -d1 -a -w -t  $case  $slevel classes=3 --
     }
     elseif ($gru -ne '') {
@@ -234,7 +235,12 @@ function yolo {
         else{
             $model=$gru
         }
-        python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel --
+        if ( $case -ne '' ) {
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel -t $case --
+        }
+        else{
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel --
+        }
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -366,8 +372,8 @@ function kyudo {
             }
             else {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    $case_list = $env:CASE_LIST
-                    $str = '・学習データのリスト： ' + $case_list
+                    $cases_list = $env:CASE_LIST.Split(' ')
+                    $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
                     write-output $str
                     $i = 1
                     foreach ( $case_name in $cases_list ) {
