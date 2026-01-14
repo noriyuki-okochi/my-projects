@@ -369,7 +369,9 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         key_names.append('loss')
         args.append('loss') 
         if len(case_names) > 1: 
-            del case_names[1:-1]
+            name = case_names[0]
+            case_names.clear()
+            case_names.append(name)
     else:
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
