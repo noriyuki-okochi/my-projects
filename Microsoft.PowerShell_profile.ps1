@@ -22,7 +22,7 @@ $inputkey = $env:INPUT_KEY
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo80_modelse_8-96-3.pt"
+$env:MODEL_PT="./kyudo802_modelse_8-96-3.pt"
 $modelpt = $env:MODEL_PT
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
