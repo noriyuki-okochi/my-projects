@@ -8,7 +8,13 @@ write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンス
 write-output '> yolo   -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／データ表示ツール'
 write-output '> kyudo  -help		：学習データ登録／学習・予測／データ表示ツール'
+write-output '> model  -help		：モデルのパラメータ表示／設定ツール'
+#
 # 環境変数の設定
+#
+# 動画ファイル検索位置設定
+$env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
+# データ入力キー設定
 $env:INPUT_KEY="80"
 $inputkey = $env:INPUT_KEY
 # モデルオプション設定
@@ -60,6 +66,7 @@ function model {
         [string]$case='',
         [string]$pt='',
         [string]$hp='',
+        [string]$path='',
         [float]$l2=0.0,
         [int]$key=0
     )
@@ -71,6 +78,7 @@ function model {
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータを設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
+        write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
     }
     else {
@@ -110,6 +118,11 @@ function model {
             $str = '・学習済モデルが ' + $modelpt + ' に設定されました。'
             write-output $str
         }
+        elseif ( $path -ne '' ) {
+            $env:ROLL_PATH="$path"
+            $str = '・動画ファイル検索位置が ' + $path + ' に設定されました。'
+            write-output $str
+        }
         elseif ( $hp -ne '' ) {
             $val_list = $hp.Split(' ')
             $i = 0
@@ -130,17 +143,19 @@ function model {
         }
         else{
             write-output '>>' 
-            $str = '・モデルオプション  ：  ' + $env:MODEL_TYPE
+            $str = '・モデルオプション    ：  ' + $env:MODEL_TYPE
             Write-Output $str
-            $str = '・学習済モデル      ： ' + $env:MODEL_PT 
+            $str = '・学習済モデル        ： ' + $env:MODEL_PT 
             write-output $str
-            $str = '・ハイパーパラメータ： ' + $env:HYPER_PARAM
+            $str = '・ハイパーパラメータ  ： ' + $env:HYPER_PARAM
             write-output $str
-            $str = '・入力データキー    ： ' + $env:INPUT_KEY
+            $str = '・入力データキー      ： ' + $env:INPUT_KEY
             write-output $str
-            $str = '・L2正則化係数      ： ' + $env:L2_LAMBDA
+            $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
             write-output $str
-            $str = '・登録済ケースリスト： ' + $env:CASE_LIST 
+            $str = '・登録済ケースリスト  ： ' + $env:CASE_LIST 
+            Write-Output $str
+            $str = '・動画ファイル検索位置： ' + $env:ROLL_PATH 
             Write-Output $str
             }
     }   

@@ -5,9 +5,12 @@ import numpy as np
 # 共通定数
 ##############################
 DB_PATH = './yolo-kyudo.db'
-PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
 #   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
-
+PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
+path = os.getenv('ROLL_PATH')
+if path != None:
+    PICT_PATH = path
+    
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
