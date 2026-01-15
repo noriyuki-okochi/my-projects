@@ -37,8 +37,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # ログ出力関数
 # fmtmsg: フォーマット済みメッセージ
 # ログは標準出力とログファイルへ出力する
-def log_write(fmtmsg):
-    print(fmtmsg)
+def log_write(fmtmsg, print_enabled=True):
+    if print_enabled: print(fmtmsg)
     ulog.info(fmtmsg)
 #
 # デバッグ用CSV出力関数
@@ -175,13 +175,19 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
     model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
     
     # 学習ループ
-    for i in range(n_epoch):
+    for i in range( n_epoch ):
         model.train()
         loss_train = 0
         for j, (x, t) in enumerate(loader):
             # 順伝搬、損失計算、逆伝搬、パラメータ更新
             y = model(x)                        # y: (batch, output_size)
             loss = criterion( y, t.squeeze() )  # t: (batch, 1) -> (batch,)
+            
+            # L2正則化の追加            
+            if L2_lambda > 0.0:
+                l2_norm = sum(p.pow(2.0).sum() for p in model.parameters())
+                loss = loss + L2_lambda * l2_norm
+            # accumulate loss
             loss_train += loss.item()
             # 勾配の初期化
             optimaizer.zero_grad()
@@ -193,7 +199,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
         loss_train /= (j + 1)                 
         #record_loss_train.append(loss_train)   # record loss to list    
         model.write_csv( [i, loss_train] )      # 学習過程をCSVファイルに出力
-        if i%20 == 0:
+        if i%20 == 0 or i == (n_epoch - 1):
             # 20エポックごとに学習過程を表示
             #log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f},y={y[0]}')
             log_write(f'epoch:{i:3d}, iter={j}, loss_train={loss_train:.4f}')
@@ -217,7 +223,7 @@ def train_Kyudo( model , np_x, np_yact, s_frames, batch_size=256, n_epoch=501, p
 # s_frames: 1セットのフレーム数
 # 戻り値: 予測データ (input_frames,)
 #
-def predict_Kyudo( model, np_x, s_frames):
+def predict_Kyudo( model, np_x, s_frames, log_print=True):
     # 予測データ
     input_frames, input_size = np_x.shape
     #ulog.debug(f"[predict_Kyudo]:np_x={np_x.shape}") 
@@ -263,7 +269,7 @@ def predict_Kyudo( model, np_x, s_frames):
         #
         if action != 0:
             i += 1
-            log_write(f"[predict_Kyudo]:({i:2d}) not zero action={action}, t={t}")    
+            log_write(f"[predict_Kyudo]:({i:2d}) not zero action={action}, t={t}", log_print)    
         ulog.debug(f"[predict_Kyudo]:action={action}")
         y_data[t] = action
         

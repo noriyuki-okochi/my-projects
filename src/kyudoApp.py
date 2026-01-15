@@ -60,9 +60,9 @@ if '-h' in opts:        #debug write
          + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-         + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>]  {-models|-modelm} ['<model-path>']]\n"\
+         + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
-         + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
+         + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
@@ -102,6 +102,15 @@ else:
     last = int(LAST_FRAMES)        # default display frames
     mlast[0] = mlast[1] = last
 #
+if '-inputkey' in cmds:
+    # 入力データキー一覧を表示して終了
+    print(f"[kyudoApp]info:Input-Features-lists: default input_key={Current_feature_key}   ")
+    for key, features in Features_lists.items():
+        print(f"  Input_key={key}:")
+        for feat in features:
+            print(f"    {feat}")
+    exit(0)
+#
 # 対象ケース名を指定するコマンドオプションの解析
 #
 case_compare:bool = False
@@ -110,10 +119,11 @@ if '-case' in cmds:
     i = cmds.index('-case')
     if len(cmds) > (i + 1):
         names = cmds[i +1].split(',')
-        case_names.append(names[0])
-        if len(names) > 1 :
+        for name in names:
+            name = name.strip()
+            if name != '': case_names.append(name)
+        if len(names) > 1 and '-train' not in cmds:
             # ケース比較時の、比較ケース名を追加
-            case_names.append(names[1])
             case_compare = True
             
 if len(case_names) > 0 and case_names[0] == '-L':
@@ -218,6 +228,14 @@ if len(num_opts) > 0:
         input_key = int(params[1])
         input_key_opt = True
 print(f"[kyudoApp]info:{input_key_opt}:Input_feature_key = {input_key}")
+# eta=<rate>の解析(学習率の指定)
+num_opts = [opt for opt in args if opt.startswith('eta')]
+if len(num_opts) > 0: 
+    # inputkey=<no>の解析
+    params = num_opts[0].split('=')
+    if len(params) == 2:
+        Learning_rate = float(params[1])
+print(f"[kyudoApp]info:Learning_rate = {Learning_rate}")
 # <<< GRUモデルの学習、または予測の実行 >>>
 #
 if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
@@ -226,8 +244,9 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     if '-predict' in cmds: predict = True
     if predict and model_pth is None:
         #  予測実行時は学習済モデルファイルの指定が必須
-        print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
-        exit(0)
+        #print(f"[kyudoApp]error:'-predict' requires '-model <model-path>'")
+        #exit(0)
+        model_pth = Kyudo_model_pt      # デフォルトの学習済モデルファイルを使用する
     #  学習用データの読み込み
     features = Features_lists[input_key]
     input_dim = len(features)
@@ -236,7 +255,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     log_write(f"[kyudoApp]:features:{features}")
     if section is None:
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
-        df_x = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
+        df_x = db.pandas_read_kyudo( features, case_names )        # 学習用特徴量(input_frames, input_dim)                       
     else:
         # 指定セクションのデータを読み込み（frame_noをインデックスに設定）
         # section={section,section+1}を選択
@@ -256,17 +275,17 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df2csv(df_x, case_names[0], title=f'df_x after clean on section = {section}')
     # 教師ラベルデータの読み込み
     if section is None:
-        df_y = db.pandas_read_kyudo( ['label as label'] )    # 教師ラベル(input_frames, 1)
+        df_y = db.pandas_read_kyudo( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
     else:    
         df_y = db.pandas_read_kyudo_section( ['label as label'], section )  # section={section,section+1}を選択
     if verbose:
         # debug write 
         df2csv(df_y, case_names[0], title=f'df_y on section = {section}')
 
+    print(f"[kyudoApp]df_x.shape={df_x.shape}, df_y.shape={df_y.shape}")   
     # 学習データの使用範囲の指定がある場合の処理
     pf_vals = (df_x.shape[0],df_x.shape[0])   # (max_frames, display_frames)
-    if len(pf_opt) > 0:
-        print(f"[kyudoApp]df_x.shape={df_x.shape}")   
+    if len(pf_opt) > 0 and len(case_names) == 1:
         print(f"[kyudoApp]info:mlast={mlast[0]}, last={last}")    # 表示フレーム数   
         if not p_option:   # '-fxxxx' は開始フレームをフレーム数で指定
             frame_length = df_x.index[-1] - df_x.index[0] + 1
@@ -312,7 +331,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # モデル情報の表示
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
-    
+    numel_params = [p.numel() for p in model.parameters() if p.requires_grad]
+    log_write(f"[kyudoApp]: numel parameters={sum(numel_params)}, {numel_params}")   
     # 学習済モデルの読み込み
     if model_pth is not None:
         if os.path.isfile(model_pth):
@@ -333,6 +353,8 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # 学習、または予測の実行
     if not predict:      
         log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
+        log_write(f"[kyudoApp]:learning_rate={Learning_rate:.5f}")
+        log_write(f"[kyudoApp]:L2_lambda={L2_lambda:.5f}")
         log_write(f"[kyudoApp]:section-option={section}")
         # 学習実行(train)
         train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
@@ -346,6 +368,10 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         last = n_epoch
         key_names.append('loss')
         args.append('loss') 
+        if len(case_names) > 1: 
+            name = case_names[0]
+            case_names.clear()
+            case_names.append(name)
     else:
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
