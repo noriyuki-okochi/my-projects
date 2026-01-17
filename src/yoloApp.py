@@ -690,6 +690,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 #
 def section_started(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
+    global ER_angle
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -827,6 +828,8 @@ def section_started(section_no, myResult:MyResult):
     
     # 6-Kai  ->  7-Hanare        
     elif section_no == 6:  
+        _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
+        mylog.log(INFO, f">>>   angR-ELWR={ER_angle:.1f}°")
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
 
@@ -1303,16 +1306,20 @@ def correct_action_by_rules(action, section, completed):
     r_action = action
     if completed == True and action == 1:
         # 「動作完了」で「動作完了」が認識された場合、
-        r_action = 0
+        #r_action = 0
+        pass
     elif completed == False and action == 2:
         # 「動作未完了」で「動作開始」が認識された場合、
         r_action = 0
     elif Hybrid_model == True:
         # 動作解析ステップに応じた補正ルール
         if section == 2:        # 「胴づくり」
-            if action == 1 and Step_counter < 20:   # 動作完了が早すぎる（一回目の腰）
+            if action == 1 and Step_counter < 21:   # 動作完了が早すぎる（一回目の腰）
                 r_action = 0
             if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
+                r_action = 0
+        elif section == 6:      # 「会」
+            if action == 2 and ER_angle > -90.0:    # 動作開始が早すぎる
                 r_action = 0
     #
     if r_action != action:
