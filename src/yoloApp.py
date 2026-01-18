@@ -908,7 +908,7 @@ def section_completed(section_no, myResult:MyResult):
     # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
     arrow = myResult.arrow_length_angles[Sample_lag]  
     
-    normR, _ = arrow[Kn2idx['right_wrist']]                         # 右手首の移動ベクトルの長さと角度
+    normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
     normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
     normER, _ = arrow[Kn2idx['right_elbow']]                        # 右肘の移動ベクトルの長さと角度
     normEL, _ = arrow[Kn2idx['left_elbow']]                         # 左肘の移動ベクトルの長さと角度
@@ -1084,12 +1084,21 @@ def section_completed(section_no, myResult:MyResult):
         mylog.log(INFO, f">>>   [ y_wristR < y_nose ]")
         if  xy_wristR[1] < xy_nose[1]  :
             # 右手首が鼻より高い位置（Y軸は下方が正）
-            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
+            _, anglEL = keyPoints.norm('left_elbow', 'left_wrist')       # 左肘から左手首へのベクトルの角度を計算
+            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), anglR={int(anglR)}°, anglEL={int(anglEL)}°")
             if Step_counter < 10:   # 「打越し」から「大三」への移行
-                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} ]")
+                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} and anglEL > -80° ]")
                 Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-                if normL < thsd(PRM[0]):  Step_counter += 1
-                if Step_counter > PRM[1]: Step_counter = 10
+                if normL < thsd(PRM[0]) and anglEL > -80.0:  Step_counter += 1
+                else: Step_counter = 0
+                              
+                if Step_counter > PRM[1]: Step_counter = 10                     # 8回保持で「大三」へ移行
+                elif normR > thsd(0.025) and (anglR < -130 or anglR > 130):     # 馬手の引きが大きい場合    
+                    # 「大三」不安定
+                    Step_counter = 10
+                    Alart_id = Alart_Daisan
+                    Step_error = True
+                
             elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
                 mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
                 Stkp.push( [(2,PRM[2])] )  
@@ -1098,6 +1107,7 @@ def section_completed(section_no, myResult:MyResult):
                 else:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
                     if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
+            
             else: Step_counter = 13
 
         elif  xy_wristR[1] < xy_shouderR[1] :
@@ -1318,13 +1328,16 @@ def correct_action_by_rules(action, section, completed):
                 r_action = 0
             if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
                 r_action = 0
+        elif section == 4:      # 「打起し」
+            if action == 1 and Step_counter < 10:   # 動作完了が早すぎる
+                r_action = 0
         elif section == 6:      # 「会」
             if action == 2 and ER_angle > -90.0:    # 動作開始が早すぎる
                 r_action = 0
     #
     if r_action != action:
-        mylog.log(INFO, f"[correct_action_by_rules]: action corrected {action} to {r_action}")
-        print(f"[correct_action_by_rules]: action corrected {action} to {r_action}")
+        mylog.log(INFO, f"[correct_by_rules]: action corrected {action} to {r_action}")
+        print(f"[correct_by_rules]: action corrected {action} to {r_action}")
     return r_action
             
 #
@@ -1449,8 +1462,9 @@ def manual_analize_completed(section_no, myResult:MyResult):
             if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
             if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
             if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
-            Step_counter = 0
-            Nop_counter = 0
+            if Alart_id != Alart_Daisan:                        # 大三不安定の場合、リセットしない
+                Step_counter = 0
+                Nop_counter = 0
         #
     return Section_no, Completed  
 #
