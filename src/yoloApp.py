@@ -59,7 +59,8 @@ Section_color:list = YELLOW # セクションの色（黄色）BGR
 RL_angle:float = 0.0        # 右手首ー＞左手首の角度
 SL_angle:float = 0.0        # 左腕の角度
 ER_angle:float = 0.0        # 右肘ー＞右手首の角度
-
+HR_angle:float = 0.0        # 右腰ー＞右手首の角度
+RSE_angle:float = 0.0       # 右肩ー＞右肘の角度
 # カメラの位置を定義
 Camera_position:int = 0     # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
 CameraPos:str = ''          # カメラの位置名
@@ -599,6 +600,7 @@ class FeaturePdf:
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
+    global HR_angle, RSE_angle
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -639,16 +641,17 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                     # 左手首移動ベクトルの長さと角度
         rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')      # 右手首から左手首のベクトルの長さと角度を計算
         hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')       # 右腰から右手首のベクトルの長さと角度を計算
+        HR_angle = hr_angle
         sr_norm, sr_angle = keyPoints.norm('right_shoulder','right_wrist')  # 右肩から右手首ベクトルの長さと角度を計算
         sl_norm, sl_angle = keyPoints.norm('left_shoulder','left_wrist')    # 左肩から左手首ベクトルの長さと角度を計算
         _, rew_angle = keyPoints.norm('right_elbow','right_wrist')          # 右肘から右手首のベクトルの長さと角度を計算
         _, lew_angle = keyPoints.norm('left_elbow','left_wrist')            # 左肘から左手首のベクトルの長さと角度を計算
         _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
+        RSE_angle = rse_angle
         _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
-        
         # アクション発生後の経過時間（x10秒）
         # act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
         # 体の向き（0/1=的方向／正面向き）
@@ -869,7 +872,7 @@ def section_started(section_no, myResult:MyResult):
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
         if Step_counter == 0: Step_counter = 10
-        mylog.log(INFO, f">>>   normS={int(normS)}({thsd.ratio(normS):.3f})")
+        mylog.log(INFO, f">>>   normS={int(normS)}({thsd.ratio(normS):.3f}), HR_angle={HR_angle:.1f}°")
 
         mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[0]))} ]")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
@@ -1020,9 +1023,9 @@ def section_completed(section_no, myResult:MyResult):
                 Step_counter = int(Step_counter/10)*10 + 1 # 連続回数をリセット
         #
         if not completed and Step_counter >= 10:
-            mylog.log(INFO, f">>>   [ lenY < {int(thsd(PRM[7]))} ]")            
+            mylog.log(INFO, f">>>   [ lenY < {int(thsd(PRM[8]))} and angER > {PRM[0]:.1f} ]")            
             Stkp.push( [(7,PRM[8])] )  
-            if lenY < thsd(PRM[8]):
+            if lenY < thsd(PRM[8]) and  angER >PRM[0]:
                 # 目の間隔が狭くなる（箆調べ）
                 completed = True
                         
@@ -1301,7 +1304,7 @@ def edit_section_name(no, counter):
             else : pass   
     # セクションの色を設定    
     if Step_error or Section_color == RED: 
-        if Section_no > Alart_section + 1:
+        if Section_no > (Alart_section + 1) or Section_no == 0 or Section_no == 9:
             # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
             color = YELLOW
         else:  color = RED                      # 不正な動作のセクションの色（赤色）BGR
@@ -1326,6 +1329,8 @@ def correct_action_by_rules(action, section, completed):
         if section == 2:        # 「胴づくり」
             if action == 1 and Step_counter < 21:   # 動作完了が早すぎる（一回目の腰）
                 r_action = 0
+            if action == 1 and RSE_angle < 120.0:   # 動作完了が早すぎる（肘の角度が不十分）
+                r_action = 0
             if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
                 r_action = 0
         elif section == 4:      # 「打起し」
@@ -1333,6 +1338,9 @@ def correct_action_by_rules(action, section, completed):
                 r_action = 0
         elif section == 6:      # 「会」
             if action == 2 and ER_angle > -90.0:    # 動作開始が早すぎる
+                r_action = 0
+        elif section == 9:      # 「弓倒し」
+            if action == 2 and HR_angle > -90.0:    # 動作開始が早すぎる
                 r_action = 0
     #
     if r_action != action:
