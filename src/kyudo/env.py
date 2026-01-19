@@ -193,7 +193,7 @@ Alart_msg = {
    6:'Warning:Detected illegal action in section-6.(KAI fusoku)',
    60:'<警告>：「会不十分な離れ」を検知しました。',
    7:'Warning:Detected illegal action in section-7.(Timing un-match)',
-   70:'<警告>：「弓手押しタイミングの遅れ」を検知しました。'
+   70:'<警告>：「弓手押しタイミングのズレ」を検知しました。'
 }
 # 
 # テキスト属性
