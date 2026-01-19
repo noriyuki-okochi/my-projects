@@ -22,7 +22,7 @@ $inputkey = $env:INPUT_KEY
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo802_modelse_8-96-3.pt"
+$env:MODEL_PT="./kyudo80b_modelse_8-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
 #
@@ -172,8 +172,8 @@ function yolo {
         [string]$gru
     )
     $param_id = '1.7-s'
-    $no=1
-    $slevel='s80'
+    $no=0
+    $slevel='-s0'
     $idx = $args.IndexOf("-level")
     $len = $args.Length
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
