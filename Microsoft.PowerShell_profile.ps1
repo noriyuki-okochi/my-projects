@@ -22,8 +22,7 @@ $inputkey = $env:INPUT_KEY
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo802_modelse_8-96-3.pt"
-$modelpt = $env:MODEL_PT
+$env:MODEL_PT="./kyudo80b_modelse_8-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
 #
@@ -173,8 +172,8 @@ function yolo {
         [string]$gru
     )
     $param_id = '1.7-s'
-    $no=1
-    $slevel='s80'
+    $no=0
+    $slevel='-s0'
     $idx = $args.IndexOf("-level")
     $len = $args.Length
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
@@ -203,10 +202,10 @@ function yolo {
         write-output '>yolo  -update -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -raw		：選択した動画ファイルを再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yolo  -man  [-level <no>]                ：選択した動画の射形を解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
+        write-output '>yolo  -man  [-level <no>]                          ：選択した動画の射形を解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -gru  {<GRUモデルファイル名>|-} [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
-        write-output '>yolo  -h         ：コマンドの詳細パラメータを表示する'
+        write-output '>yolo  -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
         write-output ' 0 :解析開始'
@@ -245,6 +244,7 @@ function yolo {
         #$cmdline = 'python ./src/yoloApp.py -d1 -a -m -gru  ' + $gru + ' --' 
         #write-output $cmdline
         if ($gru -eq '-') {
+            $modelpt = $env:MODEL_PT
             $model=$modelpt
         }
         else{
