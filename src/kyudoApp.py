@@ -126,7 +126,7 @@ if '-case' in cmds:
             # ケース比較時の、比較ケース名を追加
             case_compare = True
             
-if len(case_names) > 0 and case_names[0] == '-L':
+if len(case_names) > 0 and case_names[0].upper() == '-L':
     #
     # 登録済ケースの一覧表示
     #
@@ -134,8 +134,11 @@ if len(case_names) > 0 and case_names[0] == '-L':
     print(f"[kyudoApp]info:{fdf.shape}")
     rows, cols = fdf.shape
     for i in range(0, rows):
-        print(f"----({i+1})----")
-        print(fdf.iloc[i])        
+        if case_names[0] == '-L':
+            print(f"----({i+1})----")
+            print(fdf.iloc[i])        
+        else:
+            print(f"{(i+1):2} {fdf.iloc[i]['case_name']}")        
     exit(0)
 
 if len(case_names) > 0 and '-D' in opts:
