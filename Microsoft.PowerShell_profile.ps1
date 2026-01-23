@@ -338,7 +338,7 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list	case|key|pt                          ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
+        write-output '>kyudo  -list	case|case_name|key|pt                ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                     ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
@@ -356,6 +356,9 @@ function kyudo {
         }
         elseif ( $list -eq 'case' ) {
             python ./src/kyudoApp.py  -d -case -L
+        }
+        elseif ( $list -eq 'case_name' ) {
+            python ./src/kyudoApp.py  -d -case -l
         }
         elseif ( $list -eq 'pt' ) {
             get-childitem ./kyudo*.pt
