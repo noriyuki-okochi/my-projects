@@ -838,9 +838,10 @@ def section_started(section_no, myResult:MyResult):
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
-            # 右手首の移動ベクトルの長さが10以上の場合（離れ）
+            # 右手首、左手首の移動ベクトルの長さが大きい場合（離れ）
             started = True
         elif normR > thsd(PRM[0]):
+            # 右手首の動き検知のみあり
             Step_counter += 1
             if Step_counter > PRM[2]:
                 # 左手首（弓手）の押しタイミングズレ
