@@ -865,10 +865,12 @@ def section_started(section_no, myResult:MyResult):
         mylog.log(INFO, f">>>   normR={int(normR)}({thsd.ratio(normR):.3f}), normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
 
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
+        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (1,PRM[2])] )  
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
             # 右手首と左手首の移動ベクトルの長さが大きい場合（弓だおし開始）
-            started = True
+            Step_counter += 1
+            if Step_counter == PRM[2]:
+                started = True
     
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
@@ -1344,6 +1346,9 @@ def correct_action_by_rules(action, section, completed):
                 r_action = 0
         elif section == 6:      # 「会」
             if action == 2 and ER_angle > -90.0:    # 動作開始が早すぎる
+                r_action = 0
+        elif section == 8:      # 「残心」
+            if action == 2 and Step_counter < 1:    # 動作開始が早すぎる
                 r_action = 0
         elif section == 9:      # 「弓倒し」
             if action == 1 and Step_counter < 2:    # 動作完了が早すぎる
