@@ -137,11 +137,11 @@ StartAction_params = [
         [1.000, 2, None, None, None, None, None, None],              # 1.足踏み
         [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.040, 0.040, 5, None, None, None, None, None],             # 3.弓構え
-        [1.000, 1.000, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
+        [1.000, 0.015, -45.0, 45.0, 9, None, None, None],            # 4.打起こし
         [0.008, 0.008, 0.008, 0.008, 6, 0.050, None, None],          # 5.引分け
         [0.050, 0.020, 8, None, None, None, None, None],             # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
-        [1.000, 0.085, None, None, None, None, None, None],          # 8.残心
+        [0.050, 0.050, 3, None, None, None, None, None],             # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
@@ -158,7 +158,7 @@ StartAction_params = [
         [0.008, 0.008, 0.008, 0.008, 6, 0.050, None, None],          # 5.引分け
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
-        [0.085, 0.085, None, None, None, None, None, None],          # 8.残心
+        [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
@@ -175,7 +175,7 @@ StartAction_params = [
         [0.008, 0.008, 0.008, 0.008, 4, 0.050, None, None],          # 5.引分け
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
-        [0.085, 0.085, None, None, None, None, None, None],          # 8.残心
+        [0.085, 0.085, 2, None, None, None, None, None],          # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
@@ -192,7 +192,7 @@ StartAction_params = [
         [0.008, 0.008, 0.008, 0.008, 4, 0.050, None, None],          # 5.引分け
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
-        [0.085, 0.085, None, None, None, None, None, None],          # 8.残心
+        [0.085, 0.085, 2, None, None, None, None, None],          # 8.残心
         [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
