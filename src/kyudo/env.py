@@ -42,6 +42,11 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
 
 # 学習用データの読み込みリスト
 # ・データベースから読み込むSQL文のデータ項目名と別名
+Features_list_50 = ['rw_norm/box_h as rw_ratio',\
+                'lw_norm/box_h as lw_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'section','completed'
+                ]
 Features_list_60 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'eyes_norm/box_w as eyes_ratio',\
@@ -105,6 +110,7 @@ Features_list_90 = ['rw_norm/box_h as rw_ratio',\
                 ]
 #
 Features_lists = {
+    50: Features_list_50,       # プロット専用特徴量リスト
     60: Features_list_60,
     61: Features_list_61,
     70: Features_list_70,
