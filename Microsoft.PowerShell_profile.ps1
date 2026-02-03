@@ -169,11 +169,18 @@ function yolo {
         [switch]$raw,
         [switch]$clip,
         [string]$case,
-        [string]$gru
+        [string]$gru,
+        [switch]$mask
     )
     $param_id = '1.7-s'
-    $no=0
-    $slevel='-s0'
+    if ($man) {
+        $no=2
+        $slevel='-s2'
+    }
+    else {
+        $no=0
+        $slevel='-s0'
+    }
     $idx = $args.IndexOf("-level")
     $len = $args.Length
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
@@ -192,18 +199,18 @@ function yolo {
         write-output 'GRUモデルファイル名を指定してください' 
         return
     }
-    #if ($gru -ne '' -and $case -ne ''){
-    #    write-output '不正なパラメータが指定されました' 
-    #    return
-    #}
+    $mozic = ''
+    if ( $mask ) {
+        $mozic = '-z'
+    }
     #
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>yolo  -update -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
-        write-output '>yolo  -raw		：選択した動画ファイルを再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
+        write-output '>yolo  -raw		：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yolo  -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データをファイル出力する（解析結果画像のファイル保存可）'
-        write-output '>yolo  -man  [-level <no>]                          ：選択した動画の射形を解析しながら再生する（no:解析レベル {0|1|2|3}）'
+        write-output '>yolo  -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
+        write-output '>yolo  -man  [-level <no>]                          ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -gru  {<GRUモデルファイル名>|-} [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output '>yolo  -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
@@ -222,39 +229,52 @@ function yolo {
         write-output ' l(L) :再生速度ダウン'
         write-output ' g :グリッド表示・非表示（"-r"時無効）'
     } 
-    elseif ($h) {
+    elseif ($h) {           
+        # 詳細ヘルプ表示
         python ./src/yoloApp.py -h
     } 
-    elseif ($update) {
+    elseif ($update) {      
+        # 解析パラメータ更新
         python ./src/yoloApp.py -d1 -I $param_id $slevel
     }
-    elseif ($man) {
-        python ./src/yoloApp.py -d1 -a -m $slevel --
+    elseif ($man) {         
+        # 動画再生・ロジック解析
+        python ./src/yoloApp.py -d1 -a -m $slevel $mozic --
     }
-    elseif ($raw) {
+    elseif ($raw) {         
+        # 動画生再生
         python ./src/yoloApp.py -d1 -a  -r --
     }
-    elseif ($clip) {
+    elseif ($clip) {        
+        # 動画切り取り
         python ./src/yoloApp.py -d1 -a -clip --
     }
-    elseif ($case -ne '' -and $gru -eq '') {
-        python ./src/yoloApp.py -d1 -a -w -t  $case  $slevel classes=3 --
+    elseif ($case -ne '' -and $gru -eq '') {    
+        # 動画再生・ロジック解析、結果保存
+        if ($slevel -eq '-s0') {
+            # レベルのデフォルトは2に設定
+            $slevel='-s2'
+        }
+        python ./src/yoloApp.py -d1 -a -w -t  $case  $slevel classes=3 $mozic --
     }
-    elseif ($gru -ne '') {
-        #$cmdline = 'python ./src/yoloApp.py -d1 -a -m -gru  ' + $gru + ' --' 
-        #write-output $cmdline
+    elseif ($gru -ne '') {  
+        # 動画再生・GRU解析
         if ($gru -eq '-') {
+            # デフォルトモデル使用
             $modelpt = $env:MODEL_PT
             $model=$modelpt
         }
         else{
+            # 指定モデル使用
             $model=$gru
         }
         if ( $case -ne '' ) {
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel -t $case --
+            # 動画再生・GRU解析、結果保存
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel -t $case $mozic --
         }
         else{
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel --
+            # 動画再生・GRU解析
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel $mozic --
         }
     }
     else{
@@ -283,19 +303,25 @@ function chart {
         write-output '>chart  -h	  ：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
+        # 詳細ヘルプ表示
         python ./src/chart.py -h
     } 
     elseif ($list) {
+        # 登録済ケース名一覧表示
         python ./src/chart.py  -d -case -L
     } 
     elseif ($import -ne '') {
+        # 解析結果ポイントデータファイルのデータをデータベースに登録
         python ./src/chart.py  -d -case $import  -import -f0 0 -m
     }
     elseif ($case -ne '') {
+        # 解析結果ポイントデータをグラフ表示
         if ($key -ne '') {
+            # 指定キーのデータをグラフ表示
             python ./src/chart.py -d  $key -case $case  -f0 0  -m -span 
         }
         else {
+            # デフォルトキーのデータをグラフ表示
             python ./src/chart.py -d  right_wrist left_wrist right_elbow left_elbow -case $case  -f0 0      
         }
     }
@@ -348,39 +374,50 @@ function kyudo {
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
+        # 詳細ヘルプ表示
         python ./src/kyudoApp.py -h
     } 
     elseif ($list -ne '') {
         if ( $list -eq 'key' ) {
+            # 入力データキー一覧表示
             python ./src/kyudoApp.py  -d -inputkey
         }
         elseif ( $list -eq 'case' ) {
+            # 登録済ケース名一覧表示（詳細）
             python ./src/kyudoApp.py  -d -case -L
         }
         elseif ( $list -eq 'case_name' ) {
+            # 登録済ケース名一覧表示
             python ./src/kyudoApp.py  -d -case -l
         }
         elseif ( $list -eq 'pt' ) {
+            # 作成済モデルファイル一覧表示
             get-childitem ./kyudo*.pt
         }
     } 
     elseif ($delete -ne '') {
+        # 登録ケース名、データファイル削除
         python ./src/kyudoApp.py -d -case $delete -D
     }
     elseif ($rename -ne '' -and $to -ne '') {
+        # 登録ケース名リネーム
         python ./src/kyudoApp.py -d -case $rename,$to -R
     }
     elseif ($import -ne '') {
+        # 解析結果データファイルのデータをデータベースに登録
         python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -f0 0 -m
     }    
     elseif ($case -ne '') {
+        # 解析結果データをグラフ表示
         python ./src/kyudoApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m 
     }
     elseif ($train -ne '') {
+        # 学習実行
         $idx = $args.IndexOf($model)
         $len = $args.Length
         if (-not $section ) {
             if ($train -ne 'list') {
+                # 単一ケース学習（登録ケース名指定）
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
                     python ./src/kyudoApp.py -d -case $train classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
                 }
@@ -389,6 +426,7 @@ function kyudo {
                 }
             }
             else {
+                # 複数ケース学習（環境変数CASE_LIST指定）
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
                     $cases_list = $env:CASE_LIST.Split(' ')
                     $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
@@ -419,6 +457,7 @@ function kyudo {
         }
     }
     elseif ($predict -ne '') {
+        # 予測実行
         $idx = $args.IndexOf($model)
         $len = $args.Length
         if ($idx -ge 0 -and $len -gt $idx) {
