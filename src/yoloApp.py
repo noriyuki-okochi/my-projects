@@ -834,7 +834,7 @@ def section_started(section_no, myResult:MyResult):
     # 6-Kai  ->  7-Hanare        
     elif section_no == 6:  
         _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
-        mylog.log(INFO, f">>>   angR-ELWR={ER_angle:.1f}°")
+        mylog.log(INFO, f">>>   angR-EW={ER_angle:.1f}°")
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
 
