@@ -173,8 +173,14 @@ function yolo {
         [switch]$mask
     )
     $param_id = '1.7-s'
-    $no=0
-    $slevel='-s0'
+    if ($man) {
+        $no=2
+        $slevel='-s2'
+    }
+    else {
+        $no=0
+        $slevel='-s0'
+    }
     $idx = $args.IndexOf("-level")
     $len = $args.Length
     if ( $idx -ge 0 -and  $len -gt ($idx + 1) ) {
@@ -245,6 +251,10 @@ function yolo {
     }
     elseif ($case -ne '' -and $gru -eq '') {    
         # 動画再生・ロジック解析、結果保存
+        if ($slevel -eq '-s0') {
+            # レベルのデフォルトは2に設定
+            $slevel='-s2'
+        }
         python ./src/yoloApp.py -d1 -a -w -t  $case  $slevel classes=3 $mozic --
     }
     elseif ($gru -ne '') {  
