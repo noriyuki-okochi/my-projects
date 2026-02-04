@@ -220,7 +220,8 @@ def get_camera_pos(myResult):
     elif angle > -45 and angle < 45 :  # 
         ipos = 1    # Front
     else:  # 
-        ipos = 3    # Upper    
+        #ipos = 3    # Upper    
+        ipos = 2    # Right-side
     
     if ipos != Camera_position:
         # カメラの位置が変更された場合、ログに記録
