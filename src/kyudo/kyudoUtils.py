@@ -19,7 +19,7 @@ CSV_FILE_MODE = 'a'
 LOSS_FILE_MODE = 'w'
 
 ulog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('kyudoApp.log', mode=LOG_FILE_MODE)  # ログファイルの設定
+filehandler = logging.FileHandler('./log/kyudoApp.log', mode=LOG_FILE_MODE)  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
@@ -49,7 +49,7 @@ def log_write(fmtmsg, print_enabled=True):
 def df2csv(df, case_name='none', title=None, file=None):
     # CSV出力ファイルの作成
     if file is not None: out_csv = file
-    else: out_csv = f"kyudo_debug_{case_name}.csv"
+    else: out_csv = f"./log/kyudo_debug_{case_name}.csv"
     # CSVファイルのヘッダー出力
     if title is not None:
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

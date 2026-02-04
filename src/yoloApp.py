@@ -31,7 +31,7 @@ logger = logging.getLogger('ultralytics')
 logger.disabled = True  # ログ出力を無効化
 
 mylog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('yoloApp.log', mode='w')  # ログファイルの設定
+filehandler = logging.FileHandler('./log/yoloApp.log', mode='w')  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
