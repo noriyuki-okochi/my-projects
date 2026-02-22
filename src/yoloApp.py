@@ -93,7 +93,7 @@ def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name>\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n}] [-w] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n|m}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-h] [-g[<level>[<color>]]]\n"\
         + "                         [-v] [-d<debug-level>] [--]")
@@ -826,7 +826,7 @@ def section_started(section_no, myResult:MyResult):
             else:
                 mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
                 Stkp.push( [(5,PRM[5])] )  
-                if normR > thsd(PRM[5]):
+                if normR > thsd(PRM[5]) and ER_angle < -90.0:
                     # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
                     Step_counter += 90              # 離れアラート設定（仮）
                 #elif Hybrid_model:
@@ -843,7 +843,7 @@ def section_started(section_no, myResult:MyResult):
         if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
             # 右手首、左手首の移動ベクトルの長さが大きい場合（離れ）
             started = True
-        elif normR > thsd(PRM[0]):
+        elif normR > thsd(PRM[0]) and ER_angle < -90.0:
             # 右手首の動き検知のみあり
             Step_counter += 1
             if Step_counter > PRM[2]:
@@ -2348,6 +2348,8 @@ def main():
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
     if '-V8n' in opts:
         V8_model = 'v8n' # YOLOv8nモデルを使用 
+    elif '-V8m' in opts:
+        V8_model = 'v8m' # YOLOv8mモデルを使用
 
     # サンプリングフレーム数を取得
     opt_val  = [opt for opt in opts if opt.startswith('-f')]
@@ -2378,7 +2380,8 @@ def main():
         param_nms = []
         i = args.index('-I')
         if i + 1 < len(args) and (not args[i + 1].startswith('-')):
-            param_nms.append( args[i + 1] )  # パラメータテーブルframe名を取得
+            if args[i + 1] in InitAction_param_nms:
+                param_nms.append( args[i + 1] )     # パラメータテーブルframe名を取得
         else:
             param_nms = list(InitAction_param_nms)
         for nm in param_nms:

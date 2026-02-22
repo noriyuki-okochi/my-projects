@@ -22,7 +22,7 @@ $inputkey = $env:INPUT_KEY
 $env:MODEL_TYPE="-models"
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo80b_modelse_8-96-3.pt"
+$env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
 #
@@ -170,9 +170,11 @@ function yolo {
         [switch]$clip,
         [string]$case,
         [string]$gru,
+        [string]$v8='s',
         [switch]$mask
     )
-    $param_id = '1.7-s'
+    $param_id = '1.7-' + $v8
+    $v = '-V8' + $v8
     if ($man) {
         $no=2
         $slevel='-s2'
@@ -210,8 +212,8 @@ function yolo {
         write-output '>yolo  -raw		：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yolo  -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
-        write-output '>yolo  -man  [-level <no>]                          ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
-        write-output '>yolo  -gru  {<GRUモデルファイル名>|-} [-level <no>]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
+        write-output '>yolo  -man  [-level <no>] [-v8 {s|m}]                ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
+        write-output '>yolo  -gru  {<GRUモデル>|-} [-level <no>] [-v8 {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output '>yolo  -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
@@ -239,7 +241,7 @@ function yolo {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m $slevel $mozic --
+        python ./src/yoloApp.py -d1 -a -m $v $slevel $mozic --
     }
     elseif ($raw) {         
         # 動画生再生
@@ -255,7 +257,7 @@ function yolo {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py -d1 -a -w -t  $case  $slevel classes=3 $mozic --
+        python ./src/yoloApp.py -d1 -a -w -t  $case  $v $slevel classes=3 $mozic --
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -270,11 +272,11 @@ function yolo {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel -t $case $mozic --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -t $case $mozic --
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $slevel $mozic --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel $mozic --
         }
     }
     else{
