@@ -10,7 +10,8 @@ PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/'
 path = os.getenv('ROLL_PATH')
 if path != None:
     PICT_PATH = path
-    
+
+V8_models_l = ['V8n', 'V8s', 'V8m', 'V8l', 'V8x', 'V8x-p6' ]  # YOLOv8モデルのリスト   
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
