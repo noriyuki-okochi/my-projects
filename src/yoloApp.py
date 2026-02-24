@@ -43,6 +43,7 @@ Frame_counter:int = 0       # フレームカウンター
 Fps:float = 30              # フレームレート
 Section_no:int = 0          # セクション番号
 Split_sec:float = 0.0       # スプリット秒
+Split_last:float = 0.0      # スプリット秒
 Split_start:int = 0         # スプリットベースフレームカウント
 Lap_sec:float = 0.0         # ラップ秒 
 Lap_start:int = 0           # ラップベースフレームカウント
@@ -803,8 +804,8 @@ def section_started(section_no, myResult:MyResult):
     
     # 5-Hiki-wake  ->  6-Kai        
     elif section_no == 5:  
+        _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
         if Step_counter > 90 :  # 離れアラート設定（仮）
-            _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
             mylog.log(INFO, f">>>   angER={angER:.1f}°")
             if angER > 145 or angER < -145:                 # Yolo8の誤検出防止
                 # 右肘の角度が伸展している場合（会なしで離れ）
@@ -824,9 +825,10 @@ def section_started(section_no, myResult:MyResult):
                 Step_counter = Step_counter + 1
                 if Step_counter == PRM[4]: started = True    #  停止状態の５回保持で完了
             else:
-                mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
+                mylog.log(INFO, f">>>   angER={angER:.1f}°")
+                mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and angER < -90.0 ]")
                 Stkp.push( [(5,PRM[5])] )  
-                if normR > thsd(PRM[5]) and ER_angle < -90.0:
+                if normR > thsd(PRM[5]) and angER < -90.0:
                     # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
                     Step_counter += 90              # 離れアラート設定（仮）
                 #elif Hybrid_model:
@@ -1109,10 +1111,10 @@ def section_completed(section_no, myResult:MyResult):
                         Step_counter = 31
             elif Step_counter > 30:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(0.025))} and (anglR < -130 or anglR > 130) ]")
-                    if normR > thsd(0.025) and (anglR < -130 or anglR > 130):       # 馬手の引きが大きい場合    
+                    if normR > thsd(0.030) and (anglR < -130 or anglR > 130):       # 馬手の引きが大きい場合    
                         # 「大三」不安定
                         Step_counter += 1
-                        if (Step_counter%10) == 2:
+                        if (Step_counter%10) == 3:
                             Step_counter = 10
                             Alart_id = Alart_Daisan
                             Step_error = True
@@ -1385,7 +1387,7 @@ def correct_action_by_rules(action, section, completed):
 #
 # GRUモデルによる動作予測関数
 def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
-    global Split_start, Split_sec, Lap_start, Action_start, Step_counter
+    global Split_start, Split_sec, Split_last, Lap_start, Action_start, Step_counter
     
     mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
     mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
@@ -1406,6 +1408,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
     if action == 2:
         Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
+        if section == 6: Split_last = Split_sec             # 「会」スプリット秒を記録
         Split_sec = 0.0
     elif action == 1:
         Action_start = Lap_sec
@@ -1434,7 +1437,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
 # 動作の開始を判定する関数
 #  
 def manual_analize_start(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Action_start
+    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
     global Completed, Step_counter, Nop_counter
     global Step_error, Alart_section, Alart_id
     
@@ -1443,6 +1446,7 @@ def manual_analize_start(section_no, myResult:MyResult):
         print(f"[man_analize]: section({section_no}), strated=True")
         Action_start = Lap_sec
         Split_start = Frame_counter                         # スプリット開始時間を記録
+        if Section_no == 6: Split_last = Split_sec          # 「会」スプリット秒を記録
         Split_sec = 0.0
         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
         Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
@@ -1479,7 +1483,7 @@ def manual_analize_start(section_no, myResult:MyResult):
 # 動作の完了を判定する関数
 #
 def manual_analize_completed(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Lap_start, Lap_sec, Action_start
+    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
     global Completed, Step_counter, Nop_counter
     global Step_error, Alart_section, Alart_id
     
@@ -1517,7 +1521,7 @@ InputPdf:FeaturePdf = None
 #
 def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
     global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
-    global Split_start, Split_sec, Lap_start, Lap_sec
+    global Split_start, Split_sec, Split_last, Lap_start, Lap_sec
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message
     
     result = myResult.result
@@ -1594,6 +1598,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     # セクション情報をフレームに描画
     if Lap_start > 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
     if Split_start > 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
+    if Section_no < 7:  Split_last = 0.0
 
     # セクション名を編集
     section_name, Section_color = edit_section_name(Section_no, Step_counter)   
@@ -1609,7 +1614,10 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
     annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
-    cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if Split_last == 0.0:
+        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    else:
+        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     if Section_no == 4 or Section_no == 5 or Section_no == 6:
         cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
@@ -2346,10 +2354,9 @@ def main():
             else: Tracking_only = False
     #
     # YOLOv8モデルファイル指定（デフォルトは'v8s'）
-    if '-V8n' in opts:
-        V8_model = 'v8n' # YOLOv8nモデルを使用 
-    elif '-V8m' in opts:
-        V8_model = 'v8m' # YOLOv8mモデルを使用
+    for V8 in V8_models_l:
+        if f'-{V8}' in opts:
+            V8_model = V8.lower()  # YOLOv8モデルを使用
 
     # サンプリングフレーム数を取得
     opt_val  = [opt for opt in opts if opt.startswith('-f')]
