@@ -1,19 +1,21 @@
 f:
 set-location share/YOLO
+# 動画ファイル検索位置設定
+$env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
 # プロファイルの表示
 write-output $profile
+python -V
 #
+write-output '>'
 write-output 'Hellow YOLO!!'
 write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンスが表示されます。'
-write-output '> yolo   -help		：動画再生・解析ツール'
+write-output '> yoloAp -help		：動画再生・解析ツール'
 write-output '> chart  -help		：解析データ登録／データ表示ツール'
 write-output '> kyudo  -help		：学習データ登録／学習・予測／データ表示ツール'
 write-output '> model  -help		：モデルのパラメータ表示／設定ツール'
 #
 # 環境変数の設定
 #
-# 動画ファイル検索位置設定
-$env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
 # データ入力キー設定
 $env:INPUT_KEY="80"
 $inputkey = $env:INPUT_KEY
@@ -57,6 +59,12 @@ $cases_list = "iijima_1.7s0-3", "anbe_1.7s0-3", "iwata_1.7s0-3", "nemoto_1.7s0-3
 # 一括ケース設定例
 #$cases_list = "iijima_1.7s3-3,anbe_1.7s3-3,iwata_1.7s3-3,nemoto_1.7s3-3"
 $env:CASE_LIST=$cases_list
+#
+# 仮想環境アクティベート関数
+function v26Activate {
+    .v26/Scripts/activate
+    write-output '仮想環境:.v26がアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
+}
 # モデル設定関数
 function model {
     param(
@@ -160,7 +168,7 @@ function model {
     }   
 }
 # 動画再生・解析ツール関数
-function yolo {
+function yoloAp {
     param(
         [switch]$help,
         [switch]$h,
@@ -171,10 +179,17 @@ function yolo {
         [string]$case,
         [string]$gru,
         [string]$v8='s',
+        [string]$v26='',
         [switch]$mask
     )
-    $param_id = '1.7-' + $v8
-    $v = '-V8' + $v8
+    if ($v26 -eq '') {
+        $param_id = '1.7-' + $v8
+        $v = '-V8' + $v8
+    }
+    else {
+        $param_id = '1.7-' + $v26
+        $v = '-V26' + $v8
+    }
     if ($man) {
         $no=2
         $slevel='-s2'
@@ -212,7 +227,7 @@ function yolo {
         write-output '>yolo  -raw		：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yolo  -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yolo  -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
-        write-output '>yolo  -man  [-level <no>] [-v8 {s|m}]                ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
+        write-output '>yolo  -man  [-level <no>] [-v{8|26} {s|m}]           ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yolo  -gru  {<GRUモデル>|-} [-level <no>] [-v8 {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output '>yolo  -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
@@ -276,7 +291,7 @@ function yolo {
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel $mozic --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -w $mozic --
         }
     }
     else{
