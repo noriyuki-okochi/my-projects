@@ -94,7 +94,7 @@ def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py [<Camera-ID>]|[-a] [-clip]|[-multi]|[-r]|[-m|[-t|-u] <case_name>\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V8{s|n|m}] [-w] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-h] [-g[<level>[<color>]]]\n"\
         + "                         [-v] [-d<debug-level>] [--]")
@@ -2353,7 +2353,7 @@ def main():
             if ans == 'y': delete_frame_info(Db, case_name)                
             else: Tracking_only = False
     #
-    # YOLOv8モデルファイル指定（デフォルトは'v8s'）
+    # YOLOv8モデルファイル指定（デフォルトは'V8s'）
     for V8 in V8_models_l:
         if f'-{V8}' in opts:
             V8_model = V8.lower()  # YOLOv8モデルを使用
@@ -2609,6 +2609,9 @@ def main():
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
                 
         # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
+        if V8_model[1] != '8':
+            V8_model = V8_model[1:]
+        print(f"[main]:学習済モデルファイル：yolo{V8_model}-pose.pt")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
         
@@ -2866,8 +2869,10 @@ if __name__ == "__main__":
     print(os.getcwd())
     #
     ultralytics.checks()  # YOLOv8のチェックを実行
+    '''
     if not os.path.exists(f'yolo{V8_model}-pose.pt'):
-        print("YOLOv8-poseモデルが見つかりません。ダウンロードしてください。")
-        exit(1)
+        print(f"YOLOv8-poseモデル(yolo{V8_model}-pose.pt)が見つかりません。ダウンロードしてください。")
+        #exit(1)
+    '''
     main()
 # eof
