@@ -1,8 +1,13 @@
 .vscode/
 yolo.code-workspace
+.v26/
 *.log
 *.csv
 *.db
+*.pt
+*.xlsx
+*.txt
+!requirement.txt
 *__.*
 src/*__.* 
 src/.ipynb_checkpoints
