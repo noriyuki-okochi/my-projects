@@ -4,7 +4,7 @@ from torch import optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from datetime import datetime
 
 import logging
