@@ -2603,15 +2603,15 @@ def main():
         #------------------------------------------------------------------------
         # NNモデルのインスタンス生成
         #------------------------------------------------------------------------
+        mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLOv8 ログレベル={mylog_level}")
         print(f"解析パラメータ={param_nm}, レベル={step_no}, モデル={V8_model}, 出力クラス区分数: {output_dim}")        
-        mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
                 
         # YOLOv8-poseモデルの読み込み（事前学習済みモデル）
         if V8_model[1] != '8':
             V8_model = V8_model[1:]
-        print(f"[main]:学習済モデルファイル：yolo{V8_model}-pose.pt")
+        print(f"学習済モデルファイル：yolo{V8_model}-pose.pt")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
         
