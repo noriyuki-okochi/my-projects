@@ -1,7 +1,10 @@
-f:
-set-location share/YOLO
+# ホームディレクトリ設定
+$HOME_DIR = 'f:/share/YOLO'
 # 動画ファイル検索位置設定
 $env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
+#
+# ホームディレクトリに移動
+set-location $HOME_DIR
 # プロファイルの表示
 write-output $profile
 python -V
@@ -64,6 +67,10 @@ $env:CASE_LIST=$cases_list
 function v26Activate {
     .v26/Scripts/activate
     write-output '仮想環境:.v26がアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
+}
+function home {
+    set-location $HOME_DIR
+    write-output 'ホームディレクトリに移動しました。'
 }
 # モデル設定関数
 function model {
@@ -164,6 +171,8 @@ function model {
             Write-Output $str
             $str = '・動画ファイル検索位置： ' + $env:ROLL_PATH 
             Write-Output $str
+            $str = '・ホームディレクトリ  ： ' + $HOME_DIR
+            Write-Output $str
             }
     }   
 }
@@ -256,11 +265,11 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m $v $slevel $mozic --
+        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $mozic --
     }
     elseif ($raw) {         
         # 動画生再生
-        python ./src/yoloApp.py -d1 -a  -r --
+        python ./src/yoloApp.py -d1 -a  -r -w --
     }
     elseif ($clip) {        
         # 動画切り取り
