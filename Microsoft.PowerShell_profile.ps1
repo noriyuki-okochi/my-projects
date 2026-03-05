@@ -5,17 +5,9 @@ $env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
 #
 # ホームディレクトリに移動
 set-location $HOME_DIR
-# プロファイルの表示
-write-output $profile
 python -V
-#
-write-output '>'
 write-output 'Hellow YOLO!!'
-write-output '・次のコマンドを実行することで、射形動画解析ツールの使用ガイダンスが表示されます。'
-write-output '> yoloAp -help		：動画再生・解析ツール'
-write-output '> chart  -help		：解析データ登録／データ表示ツール'
-write-output '> kyudo  -help		：学習データ登録／学習・予測／データ表示ツール'
-write-output '> model  -help		：モデルのパラメータ表示／設定ツール'
+#
 #
 # 環境変数の設定
 #
@@ -63,6 +55,17 @@ $cases_list = "iijima_1.7s0-3", "anbe_1.7s0-3", "iwata_1.7s0-3", "nemoto_1.7s0-3
 #$cases_list = "iijima_1.7s3-3,anbe_1.7s3-3,iwata_1.7s3-3,nemoto_1.7s3-3"
 $env:CASE_LIST=$cases_list
 #
+function help {
+    # プロファイルの表示
+    write-output $profile
+    write-output '・このプロファイルでは、射形動画解析ツールの使用に必要な環境変数の設定と、ツールのコマンドを定義しています。'
+    write-output '・コマンドを実行することで、ツールの使用ガイダンスが表示されます。'
+    write-output '> help         : このヘルプを表示する'
+    write-output '> yoloAp -help : 動画再生・解析ツールの使用ガイダンスを表示する'
+    write-output '> chart  -help : 解析データ登録／データ表示ツールの使用ガイダンスを表示する'
+    write-output '> kyudo  -help : 学習データ登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
+    write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
+}
 # 仮想環境アクティベート関数
 function v26Activate {
     .v26/Scripts/activate
@@ -495,5 +498,9 @@ function kyudo {
         write-output '不正なパラメータが指定されました' 
     }	
 }
+# コマンドエイリアス設定
+#Set-Alias -Name help -Value help
+# コマンドガイダンス表示
+help
 # モデル設定関数呼び出し（プロファイル読み込み時）
 model

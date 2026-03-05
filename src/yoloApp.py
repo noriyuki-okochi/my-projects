@@ -2664,7 +2664,7 @@ def main():
     #   
     Frame_counter = 1                   # フレームカウンターの初期化
     if raw_video is True:
-        keyCtl['iwait_init'] = int(1/Fps * 1000)  # 生画像を表示する場合、FPS値からキー入力待ち時間を設定
+        keyCtl['iwait_init'] = int(1/Fps * 1000) + 1  # 生画像を表示する場合、FPS値からキー入力待ち時間を設定
     else: 
         keyCtl['iwait_init'] = 1
     # ウィンドウの更新間隔を設定
@@ -2858,6 +2858,8 @@ def main():
     if Tracking_only: 
         Db.csvfile1.close()
         Db.csvfile2.close()
+    if Cv2Video is not None:
+        Cv2Video.release()
     Db.close() 
     cap[0].release()
     if multi_frames and cap[1] is not None: cap[1].release()

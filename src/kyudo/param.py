@@ -172,7 +172,7 @@ StartAction_params = [
         [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 5, None, None, None, None, None],             # 3.弓構え
         [1.000, 0.015, -45.0, 45.0, 9, None, None, None],            # 4.打起こし
-        [0.006, 0.006, 0.006, 0.006, 5, 0.050, None, None],          # 5.引分け
+        [0.006, 0.006, 0.006, 0.006, 3, 0.050, None, None],          # 5.引分け
         [0.050, 0.020, 8, None, None, None, None, None],             # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 3, None, None, None, None, None],             # 8.残心
