@@ -200,7 +200,7 @@ function yoloAp {
     }
     else {
         $param_id = '1.7-' + $v26
-        $v = '-V26' + $v8
+        $v = '-V26' + $v26
     }
     if ($man) {
         $no=2
