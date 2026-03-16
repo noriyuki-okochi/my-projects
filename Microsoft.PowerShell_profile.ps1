@@ -97,6 +97,7 @@ function model {
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
+        write-output ">v26Activate	                  ：V26仮想環境をアクティベートする"
     }
     else {
         if ( $head -ne '' ) {
@@ -189,6 +190,7 @@ function yoloAp {
         [switch]$raw,
         [switch]$clip,
         [string]$case,
+        [string]$multi='',
         [string]$gru,
         [string]$v8='s',
         [string]$v26='',
@@ -238,7 +240,8 @@ function yoloAp {
         write-output '>yoloAp -update -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -raw		：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yoloAp -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yoloAp -case <登録ケース名> [-level <no>] ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
+        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
+        write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}]                ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
@@ -256,7 +259,7 @@ function yoloAp {
         write-output ' ,(<):巻き戻し'
         write-output ' k(K) :再生速度アップ'
         write-output ' l(L) :再生速度ダウン'
-        write-output ' g :グリッド表示・非表示（"-r"時無効）'
+        write-output ' g :グリッド表示・非表示'
     } 
     elseif ($h) {           
         # 詳細ヘルプ表示
@@ -273,6 +276,10 @@ function yoloAp {
     elseif ($raw) {         
         # 動画生再生
         python ./src/yoloApp.py -d1 -a  -r -w --
+    }
+    elseif ($multi -ne '') {         
+        # マルチ動画再生
+        python ./src/yoloApp.py -d1 -a -multi $multi --
     }
     elseif ($clip) {        
         # 動画切り取り
