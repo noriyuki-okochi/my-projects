@@ -2026,9 +2026,9 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
     elif key == ord('>'):                   # (>) nフレーム進める
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
             # キー入力データの2文字目以降をフレーム数として設定
-            ctl['skip_frames'] = int(ctl['key_data'][1:])
+            ctl['skipf_frames'] = int(ctl['key_data'][1:])
             ctl['key_data'] = ''            # キー入力データをクリア
-        Frame_counter += ctl['skip_frames'] 
+        Frame_counter += ctl['skipf_frames'] 
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
     
@@ -2043,9 +2043,9 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # (<) nフレーム戻す
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
             # キー入力データの2文字目以降をフレーム数として設定
-            ctl['skip_frames'] = int(ctl['key_data'][1:])
+            ctl['skipb_frames'] = int(ctl['key_data'][1:])
             ctl['key_data'] = ''            # キー入力データをクリア
-        if Frame_counter > ctl['skip_frames'] :Frame_counter -= ctl['skip_frames']  
+        if Frame_counter > ctl['skipb_frames'] :Frame_counter -= ctl['skipb_frames']  
         else: Frame_counter = 1
         cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
         print(f"フレーム={Frame_counter}")
@@ -2152,6 +2152,10 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             ctl['stop_frame'] = 0
             print(f"繰り返し再生の終了フレームをリセット")
 
+        # フレームスキップ数をデフォルトにリセット
+        ctl['skipf_frames'] = 1
+        ctl['skipb_frames'] = 2              
+
         # グリッド表示をデフォルトにリセット
         ctl['grid_shape'] = (6, 6)              
         ctl['grid_shift'] = (0, 0)
@@ -2212,7 +2216,8 @@ def main():
         'tag1_section': 0,                          # タグ1のセクションカウンター 
         'tag2_section': 0,                          # タグ2のセクションカウンター
         'attention': 0,                             # アテンション出力カウンター
-        'skip_frames': 8,                           # 早送り、巻き戻しフレーム数
+        'skipf_frames': 1,                          # 早送りフレーム数
+        'skipb_frames': 2,                          # 巻き戻しフレーム数
         'videoWrite': False,                        # 動画ファイルへの書き込みフラグ
         'repeat': False,                            # 繰り返し再生フラグ
         'frame_count': 0,                           # 総フレーム数
