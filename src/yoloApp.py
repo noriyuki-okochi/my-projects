@@ -295,17 +295,6 @@ class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
     Skip:bool = False
-    # 補正対象のキーポイントの信頼度閾値テーブル
-    # --'nose', 
-    #   'left_eye',             'right_eye',                'left_ear',             'right_ear', 
-    #   'left_shoulder',        'right_shoulder',           'left_elbow',           'right_elbow', 
-    #   'left_wrist',           'right_wrist',              'left_hip',             'right_hip',
-    #   'left_knee',            'right_knee',               'left_ankle',           'right_ankle'--
-    Limit_val = [ {'valid':0, 'limit':0.0}, 
-        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, 
-        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.85}, {'valid':0, 'limit':0.0}, 
-        {'valid':0, 'limit':0.85}, {'valid':0, 'limit':0.92},{'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0},
-        {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}, {'valid':0, 'limit':0.0}]
     
     def __init__(self, result, boxid=None):
         if boxid is None:
@@ -340,24 +329,13 @@ class MyResult(Keypoint):
         # 各キーポイントの移動ベクトルの長さの加重平均を格納するリスト（calc_moving_averageで作成_）
         self.arrow_moving_ave = np.zeros(len(Kn2idx))  
         # 過去のサンプルキーポイントの現在位置までの移動ベクトルの長さと角度のタプルを格納するリスト（calc_arrow_length_anglesで作成_）  
-        self.arrow_length_angles = [None] * Window_size
+        self.arrow_length_angles = [None] * Sample_lag_Max
              
     #　指定キーポイントの移動ベクトルの長さ（加重平均値）と角度をタプルで返す
     def tuple_ave_angle(self, idx):
         _, angle = self.arrow_length_angles[0][idx]         # idxの移動ベクトルの長さと角度を取得
         return self.arrow_moving_ave[idx], angle            # 移動ベクトルの長さ（加重平均値）と角度を返す
     
-    # 信頼度の低いキーポイントの座標を直前の値で置き換える    
-    def adjust_points(self, prePoints):
-        for key, idx in Kn2idx.items():
-            # 有効なデータが出現したかどうかを判定
-            if self.confs[idx] > MyResult.Limit_val[idx]['limit']:  MyResult.Limit_val[idx]['valid'] = 1
-                
-            if self.Limit_val[idx]['valid'] == 1 and self.confs[idx] < MyResult.Limit_val[idx]['limit']:
-                self.points[idx] = prePoints[idx]           
-                mylog.log(INFO, f"[adjust_points]:フレーム={Frame_counter}, Key={key},"\
-                              + f" conf={self.confs[idx]:.3f}({MyResult.Limit_val[idx]['limit']:.3f})")
-     
     # 指定キーポイントの移動ベクトルの長さ、角度を計算する            
     def vector_length(self, idx, points):
         """
@@ -2196,10 +2174,7 @@ def main():
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
     filetypes = f"WIN_{timestamp}_*.mp4"            #'*WIN_YYYYmmdd_10_46_55_Pro.mp4'  # 動画ファイル名
-    file_name = [None, None]                        # 動画ファイル名
-    prePointsBuffer = RingBuffer(Window_size)       # 検出結果を保存するリングバッファ                           
-    preResult = RingBuffer(2)                       # 前回の検出結果（補整済）を保存するリングバッファ                           
-    preFrame = None                                 # 前回のフレームを保存する変数
+    file_name = [None, None]  
     #
     case_name = None                                # ケース名（デフォルト：動画ファイル名）
     #
@@ -2283,7 +2258,7 @@ def main():
     input_dim = Num_input
     output_dim = Num_classes
     seq_frames = Num_frames
-    _, _, _, section_dim, completed_dim = Hyper_parameters
+    _, _, _, _, section_dim, completed_dim = Hyper_parameters
         
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
@@ -2381,6 +2356,8 @@ def main():
         if f'-{V8}' in opts:
             V8_model = V8.lower()  # YOLOv8モデルを使用
 
+    # 動作解析パラメータのフレーム名を設定（デフォルト値から変更することがあるため、ここで設定）
+    param_nm = f"{Sample_frames}.{Sample_lag}-{V8_model[-1:]}"
     # サンプリングフレーム数を取得
     opt_val  = [opt for opt in opts if opt.startswith('-f')]
     if len(opt_val) > 0:
@@ -2390,13 +2367,7 @@ def main():
                 Sample_frames = int(vals[0])
             if len(vals) > 1 and vals[1].isnumeric(): 
                 Sample_lag = int(vals[1])
-    #print(f"frames={Sample_frames}, lag={Sample_lag}")
-    #
-    if Sample_lag > 0:
-        param_nm = f"{Sample_frames}.{Sample_lag}-{V8_model[-1:]}"
-    else:               
-        param_nm = f"{Sample_frames}-{V8_model[-1:]}"
-    
+
     # 段レベル(step)を取得
     step_no = 1
     opt_val  = [opt for opt in opts if opt.startswith('-s')]
@@ -2720,7 +2691,12 @@ def main():
     #------------------------------------------------------------------------
     #  メインのループ処理 
     #------------------------------------------------------------------------
+    buffer_size = max( (Window_size, (Sample_lag+1)) )  # リングバッファサイズ
+    prePointsBuffer = RingBuffer(buffer_size)           # 検出結果を保存するリングバッファ                           
+    preResult = RingBuffer(2)                           # 前回の検出結果（補整済）を保存するリングバッファ                           
+    preFrame = None                                     # 前回のフレームを保存する変数
     actStr = 'action :'
+    # メインループ
     while True:
         # 次のフレームの読み込み
         ret, frame = cap[0].read()
@@ -2771,11 +2747,6 @@ def main():
                 preResult.clear()
                 annotated_frame = frame
             else:
-                '''
-                if preResult.len() > 1 and Section_no > 1 and Section_no < 9:
-                    # 直近の検出結果がある場合、信頼度の低いキーポイント座標データは前回採用データで置き換える
-                    myResult.adjust_points(preResult.get().points)
-                '''
                 # 補正用の直近リングバッファに保存
                 preResult.append( myResult )
                 
