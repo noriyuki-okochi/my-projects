@@ -147,6 +147,7 @@ Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle']
 # 動作解析起点データのサンプリング間隔（フレーム数）
 Sample_frames:int = 1
 Sample_lag:int = 7
+Sample_lag_Max:int = 16
 # ハイパーパラメータのデフォルト値設定
 L2_lambda = 1e-5         # L2正則化の強度
 l2_lambda = os.getenv('L2_LAMBDA')
@@ -156,11 +157,12 @@ if l2_lambda != None:
 Sequence_frames:int = 96    # 入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
+R_factor:float = 1.0   # 学習率減衰の係数
 Face_dim:int = 4       # 顔向き埋め込みベクトルの次元数
 Section_dim:int = 8
 Completed_dim:int = 4
 Hyper_parameters = (Sequence_frames, \
-                    Batch_size, N_epoch,\
+                    Batch_size, N_epoch, R_factor, \
                     Section_dim, Completed_dim) 
 Learning_rate:float = 0.001  # 学習率   
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
