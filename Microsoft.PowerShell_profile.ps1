@@ -25,10 +25,9 @@ $l2_lambda = $env:L2_LAMBDA
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
-$b = 192    # バッチサイズ
-$e = 301    # エポック数
+$b = 32     # バッチサイズ
 $e = 280    # エポック数
-$e = 500    # エポック数
+$r = 1.0    # 学習率の減衰率
 $d_s = 8    # 埋め込み次元数(section)
 $d_c = 4    # 埋め込み次元数(completed)
 #
@@ -36,23 +35,24 @@ $d_c = 4    # 埋め込み次元数(completed)
 #$b = 256    # バッチサイズ
 #$e = 161    # エポック数
 #$d_c = 6    # 埋め込み次元数(completed)
-$env:HYPER_PARAM=($s,$b,$e,$d_s,$d_c)
-$hp_vals = @($s,$b,$e,$d_s,$d_c)
-$hparam = $hp_vals[0],$hp_vals[1],$hp_vals[2],$hp_vals[3],$hp_vals[4]
+$env:HYPER_PARAM=($s,$b,$e,$r,$d_s,$d_c)
+$hp_vals = @($s,$b,$e,$r,$d_s,$d_c)
+$hparam = $hp_vals[0],$hp_vals[1],$hp_vals[2],$hp_vals[3],$hp_vals[4],$hp_vals[5]
 #
 # 登録ケース名リスト
 #
 # 個別ケース設定例
-$cases_list = "iwata_1.7s2-3", "okochi_1.7s2-3", "kanoda_1.7s2-3", "tuneyoshi_1.7s2-3"
-$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3","anbe_1.7s2-3"
-$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "anbe_1.7s1-3"
-$cases_list = "iijima_1.7s1-3", "iijima_1.7s2-3", "iwata_1.7s1-3","iwata_1.7s2-3"
-$cases_list = "iijima_1.7s3-3", "iwata_1.7s1-3", "iwata_1.7s2-3", "nemoto_1.7s3-3"
-$cases_list = "iijima_1.7s1-3","iijima_1.7s2-3", "iwata_1.7s1-3", "iwata_1.7s2-3", "nemoto_1.7s3-3"
-$cases_list = "iijima_1.7s3-3", "anbe_1.7s3-3", "iwata_1.7s3-3", "nemoto_1.7s3-3"
-$cases_list = "iijima_1.7s0-3", "anbe_1.7s0-3", "iwata_1.7s0-3", "nemoto_1.7s0-3"
+$cases_list = "iwata_1.2", "okochi_1.2", "kanoda_1.2", "tuneyoshi_1.2"
+$cases_list = "iijima_1.1", "iijima_1.2", "anbe_1.1","anbe_1.2"
+$cases_list = "iijima_1.1", "iijima_1.2", "anbe_1.1"
+$cases_list = "iijima_1.1", "iijima_1.2", "iwata_1.1","iwata_1.2"
+$cases_list = "iijima_1.3", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
+$cases_list = "iijima_1.1","iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
+$cases_list = "iijima_1.3", "anbe_1.3", "iwata_1.3", "nemoto_1.3"
+$cases_list = "iijima_1.0", "anbe_1.0", "iwata_1.0", "nemoto_1.0"
+$cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 # 一括ケース設定例
-#$cases_list = "iijima_1.7s3-3,anbe_1.7s3-3,iwata_1.7s3-3,nemoto_1.7s3-3"
+#$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
 $env:CASE_LIST=$cases_list
 #
 function help {
@@ -93,7 +93,7 @@ function model {
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
-        write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータを設定する"
+        write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
@@ -148,7 +148,7 @@ function model {
                 $hp_vals[$i] = $val
                 $i++    
             }
-            $hparam = $hp_vals -join ','
+            $hparam = $hp_vals -join ' '
             $env:HYPER_PARAM="$hparam"
             $str = '・ハイパーパラメータが ' + $hparam + ' に設定されました。'
             write-output $str
@@ -194,6 +194,7 @@ function yoloAp {
         [string]$gru,
         [string]$v8='s',
         [string]$v26='',
+        [string]$sample='1.7',
         [switch]$mask
     )
     if ($v26 -eq '') {
@@ -291,7 +292,7 @@ function yoloAp {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py -d1 -a -w -t  $case  $v $slevel classes=3 $mozic --
+        python ./src/yoloApp.py -d1 -a -w -t  $case  $v $slevel -f"$sample" classes=3 $mozic --
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -306,11 +307,11 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -t $case $mozic --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -t $case $mozic --
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -w $mozic --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $mozic --
         }
     }
     else{
@@ -377,6 +378,7 @@ function kyudo {
         [string]$import,
         [string]$case,
         [string]$train,
+        [string]$valid='none',
         [switch]$section,
         [string]$predict,
         [int]$input_frames = 0,
@@ -405,7 +407,7 @@ function kyudo {
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]          ：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train   <登録ケース名> [-section] [-model <モデルファイル>] [-eta <学習率>]           ：解析結果データで学習する'
+        write-output '>kyudo  -train   <登録ケース名> [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
         write-output '>kyudo  -predict <登録ケース名> [-multi] [-model <モデルファイル>]      	              ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
@@ -451,14 +453,16 @@ function kyudo {
         # 学習実行
         $idx = $args.IndexOf($model)
         $len = $args.Length
+        # 検証ケース名が指定さた場合は、-valid オプションで指定する
+        $valid_case = $valid
         if (-not $section ) {
             if ($train -ne 'list') {
                 # 単一ケース学習（登録ケース名指定）
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/kyudoApp.py -d -case $train classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
+                    python ./src/kyudoApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
                 }
                 else {
-                    python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
+                    python ./src/kyudoApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
                 }
             }
             else {
@@ -469,7 +473,7 @@ function kyudo {
                     write-output $str
                     $i = 1
                     foreach ( $case_name in $cases_list ) {
-                        python ./src/kyudoApp.py -d -case $case_name classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                         #Write-Output $LASTEXITCODE
                         if ( $LASTEXITCODE -ne 0 ) {
                             break
