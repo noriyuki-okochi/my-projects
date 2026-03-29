@@ -61,7 +61,8 @@ if '-h' in opts:        #debug write
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
-         + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<section_embed_dim>,<completed_embed_dim>])']\n"\
+         + "        [-valid <case_name>|none]\n"\
+         + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
     exit(0)
 # 
@@ -158,20 +159,30 @@ if case_compare and '-R' in opts:
     
 if len(case_names) == 0:
     print("[kyudoApp]:error:'-case <name>' must be specified.")
-    exit(0)
+    exit(1)
 
+valid_case:str = []
+if '-valid' in cmds:
+    #検証対象ケース名の指定
+    i = cmds.index('-valid')
+    if len(cmds) > (i + 1) and cmds[i + 1] != 'none':
+        valid_case.append(cmds[i +1])
+        print(f"[kyudoApp]:valid_case:{valid_case}")
 # ケース名の存在チェック
-for name in case_names:
+names = case_names.copy()
+if len(valid_case) > 0 and valid_case[0] not in names:
+    names.append(valid_case[0])
+for name in names:
     db.case_name = name
     FPS, count = db.get_fps()
     if FPS is None:
-        print(f"[kyudoApp]error:'{names} not found in frame_info table.")
-        exit(0)
+        print(f"[kyudoApp]error:'{name}' not found in frame_info table.")
+        exit(1)
     if count == 0 and '-import' not in cmds:
-        print(f"[kyudoApp]error:'{names} import count is zero.")
-        exit(0)
+        print(f"[kyudoApp]error:'{name} import count is zero.")
+        exit(1)
 #print(f"[kyudoApp]info:FPS={FPS:.3f}, import_count={count}")
-#c
+#
 # CSVデータのインポートを指定するコマンドオプションの解析
 #
 if '-import' in cmds and len(case_names) > 0 :
@@ -304,8 +315,18 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # numpy配列に変換
     x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
     y = df_y.to_numpy(dtype=np.int64)           # (input_frames, 1)
+    np_train = (x, y)
+    
+    # 検証用データの読み込みとnumpy配列への変換
+    np_valid = None
+    if len(valid_case) > 0:  
+        df_x = db.pandas_read_kyudo( features, valid_case )             # 評価用特徴量(input_frames, input_dim)                       
+        df_y = db.pandas_read_kyudo( ['label as label'] , valid_case)   # 教師ラベル(input_frames, 1)
+        print(f"[kyudoApp]val_x.shape={df_x.shape}, val_y.shape={df_y.shape}")   
+        np_valid = (df_x.to_numpy(dtype=np.float32), df_y.to_numpy(dtype=np.int64))
+    
     # 学習パラメータ
-    s_frames, batch_size, n_epoch, section_dim, completed_dim = hyper_parameters
+    s_frames, batch_size, n_epoch, r_factor, section_dim, completed_dim = hyper_parameters
     log_write(f"[kyudoApp]:num_classes:{num_classes}")
     log_write(f"[kyudoApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
     log_write(f"[kyudoApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
@@ -330,7 +351,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         model.to( get_device() )
     else:
         print(f"[kyudoApp]error:'Illegal model option:{model_opt}")
-        exit(0)
+        exit(1)
     # モデル情報の表示
     log_write(f"[kyudoApp]:model\n {model}")
     log_write(f"[kyudoApp]:input_size={input_dim}, output_size={num_classes}")
@@ -343,7 +364,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
             log_write(f"[kyudoApp]:model loaded from {model_pth}")
         elif predict:
             print(f"[kyudoApp]error:model-file({model_pth}) not found.")
-            exit(0)
+            exit(1)
         else:
             print(f"[kyudoApp]:model-file({model_pth}) will be created.")
     
@@ -356,11 +377,11 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     # 学習、または予測の実行
     if not predict:      
         log_write(f"[kyudoApp]:batch_size={batch_size}, n_epoch={n_epoch}")
-        log_write(f"[kyudoApp]:learning_rate={Learning_rate:.5f}")
+        log_write(f"[kyudoApp]:learning_rate={Learning_rate:.5f}, r_factor={r_factor:.2f}")
         log_write(f"[kyudoApp]:L2_lambda={L2_lambda:.5f}")
         log_write(f"[kyudoApp]:section-option={section}")
         # 学習実行(train)
-        train_Kyudo( model, x, y, s_frames, batch_size, n_epoch, pth = model_pth )
+        train_Kyudo( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, pth = model_pth )
 
         # 学習結果のlossデータの読み込み、プロット準備
         csvfile = model.csvpath
