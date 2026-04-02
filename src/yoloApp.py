@@ -2057,18 +2057,32 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         print(f"アテンション({ctl['attention']}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
 
     elif key == ord('I'):
-        step = None
-        if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
-            # キー入力データの1文字目をステップ番号として設定
-            step = int(ctl['key_data'][1:])
-            ctl['key_data'] = ''
-
         tbl = CompleteAction_param
-        if step is not None: tbl['step'] = step
+        print(f">Please input frame-name.!: [/:cancle]")
+        ans = input(f"{tbl['frame']} -> :")
+        if len(ans) > 0:
+            if ans == '/':
+                return True
+            elif ans not in InitAction_param_nms:
+                print(f"Error: Invalid frame name. Please input one of {InitAction_param_nms}")
+                return True
+            else: tbl['frame'] = ans
+        print(f">Please input step.!: [/:cancle]")
+        ans = input(f"{tbl['step']} -> :")
+        if len(ans) > 0:
+            if ans == '/':
+                return True
+            elif ans.isnumeric() == False:
+                print(f"Error: Invalid step. Please input a numeric value.")
+                return True
+            else: tbl['step'] = int(ans)
+        # 動作完了パラメータをテーブルに登録
         Db.insert_act_param(tbl)
         print(f"パラメータ:{tbl['frame']} step={tbl['step']},act={tbl['act']} テーブル登録完了")
+        # 動作開始パラメータをテーブルに登録
+        StartAction_param['frame'] = CompleteAction_param['frame']
+        StartAction_param['step'] = CompleteAction_param['step']
         tbl = StartAction_param
-        if step is not None: tbl['step'] = step
         Db.insert_act_param(tbl)
         print(f"パラメータ:{tbl['frame']} step={tbl['step']},act={tbl['act']} テーブル登録完了")
     
