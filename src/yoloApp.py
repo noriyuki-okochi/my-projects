@@ -137,6 +137,7 @@ def help():
     print(" j :指定フレームへジャンプ（ジャンプ先フレームは数値入力キー’i’で指定：：(<フレームカウント>)）")
     print(" r :繰り返し再生開始／停止（'-r'時のみ有効）,’i’キー押下後のとき、停止中は開始、開始中は停止フレームを設定")
     print(" R :繰り返し再生開始フレームに戻る")
+    print(" z :ズーム領域を指定してズーム再生開始（終了はクリア'c'キー押下）")
     print(" g :グリッド表示・非表示（分割数は数値入力キー’i’で指定：：(0|1)(<分割数>),0=行,1=列）")
     print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(グリッド幅の割合<分子><分母>)）")
     print(" 0 :姿勢解析開始")
@@ -1650,43 +1651,6 @@ def adjust_frame_contrast(frame, alpha=1,beta=0):
     adjusted_frame = cv2.LUT(frame, table)  # ルックアップテーブルを使用してコントラストと明るさを調整
     return adjusted_frame
 #
-# モザイク処理
-#
-def mosaic_area( src, y, x, height, width, ratio=0.1):
-    #print(f"[mosice_area]:({y}, {x}), height={height}, width={width}, shape={src.shape}")
-    if y <= 0 or (y + height) >= src.shape[0]: return src
-    x = 0 if x < 0 else x
-    x = src.shape[1] - width if (x + width) >= src.shape[1] else x
-    #print(f"[mosice_area]:({y}, {x})")
-    
-    dst_area = src[y:y + height, x:x + width]
-    small = cv2.resize(dst_area, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
-    zoom = cv2.resize(small, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
-    src[y:y + height, x:x + width] = zoom
-    return src
-#
-# モザイク処理エリアを取得する関数
-#
-def get_mosaic_areas(myResult):
-    areas = []
-    boxes = myResult.boxes              # 検出されたバウンディングボックスの取得
-    keypoints = myResult.keypoints      # 検出されたキーポイントの取得
-    max_box_no = myResult.boxid         # 対象ボックスの番号
-    
-    # 対象ボックス以外の顔エリアの矩形を求める
-    for i in range(len(boxes.xywh)):        
-        if i == max_box_no: continue 
-        _, _, w, _ = map(int, boxes.xywh[i])                                # ボックスの幅を取得
-        x, y = map(int, keypoints.xy[i][Kn2idx['nose']]) 
-        x1, _ = map(int, keypoints.xy[i][Kn2idx['left_eye']]) 
-        x2,_ = map(int, keypoints.xy[i][Kn2idx['right_eye']]) 
-        if x == 0: x = x1 if x1 > 0 else x2
-        #conf = keypoints.conf[i][Kn2idx['nose']].item()
-        #mylog.log(DEBUG, f"[get_mosaic_areas]:{i}:({y}, {x}, {conf:.3f}, {x1}, {x2}, {w})")
-        mylog.log(DEBUG, f"[get_mosaic_areas]:{i}:({y}, {x}, {x1}, {x2}, {w})")
-        areas.append( [int(y - w/4), int(x - w/3), int(w/1.5), int(w/1.5)] )    # 矩形情報を追加
-    return areas
-#
 # 2つのフレームを重ねて表示する関数
 #
 def multi_frame_display(frame1, frame2):
@@ -1745,10 +1709,56 @@ class Rect:
         x2, y2 = self.end
         self.x[0], self.x[1] = sorted([x1, x2])
         self.y[0], self.y[1] = sorted([y1, y2])        
-        return  (self.x[1] - self.x[0]), (self.y[1] - self.y[0])
-    
+        return  (self.x[1] - self.x[0]), (self.y[1] - self.y[0])    
 # グローバル変数
-Rect_area = Rect()
+Rect_area: Rect = Rect()
+#
+# モザイク処理エリアを取得する関数
+#
+def get_mosaic_areas(myResult):
+    areas = []
+    boxes = myResult.boxes              # 検出されたバウンディングボックスの取得
+    keypoints = myResult.keypoints      # 検出されたキーポイントの取得
+    max_box_no = myResult.boxid         # 対象ボックスの番号
+    
+    # 対象ボックス以外の顔エリアの矩形を求める
+    for i in range(len(boxes.xywh)):        
+        if i == max_box_no: continue 
+        _, _, w, _ = map(int, boxes.xywh[i])                                # ボックスの幅を取得
+        x, y = map(int, keypoints.xy[i][Kn2idx['nose']]) 
+        x1, _ = map(int, keypoints.xy[i][Kn2idx['left_eye']]) 
+        x2,_ = map(int, keypoints.xy[i][Kn2idx['right_eye']]) 
+        if x == 0: x = x1 if x1 > 0 else x2
+        mylog.log(DEBUG, f"[get_mosaic_areas]:{i}:({y}, {x}, {x1}, {x2}, {w})")
+
+        areas.append( [int(y - w/4), int(x - w/3), int(w/1.5), int(w/1.5)] )  # 矩形情報を追加
+    return areas
+#
+# モザイク処理
+#
+def mosaic_area( src, y, x, height, width, ratio=0.1):
+    #print(f"[mosice_area]:({y}, {x}), height={height}, width={width}, shape={src.shape}")
+    if y <= 0 or (y + height) >= src.shape[0]: return src
+    x = 0 if x < 0 else x
+    x = src.shape[1] - width if (x + width) >= src.shape[1] else x
+    #print(f"[mosice_area]:({y}, {x})")
+    
+    dst_area = src[y:y + height, x:x + width]
+    small = cv2.resize(dst_area, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
+    zoom = cv2.resize(small, dsize=(width, height), interpolation=cv2.INTER_NEAREST)
+    src[y:y + height, x:x + width] = zoom
+    return src
+#
+# ズーム処理
+#
+def zoom_area( src, y, x,  height, width, frame_width, frame_height ):
+    if y <= 0 or (y + height) >= frame_height: return src   
+    x = 0 if x < 0 else x
+    x = frame_width - width if (x + width) >= frame_width else x    
+    dst_area = src[y:y + height, x:x + width]
+    zoom = cv2.resize(dst_area, dsize=(frame_width, frame_height), interpolation=cv2.INTER_LINEAR)
+    return zoom
+
 #RectAreas:Rect = []
 #
 def draw_rectangle(event, x, y, flags, param):
@@ -1803,8 +1813,12 @@ def clip_process( frame ):
             Rect_area.roi_set = False
             rectAreas.clear()
             continue
-        if key_val == ord("q") or key_val == ord("c") :
-            # 処理を中断、または継続する
+        elif key_val == ord("q"):
+            # 処理を中断
+            rectAreas.clear()
+            break
+        elif key_val == ord("c"):
+            # 指定を確定
             break
     #
     cv2.destroyWindow("Select ROI")
@@ -2121,6 +2135,17 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         ctl['key_data'] += str(ikey_num)
         print(f"キー入力データ={ctl['key_data']}")
         
+    elif key == ord('z'):
+        rectAreas:Rect = []
+        while( True ): 
+            rectAreas = clip_process( annotated_frame ) # ズーム領域を指定する
+            if rectAreas is  None: break                # 'q'押下で中断
+            elif len(rectAreas) > 0:                    # 'c'押下でズーム処理継続
+                # ズーム領域座標の取得
+                ctl['zoom_rect'] = rectAreas.pop(0)  # 最初の矩形をズーム領域として設定
+                print(f"ズーム領域を設定しました: {ctl['zoom_rect'].width_height()}")
+                break        
+        
     elif key == ord('c'):
         if Alart_message != '':
             Section_color =  YELLOW             # セクションの色（黄色）BGR
@@ -2143,7 +2168,9 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if ctl['stop_frame'] != 0:              # 繰り返し再生の終了フレームをリセット
             ctl['stop_frame'] = 0
             print(f"繰り返し再生の終了フレームをリセット")
-
+            
+        # ズーム領域をリセット
+        ctl['zoom_rect'] = None           
         # フレームスキップ数をデフォルトにリセット
         ctl['skipf_frames'] = 1
         ctl['skipb_frames'] = 2              
@@ -2214,7 +2241,8 @@ def main():
         'stop_frame': 0,                            # 繰り返し再生終了フレーム
         'grid': False,                              # グリッド表示有無
         'grid_shape': (6, 6),                       # グリッド分割数(行,列)
-        'grid_shift': (0, 0)                        # グリッド表示シフト量(行,列)
+        'grid_shift': (0, 0),                       # グリッド表示シフト量(行,列)
+        'zoom_rect': None                           # ズーム領域
     }
     # print command line(arguments)
     args = sys.argv
@@ -2731,8 +2759,15 @@ def main():
                 for rect in rectAreas:
                     # モザイク処理
                     w, h = rect.width_height()
-                    annotated_frame = mosaic_area( annotated_frame, \
-                                                   (rect.y[0] - frame_y), (rect.x[0] - frame_x), h, w )
+                    y1 = rect.y[0]
+                    x1 = rect.x[0]
+                    annotated_frame = mosaic_area( annotated_frame, y1 - frame_y, x1 - frame_x, h, w )
+            elif keyCtl['zoom_rect'] is not None:
+                # ズーム処理
+                w, h = keyCtl['zoom_rect'].width_height()
+                y1 = keyCtl['zoom_rect'].y[0]
+                x1 = keyCtl['zoom_rect'].x[0]
+                annotated_frame = zoom_area( frame, y1, x1, h, w, frame_width, frame_height )
             else:
                 if multi_frames and cap[1] is not None:
                     # 画面を重ねて表示
@@ -2792,8 +2827,7 @@ def main():
                             # モザイク処理
                             areas = get_mosaic_areas(myResult)
                             for rect in areas:
-                                annotated_frame = mosaic_area( annotated_frame, \
-                                                    rect[0], rect[1], rect[2], rect[3] )
+                                annotated_frame = mosaic_area( annotated_frame, rect[0], rect[1], rect[2], rect[3] )
 
                 else:
                     # YOLOv8のplot関数を使用してフレームに描画  
