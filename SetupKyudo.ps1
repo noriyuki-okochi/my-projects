@@ -11,11 +11,11 @@ Write-Host  "'user-name' replaced with '$env:USERNAME' in StartKyudo.ps1."
 #
 # ユーザープロファイルのパスを取得
 $profile_pass = $profile
-$ans = & Test-Path -Path $profile_pass
+$ans = & Test-Path -Path $profile_pass 2>&1 
 Write-Host  "'$profile_pass' exists: $ans"
 if (-not $ans) {
-    New-Item -Path $profile_pass -ItemType File -Force
-    Write-Host  "Created new profile file at '$profile_pass'."
+    $ret = & New-Item -Path $profile_pass -ItemType File -Force 2>&1 
+    Write-Host  "Created new profile file at '$ret'."
     $ans = $true
 } else {
     Write-Host  "Profile file already exists at '$profile_pass'."
