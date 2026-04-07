@@ -5,6 +5,9 @@ import numpy as np
 # 共通定数
 ##############################
 DB_PATH = './yolo-kyudo.db'
+path = os.getenv('DB_PATH')
+if path != None:
+    DB_PATH = path
 #   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
 PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
 path = os.getenv('ROLL_PATH')
