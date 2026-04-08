@@ -1,6 +1,7 @@
 #PowerShell -ExecutionPolicy RemoteSigned SetupKyudo.ps1
 # プロファイルの実行ポリシーをRemoteSignedに設定することで、ローカルで作成したスクリプトを実行できるようになります。
 Set-ExecutionPolicy RemoteSigned 
+Write-Host  ">>'Set ExecutionPolicy' to RemoteSigned."
 # ホームディレクトリ（カレントディレクトリ）設定
 $home_dir = (Get-Location).Path
 # StartKyudo.ps1のユーザ名とホームディレクトリを置換
@@ -39,8 +40,8 @@ if ($answer -eq "Y") {
 $version = & python -V 2>&1 
 if ($version -match "Python 3") {
     Write-Host  ">>$version is installed."
-    $answer = Read-Host "> Do you want to install the required packages for Kyudo? (y/n)"
-    if ($answer -eq "y") {
+    $answer = Read-Host "> Do you want to install the required packages for Kyudo? (Y/n)"
+    if ($answer -eq "Y") {
          python -m pip install -r requirements.txt
     } else {
         Write-Host ">>Skipping package installation. You can install the required packages later by running 'python -m pip install -r requirement.txt'."
