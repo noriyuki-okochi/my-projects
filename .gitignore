@@ -16,6 +16,8 @@ pt/
 !requirement*.txt
 *__.*
 _*.*
+*.ps1
+!_*.ps1
 src/*__.* 
 src/.ipynb_checkpoints
 src/__pycache__
