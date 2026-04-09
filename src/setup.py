@@ -30,12 +30,13 @@ def main():
         print("Usage: python setup.py $profile")
         return
     profile = sys.argv[1]
-    print(f"Profile: {profile}")
+    print(f"デフォルトのユーザプロファイル: {profile}")
     #
     # プロファイルの存在チェック
     if not os.path.exists(profile):
-        print(f"Profile '{profile}' does not exist.")
-        print(f">Do you want to create it? ( {profile} ).! [Y/n]")
+        print(f"デフォルトのユーザープロファイルが存在しません.")
+        print(f"デフォルトのユーザープロファイルはターミナルオープン時に自動で実行されます.")
+        print(f">作成しますか? [Y/n]")
         ans = input(f">:")
         if ans == 'Y':
             # プロファイルが存在しない場合、空のファイルを作成する
@@ -69,6 +70,8 @@ def main():
         if ret == 0:
             print(f"Failed to copy './_StartKyudo.ps1' to './StartKyudo.ps1'")
             return
+        
+    print(f">>セットアッププロファイル('./SetupKyudo.ps1')を実行してインストールを続行してください.")
     '''
     #
     # プロファイルの実行ポリシーをRemoteSignedに設定する
