@@ -70,6 +70,8 @@ def main():
         if ret == 0:
             print(f"Failed to copy './_StartKyudo.ps1' to './StartKyudo.ps1'")
             return
+        
+    print(f">>セットアッププロファイル('./SetupKyudo.ps1')を実行してインストールを続行してください.")
     '''
     #
     # プロファイルの実行ポリシーをRemoteSignedに設定する
