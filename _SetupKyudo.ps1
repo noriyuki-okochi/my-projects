@@ -15,8 +15,8 @@ $profile_pass = $profile
 $ans = & Test-Path -Path $profile_pass 2>&1 
 Write-Host  ">>'$profile_pass' exists: $ans"
 if ($ans) {
-    Write-Host  ">>Profile file already exists at '$profile_pass'."
-    $answer = Read-Host "> Do you want to replace the above items in the existing profile file? (Y/n)"
+    Write-Host  ">>デフォルトのユーザープロファイルが'$profile_pass' に存在しています。"
+    $answer = Read-Host "> このプロファイルを、本’Kyudo’プロジェクトで使用しますか? (Y/n)"
     if ($answer -ne "Y") {
         $ans = $false
     }
@@ -28,10 +28,10 @@ if ($ans) {
     Write-Host  ">>'user-name' replaced with '$env:USERNAME' in $profile_pass."
 }
 $roll_path = "C:/Users/$env:USERNAME/Pictures/Camera Roll/"
-Write-Host  ">>Setting ROLL_PATH to '$roll_path'."
-$answer = Read-Host "> Do you want to set ROLL_PATH to other than '$roll_path'? (Y/n)"
+Write-Host  ">>デフォルトの動画フォルダ：'$roll_path'"
+$answer = Read-Host "> デフォルトの動画フォルダを '$roll_path' 以外に変更しますか? (Y/n)"
 if ($answer -eq "Y") {
-    $roll_path_new = Read-Host "> Please enter the path for ROLL_PATH (e.g., C:/Users/YourName/Pictures/Camera Roll/)"
+    $roll_path_new = Read-Host "> 新しい動画フォルダのパスを入力してください (例: C:/Users/YourName/Pictures/Camera Roll/)"
     (Get-content $profile_pass) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content $profile_pass
     (Get-content ./StartKyudo.ps1) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content .\StartKyudo.ps1
     Write-Host  ">>Updated ROLL_PATH to '$roll_path_new' in $profile_pass."
@@ -40,7 +40,17 @@ if ($answer -eq "Y") {
 $version = & python -V 2>&1 
 if ($version -match "Python 3") {
     Write-Host  ">>$version is installed."
-    $answer = Read-Host "> Do you want to install the required packages for Kyudo? (Y/n)"
+    # Python仮想環境の作成と有効化
+    $answer = Read-Host "> Python仮想環境を作成しますか? (Y/n)"
+    if ($answer -eq "Y") {
+        python -m venv .venv
+        Write-Host  ">>Python virtual environment '.venv' created."
+        ./.venv/Scripts/Activate.ps1
+        Write-Host  ">>Python virtual environment '.venv' activated."
+        write-Host  ">>deavtivateコマンドで仮想環境を終了できます。"
+    }
+    # Kyudoプロジェクトの依存パッケージのインストール
+    $answer = Read-Host "> 本'Kyudo'プロジェクトの依存パッケージをインストールしますか? (Y/n)"
     if ($answer -eq "Y") {
          python -m pip install -r requirements.txt
     } else {
