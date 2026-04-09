@@ -13,7 +13,7 @@ pt/
 *.xlsx
 *.txt
 !readme.txt
-!requirement*.txt
+!requirements.txt
 *__.*
 _*.*
 *.ps1
