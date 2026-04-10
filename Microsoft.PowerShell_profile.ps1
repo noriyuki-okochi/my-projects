@@ -1,7 +1,10 @@
-# ホームディレクトリ設定
-$HOME_DIR = 'f:/share/YOLO'
+# Sqlite3データベースパス設定
+$env:DB_PATH = './yolo-kyudo_local.db'
+#
 # 動画ファイル検索位置設定
 $env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
+# ホームディレクトリ設定
+$HOME_DIR = 'f:/share/YOLO'
 #
 # ホームディレクトリに移動
 set-location $HOME_DIR
@@ -51,6 +54,7 @@ $cases_list = "iijima_1.1","iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
 $cases_list = "iijima_1.3", "anbe_1.3", "iwata_1.3", "nemoto_1.3"
 $cases_list = "iijima_1.0", "anbe_1.0", "iwata_1.0", "nemoto_1.0"
 $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
+$cases_list = "memoto_2.1", "sato_2.1", "yoshimoto_2m.0"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
 $env:CASE_LIST=$cases_list
@@ -177,7 +181,11 @@ function model {
             Write-Output $str
             $str = '・ホームディレクトリ  ： ' + $HOME_DIR
             Write-Output $str
+            if ( $env:DB_PATH -ne '') {
+                $str = '・データベース名      ： ' + $env:DB_PATH
+                Write-Output $str
             }
+        }
     }   
 }
 # 動画再生・解析ツール関数
@@ -195,7 +203,7 @@ function yoloAp {
         [string]$v8='s',
         [string]$v26='',
         [string]$sample='1.7',
-        [switch]$mask
+        [string]$mask=''
     )
     if ($v26 -eq '') {
         $param_id = '1.7-' + $v8
@@ -211,7 +219,7 @@ function yoloAp {
     }
     else {
         $no=0
-        $slevel='-s0'
+        $slevel=''
     }
     $idx = $args.IndexOf("-level")
     $len = $args.Length
@@ -231,16 +239,16 @@ function yoloAp {
         write-output 'GRUモデルファイル名を指定してください' 
         return
     }
-    $mozic = ''
-    if ( $mask ) {
-        $mozic = '-z'
+    $mozic = '-z'
+    if ( $mask -eq 'non' ) {
+        $mozic = ''
     }
     #
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>yoloAp -update -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
-        write-output '>yoloAp -raw		：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
-        write-output '>yoloAp -clip		：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
+        write-output '>yoloAp -update [-v8 {s|m}] -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
+        write-output '>yoloAp -raw		               ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
+        write-output '>yoloAp -clip		               ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}]                ：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
