@@ -62,9 +62,9 @@ function help {
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
 }
 # 仮想環境アクティベート関数
-function v26Activate {
-    .v26/Scripts/activate
-    write-output '仮想環境:.v26がアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
+function actvenv {
+    .venv/Scripts/activate
+    write-output '仮想環境:.venvがアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
 }
 function home {
     set-location $HOME_DIR
