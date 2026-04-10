@@ -28,7 +28,7 @@
          ④　必要に応じて、Pythonの仮想環境を作成する
 	     ⑤	アプリ実行に必要なパッケージをインストールする
             （注）アンチウィルスソフトのリアルタイムスキャンを停止しておく
-		    > python -m pip install -r  requirment.txt
+		    > python -m pip install -r  requirments.txt
 	
 （実行）		
 １. ターミナル、またはPowerShellでコンソールを開く。	
