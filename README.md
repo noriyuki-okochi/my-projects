@@ -12,7 +12,7 @@
         > python -V  
     （注）Visual Studio(C:\ProgramFile(x86)\Microsoft VisualStudio)がないときは、  
           Visual Studio Community206のインストールが必要。  
-          https://visualstudio.microsoft.com/ja/vs/community/  
+          [ダウンロードサイト](https://visualstudio.microsoft.com/ja/vs/community/)  
           （インストール時に、「Python開発」にチェックを入れる）
 		
 ## ３）ターミナル（管理者）、またはPowerShell（管理者）でコンソールを開く（タスクバーのスタート右クリックメニュー）
