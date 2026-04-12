@@ -59,6 +59,7 @@ function help {
     write-output '> chart  -help : 解析データ登録／データ表示ツールの使用ガイダンスを表示する'
     write-output '> kyudo  -help : 学習データ登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
+    write-output ">actvenv	     ：仮想環境をアクティベートする"
 }
 # 仮想環境アクティベート関数
 function actvenv {
