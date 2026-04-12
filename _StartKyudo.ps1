@@ -59,7 +59,6 @@ function help {
     write-output '> chart  -help : 解析データ登録／データ表示ツールの使用ガイダンスを表示する'
     write-output '> kyudo  -help : 学習データ登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
-    write-output ">actvenv	     ：仮想環境をアクティベートする"
 }
 # 仮想環境アクティベート関数
 function actvenv {
@@ -92,7 +91,7 @@ function model {
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
-        write-output ">v26Activate	                  ：V26仮想環境をアクティベートする"
+        write-output ">actvenv	     ：仮想環境をアクティベートする"
     }
     else {
         if ( $head -ne '' ) {
