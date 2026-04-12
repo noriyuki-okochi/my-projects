@@ -92,7 +92,7 @@ function model {
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
-        write-output ">v26Activate	                  ：V26仮想環境をアクティベートする"
+        write-output ">actvenv	                    ：仮想環境をアクティベートする"
     }
     else {
         if ( $head -ne '' ) {
