@@ -44,7 +44,7 @@ key_names:str = [name for name in Kn2idx]
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("chart.py -case {-L(ist)|'<case-name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
+    print("chart.py -case {-L(ist)|'<case_name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
          + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] \n"\
          + "        [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -58,6 +58,10 @@ cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()
 #
 case_compare:bool = False
 case_names:str = []
+if '-key' in cmds:
+    print("キーポイントリスト：")
+    print(key_names)
+    exit(0)
 if '-case' in cmds:
     i = cmds.index('-case')
     if len(cmds) > (i + 1):
