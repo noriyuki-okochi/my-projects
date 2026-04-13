@@ -251,6 +251,7 @@ function yoloAp {
         write-output ' q :再生終了'
         write-output ' p :一時停止／再開'
         write-output ' r :繰り返し再生開始／停止（"-r"時のみ有効）'
+        write-output ' z :矩形範囲のズーム表示'
         write-output ' w :ファイル出力開始／停止'
         write-output ' t :解析データ出力開始／停止'
         write-output ' s :スナップショットファイルの作成'
@@ -325,40 +326,65 @@ function chart {
     param(
         [switch]$help,
         [switch]$h,
-        [switch]$list,
-        [string]$import,
+        [switch]$list_case,
+        [switch]$list_key,
+        [string]$import='',
         [string]$case,
         [string]$key=''
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>chart  -list				：登録済ケース名の一覧を表示する'
+        write-output '>chart  -list_case                    ：登録済ケース名の一覧を表示する'
+        write-output '>chart  -list_key                     ：ポイントキー名の一覧を表示する'
         write-output '>chart  -import <登録ケース名>                ：解析結果ポイントデータファイルのデータをデータベースに登録する'
-        write-output '>chart  -case   <登録ケース名> [-key <データ名>] ：解析結果ポイントデータをグラフ表示する'
+        write-output ">chart  -case   <登録ケース名> -key '<キー名>{,<キー名>}...' ：解析結果ポイントデータをグラフ表示する"
         write-output '>chart  -h	  ：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
         # 詳細ヘルプ表示
         python ./src/chart.py -h
     } 
-    elseif ($list) {
+    elseif ($list_case) {
         # 登録済ケース名一覧表示
         python ./src/chart.py  -d -case -L
-    } 
-    elseif ($import -ne '') {
-        # 解析結果ポイントデータファイルのデータをデータベースに登録
-        python ./src/chart.py  -d -case $import  -import -f0 0 -m
+    }
+    elseif ($list_key) {
+        # ポイントキー名一覧表示
+        python ./src/chart.py  -d -key
     }
     elseif ($case -ne '') {
         # 解析結果ポイントデータをグラフ表示
         if ($key -ne '') {
             # 指定キーのデータをグラフ表示
-            python ./src/chart.py -d  $key -case $case  -f0 0  -m -span 
+            $key_list = $key.Split(',')
+            $keys = @("","","","")
+            $i = 0
+            foreach ( $k in $key_list ) {
+                if ( $i -ge 4 ) {
+                    write-output '1、2、または4つのキーを指定してください' 
+                    return
+                }
+                $keys[$i] = $k
+                $i++
+            }
+            if ( $i -eq 1 ) {
+                python ./src/chart.py -d  $keys[0] -case $case  -f0 0  -m 
+            }
+            elseif ( $i -eq 2-or $i -eq 4) {
+                python ./src/chart.py -d  $keys[0] $keys[1] $keys[2] $keys[3] -case $case  -f0 0 
+            }
+            else {
+                write-output '1、2、または4つのキーを指定してください' 
+            }
         }
         else {
             # デフォルトキーのデータをグラフ表示
             python ./src/chart.py -d  right_wrist left_wrist right_elbow left_elbow -case $case  -f0 0      
         }
+    }
+    elseif ($import -ne '') {
+        # 解析結果ポイントデータファイルのデータをデータベースに登録
+        python ./src/chart.py  -d -case $import  -import
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -404,9 +430,9 @@ function kyudo {
         write-output '>kyudo  -deletet <登録ケース名>	                     ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
-        write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]          ：解析結果データをグラフ表示する'
+        write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
         write-output '>kyudo  -train   <登録ケース名> [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
-        write-output '>kyudo  -predict <登録ケース名> [-multi] [-model <モデルファイル>]      	              ：解析結果データで予測する'
+        write-output '>kyudo  -predict <登録ケース名> [-model <モデルファイル>]      	                            ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -441,7 +467,7 @@ function kyudo {
     }
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録
-        python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -f0 0 -m
+        python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import
     }    
     elseif ($case -ne '') {
         # 解析結果データをグラフ表示
