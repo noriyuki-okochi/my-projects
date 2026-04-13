@@ -45,7 +45,7 @@ key_names:str = [name for name in Kn2idx]
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
     print("chart.py -case {-L(ist)|'<case_name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
-         + "        {<key_name1>|[ <key_name2>...]|*} [-range '<min>[,<max>']] \n"\
+         + "        {<key_name1>|[ <key_name2>...]|*} [-key] [-range '<min>[,<max>']]\n"\
          + "        [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-h(elp)] [-d(ebug)]")
