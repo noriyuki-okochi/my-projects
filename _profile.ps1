@@ -54,7 +54,7 @@ function help {
     # プロファイルの表示
     write-output $profile
     write-output '・このプロファイルでは、射形動画解析ツールの使用に必要な環境変数の設定と、ツールのコマンドを定義しています。'
-    write-output '・コマンドを実行することで、ツールの使用ガイダンスが表示されます。'
+    write-output '・次のコマンドを実行することで、ツールの使用ガイダンスが表示されます。'
     write-output '> help         : このヘルプを表示する'
     write-output '> yoloAp -help : 動画再生・解析ツールの使用ガイダンスを表示する'
     write-output '> chart  -help : 解析データ登録／データ表示ツールの使用ガイダンスを表示する'
@@ -533,6 +533,10 @@ function kyudo {
     else{
         write-output '不正なパラメータが指定されました' 
     }	
+}
+# 仮想環境作成済の時は、プロファイル読み込み時に仮想環境をアクティベートする
+if (Test-Path -Path .venv/Scripts/Activate.ps1) {
+    actvenv
 }
 # コマンドエイリアス設定
 #Set-Alias -Name help -Value help
