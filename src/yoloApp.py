@@ -1406,15 +1406,21 @@ def draw_rectangle(event, x, y, flags, param):
         if Rect_area.length() > 100: Rect_area.roi_set = True
 #
 # クリッピング領域指定
-def clip_process( frame ):
+def clip_process( frame , rotate = False):
     global Rect_area
     rectAreas:Rect = []
     # クリッピング・ウィンドウとマウスイベント・コールバック登録
     cv2.namedWindow("Select ROI")
     cv2.setMouseCallback("Select ROI", draw_rectangle)
     # クリッピング処理
+    h, w = frame.shape[1], frame.shape[0]
+    ratio = h/w if h < w else w/h    
     while True:
-        temp_frame = frame.copy()   # 読み込んだ先頭フレーム上で矩形領域を指定する
+        temp_frame = frame.copy()   # 読み込んだ先頭フレーム上で矩形領域を指定する    
+        if rotate:
+            temp_frame = cv2.resize(temp_frame, dsize=None, fx=ratio, fy=ratio , interpolation=cv2.INTER_NEAREST)
+            temp_frame = cv2.rotate(temp_frame, cv2.ROTATE_90_CLOCKWISE)
+            
         for rect in rectAreas:
             # 指定済み矩形のライン描画
             cv2.rectangle(temp_frame, rect.start, rect.end, GREEN, 1)
@@ -1450,8 +1456,11 @@ def clip_process( frame ):
     cv2.destroyWindow("Select ROI")
     if key_val == ord("q") : return  None   # 以降の処理を中断してプログラムを終了
     if len(rectAreas) == 0:
-        print(f"クリッピング領域を指定してください。")
-        return rectAreas
+        #print(f"クリッピング領域を指定してください。")
+        #return rectAreas
+        Rect_area.start = (0, 0)
+        Rect_area.end = (frame.shape[1], frame.shape[0])
+        rectAreas.append( copy.copy(Rect_area) )
     return copy.deepcopy( rectAreas )
 #
 # キー入力操作関数
@@ -1831,6 +1840,7 @@ def main():
     cam_id = None                                   # デフォルトのカメラID
     raw_video = False                               # 生画像を表示するオプション
     clip_video = False                              # 生画像をクリップしてファイルを作成
+    rotate_video = False                            # 動画を90度回転して表示するオプション
     manual_plot = False                             # 手動でプロット、姿勢解析するオプション
     nn_gru = False                                  # GRUによる姿勢解析オプション
     multi_frames = False                 #          # 2動画ファイルを重ねて再生するオプション
@@ -1903,6 +1913,8 @@ def main():
     if '-clip' in opts:
         clip_video = True
         raw_video = True        # 生画像を表示するオプション
+        if '-rotate' in opts: 
+            rotate_video = True # 動画を90度回転して表示するオプション   
 
     if '-multi' in opts:
         multi_frames = True     # 生画像を表示するオプション
@@ -2224,7 +2236,8 @@ def main():
     rectAreas:Rect = []
     if clip_video:
         while( True ): 
-            rectAreas = clip_process( frame )
+            # クリッピング領域を指定する
+            rectAreas = clip_process( frame, rotate_video ) 
             if rectAreas is  None: return           # 'q'押下で終了
             elif len(rectAreas) > 0:                # 'c'押下で処理継続
                 # クリッピング領域座標の取得
@@ -2364,6 +2377,7 @@ def main():
     preResult = RingBuffer(2)                           # 前回の検出結果（補整済）を保存するリングバッファ                           
     preFrame = None                                     # 前回のフレームを保存する変数
     actStr = 'action :'
+    ratio = frame_height/frame_width if frame_height < frame_width else frame_width/frame_height
     # メインループ
     while True:
         # 次のフレームの読み込み
@@ -2380,6 +2394,9 @@ def main():
         Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_video is True:
             if clip_video:
+                if rotate_video:
+                    frame = cv2.resize(frame, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
+                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
                 # クリッピング処理
                 annotated_frame = frame[ frame_y:frame_y + frame_height, frame_x:frame_x + frame_width ]
                 for rect in rectAreas:
