@@ -197,6 +197,7 @@ function yoloAp {
         [switch]$man,
         [switch]$raw,
         [switch]$clip,
+        [switch]$rotate,
         [string]$case,
         [string]$multi='',
         [string]$gru,
@@ -293,7 +294,11 @@ function yoloAp {
     }
     elseif ($clip) {        
         # 動画切り取り
-        python ./src/yoloApp.py -d1 -a -clip --
+        $clockwise = ''
+        if ($rotate) {
+            $clockwise = '-rotate'
+        }
+        python ./src/yoloApp.py -d1 -a -clip $clockwise --
     }
     elseif ($case -ne '' -and $gru -eq '') {    
         # 動画再生・ロジック解析、結果保存
