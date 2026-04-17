@@ -82,3 +82,19 @@ create table if not exists kyudo_data( case_name text NOT NULL,
                                     time_epoch integer,
                                     PRIMARY KEY(case_name, frame_no) 
                                 );
+drop table if exists eval_data;
+create table if not exists eval_data( case_name text NOT NULL,
+                                    step int NOT NULL,
+                                    section int NOT NULL,
+                                    score int DEFAULT(0),
+                                    split real DEFAULT(0.0),
+                                    rl real DEFAULT(0.0),
+                                    er real DEFAULT(0.0),
+                                    sl real DEFAULT(0.0),
+                                    push int DEFAULT(0),
+                                    pull int DEFAULT(0),
+                                    alart int DEFAULT(0),
+                                    inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
+                                    time_epoch integer,
+                                    PRIMARY KEY(case_name, step, section)
+                                );

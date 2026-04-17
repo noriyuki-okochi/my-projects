@@ -65,10 +65,10 @@ def main():
         #空のファイルを作成する
         with open("./StartKyudo.ps1", "w") as f: pass
         print(f"File './StartKyudo.ps1' is created.")
-        # './_StartKyudo.ps1'を'./StartKyudo.ps1'にコピーする
-        ret = file_copy("./_StartKyudo.ps1", "./StartKyudo.ps1")
+        # './_profile.ps1'を'./StartKyudo.ps1'にコピーする
+        ret = file_copy("./_profile.ps1", "./StartKyudo.ps1")
         if ret == 0:
-            print(f"Failed to copy './_StartKyudo.ps1' to './StartKyudo.ps1'")
+            print(f"Failed to copy './_profile.ps1' to './StartKyudo.ps1'")
             return
         
     print(f">>セットアッププロファイル('./SetupKyudo.ps1')を実行してインストールを続行してください.")
