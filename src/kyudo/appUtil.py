@@ -6,7 +6,8 @@
 import os
 import pandas as pd
 import math
-
+from datetime import datetime
+import time
 #
 # local package
 from  kyudo.env import * 
@@ -482,26 +483,64 @@ class MyEval:
     """
     def __init__(self):
         self.eval = { # 現在セクションの評価データ
-                      'score': 10 , 'completed': 0, 'split_tm': 0.0, \
+                      'completed': 0,'score': 10 , 'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                       }              
         self.section = -1               # 現在のセクション（節） 番号(0-9)
         self.completed = 0              # 現在の完了状態(0/1)
+        self.step = 0                   # ステップ番号
         self.evals = []                 # 評価データリスト(9節分)
         self.alarts = []                # 警告リスト
         self.frame = None               # 評価結果表示用のフレーム
         self.xy = (10, 170)             # 評価結果表示位置
         self.cv2 = None                 # 評価結果表示用のcv2モジュール
         self.score_on = False           # 総合評価点数表示のON/OFF
-        self.score_text = ""             # 総合評価点数表示用のテキスト
-    
+        self.score_text = ""            # 総合評価点数表示用のテキスト
+        self.csvpath = None             # 評価結果保存用のCSVファイルパス
+        self.csvfd = None               # 評価結果保存用のCSVファイルオブジェクト
+        self.case_name = None           # 評価ケース名
+        self.lv_no = 0                  # レベル番号
+        self.cycle = 0                  # セクションのサイクル
+            
+    # CSVファイルを開いてヘッダーを書き込む
+    def open_csv(self,case_name: str, lv_no: int, path: str):
+        self.case_name = case_name
+        self.lv_no = lv_no
+        self.csvpath = path.replace('track', 'eval')
+        print(f"[open_csv]: csvpath={self.csvpath}")
+        
+        self.csvfd = open(self.csvpath, 'w', newline='', encoding='utf-8')
+        # CSVファイルにヘッダーを書き込む
+        header = "case_name,step,section,score,split,rl,er,sl,push,pull,alart,inserted_at,time_epoch\n"
+        self.csvfd.write(header)
+        self.csvfd.flush()
+        
+    # CSVファイルに評価データを書き込む
+    def out_csv(self):        
+        d = datetime.now()
+        timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
+        time_epoc = int(time.mktime(d.timetuple()))
+        
+        values = f"{self.case_name},{self.lv_no},{self.section+10*self.cycle},"
+                    
+        for i, value in enumerate(self.eval.values()):
+            if i == 0: continue                                # completed
+            elif i > 1 and i < 6:                              # split, rl,er,sl
+                values += f"{value:.3f},"
+            else:
+                values += f"{value},"
+            
+        values += f"'{timestamp}',{time_epoc}"            
+        self.csvfd.write(f"{values}\n")
+        self.csvfd.flush()
+        
     # 評価データの初期化
     def reset(self):
         self.section = -1               # 現在のセクション（節） 番号(0-9)
         self.completed = 0              # 現在の完了状態(0/1
         # 評価データの初期化
-        self.eval = { 'score': 10, 'completed': 0, 'split_tm': 0, \
+        self.eval = { 'completed': 0, 'score': 10, 'split_tm': 0, \
                       'rl_angle': 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
                       'push_cnt': 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                     }
@@ -530,8 +569,11 @@ class MyEval:
         if section != self.section:
             if (section == 0) or (section < self.section):
                 if section != 0 : 
+                    # セクションが0以外で前のセクションより小さい場合、
+                    # 評価点数を表示してから初期化
                     self.print()
                     self.score_on = True
+                    self.cycle += 1
                 # 評価データの初期化
                 self.reset()
 
@@ -539,15 +581,20 @@ class MyEval:
                 self.eval['score'] -= 5 if self.eval['completed'] == 0 else 0                   # 完了していない場合、セクション変更で5点減点
                 self.eval['score'] = 0 if self.eval['alart_cnt'] > 0 else self.eval['score']    # 警告は減点
 
-                print(f"[my_evaluate]: section({self.section}) evaluated.") 
-                mylog.log(INFO, f"[my_evaluate]:section={self.section}, score={self.eval['score']}, alart={self.eval['alart_cnt']},"\
-                                f" split={self.eval['split_tm']:.2f},"\
-                                f" rl={self.eval['rl_angle']:.2f}, er={self.eval['er_angle']:.2f}, sl={self.eval['sl_angle']:.2f}, "\
-                                f" push={self.eval['push_cnt']}, pull={self.eval['pull_cnt']}")
-                          
+                print(f"[my_evaluate]: section({self.section})  evaluated.") 
+                mylog.log(INFO, f"[my_evaluate]:section={self.section}  score={self.eval['score']}  alart={self.eval['alart_cnt']}"\
+                                f"  split={self.eval['split_tm']:.2f}"\
+                                f"  rl={self.eval['rl_angle']:.2f}  er={self.eval['er_angle']:.2f}  sl={self.eval['sl_angle']:.2f}"\
+                                f"  push={self.eval['push_cnt']}    pull={self.eval['pull_cnt']}")
+                if self.csvfd is not None:
+                    self.out_csv()  # CSVファイルに評価データを書き込む
+                              
                 # 現在の評価データを保存
                 self.evals[self.section - 1] = self.eval.copy()
-                self.eval['alart_cnt'] = 0    # 警告カウントはセクションごとにリセット   
+                self.eval['score'] = 10         # スコアはセクションごとにリセット（10点満点）   
+                self.eval['alart_cnt'] = 0      # 警告カウントはセクションごとにリセット   
+                self.eval['push_cnt'] = 0
+                self.eval['pull_cnt'] = 0
                 
         elif completed != self.completed:
             if completed == 1:
@@ -566,9 +613,6 @@ class MyEval:
             if section == 5:
                 if step == 11:      self.eval['push_cnt'] += 1
                 elif step == 12:    self.eval['pull_cnt'] += 1
-            else:
-                self.eval['push_cnt'] = 0
-                self.eval['pull_cnt'] = 0
         # 
         if self.score_on: 
             # 評価点数の表示
@@ -581,7 +625,6 @@ class MyEval:
     # 評価結果の表示
     def print(self):
         if self.frame is not None and self.cv2 is not None:
-            print(f"[my_evaluate]: score_on={self.score_on}")
             if not self.score_on: 
                 # セクションごとの評価点数の合計を計算
                 score = 0
@@ -672,18 +715,35 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     csvfile = csvfile.replace('track','kyudo')
     if csvfile == '' or os.path.isfile(csvfile) == False:
         # ファイルが存在しないとき終了
-        print(f"[import_tracking_data]error: csv-file({csvfile}) not found.")
+        print(f"[import_kyudo_data]error: csv-file({csvfile}) not found.")
         return False    
     # CSVファイルを読み込む
     df = pd.read_csv(csvfile)
-    print(f"[import_tracking_data]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
+    print(f"[import_kyudo_data]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
     if df['case_name'][0] != case_name:
-        print(f"[import_tracking_data]:case_name:{df['case_name'][0]} changed to '{case_name}'")
+        print(f"[import_kyudo_data]:case_name:{df['case_name'][0]} changed to '{case_name}'")
         df['case_name'] = case_name
     
     db.delete_kyudo_data()         # 登録済データの削除
     df.to_sql('kyudo_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[import_tracking_data]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
+    print(f"[import_kyudo_data]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
+
+    # 評価データをeval_dataテーブルへ登録
+    csvfile = csvfile.replace('kyudo','eval')
+    if csvfile == '' or os.path.isfile(csvfile) == False:
+        # ファイルが存在しないとき終了
+        print(f"[import_eval_data]error: csv-file({csvfile}) not found.")
+        return False    
+    # CSVファイルを読み込む
+    df = pd.read_csv(csvfile)
+    print(f"[import_eval_data]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
+    if df['case_name'][0] != case_name:
+        print(f"[import_eval_data]:case_name:{df['case_name'][0]} changed to '{case_name}'")
+        df['case_name'] = case_name
+    
+    db.delete_eval_data()         # 登録済データの削除
+    df.to_sql('eval_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
+    print(f"[import_eval_data]info:import '{csvfile}' to 'eval_data'{df.shape}.")
     return True
 #
 # 登録ケースの削除関数

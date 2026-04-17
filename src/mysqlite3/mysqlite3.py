@@ -292,6 +292,16 @@ class MyDb:
         values += f"{self.section},{self.completed},{label},'{timestamp}',{time_epoc}"            
         self.csvfile2.write(f"{values}\n")
 #
+# delete eval_data table
+    def delete_eval_data(self):
+        sql = f"delete from eval_data where case_name = '{self.case_name}'"
+        try:
+            self.cur.execute(sql)
+        except:
+            print("[delete_eval_data]:no records.")
+        else:
+            self.conn.commit()
+#
 # select FPS from balance-table
 #
     def get_fps(self, case_name=None):
