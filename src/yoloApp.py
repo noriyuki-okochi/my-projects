@@ -2019,6 +2019,7 @@ def main():
     if not raw_video and ( '-t' in opts) :
         manual_plot = True
         Tracking_only = True    # トラッキングのみを行うオプション
+        Eval_enabled = True     # 評価用のデータ作成をセット
         # トラッキングデータリストのインスタンス作成
         if not nn_gru: 
             InputPdf = FeaturePdf(input_key, seq_frames)
@@ -2248,6 +2249,7 @@ def main():
     if Tracking_only:
         # トラッキングデータ、姿勢解析データの出力先CSVファイルを開く
         Db.open_csv()
+        Eval.open_csv(case_name, step_no, Db.csvpath1)
         # トラッキングデータの情報テーブルに登録 
         Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1] )     
     #---------------------------------------------------------------------  
