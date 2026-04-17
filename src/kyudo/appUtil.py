@@ -546,7 +546,8 @@ class MyEval:
                                 f" push={self.eval['push_cnt']}, pull={self.eval['pull_cnt']}")
                           
                 # 現在の評価データを保存
-                self.evals[self.section - 1] = self.eval.copy()   
+                self.evals[self.section - 1] = self.eval.copy()
+                self.eval['alart_cnt'] = 0    # 警告カウントはセクションごとにリセット   
                 
         elif completed != self.completed:
             if completed == 1:
@@ -580,14 +581,17 @@ class MyEval:
     # 評価結果の表示
     def print(self):
         if self.frame is not None and self.cv2 is not None:
+            print(f"[my_evaluate]: score_on={self.score_on}")
             if not self.score_on: 
+                # セクションごとの評価点数の合計を計算
                 score = 0
                 for i in range(8): 
                     score += self.evals[i]['score']
-                                    
+                #                    
                 self.score_text = f"total score:{score}, alart:{len(self.alarts)}"
                 print(f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
                 mylog.log(INFO, f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
+            #  総合評価点数の表示
             self.cv2.putText(self.frame, self.score_text, self.xy, self.cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)        
         return 
 #
