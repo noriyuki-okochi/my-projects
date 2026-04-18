@@ -187,8 +187,8 @@ for name in names:
 #
 if '-import' in cmds and len(case_names) > 0 :
     # 対象は先頭のケース名に限定
-    if import_tracking_data(db, cmds, case_names[0]) is False:
-        exit(0)
+    _, count_k, _ = import_tracking_data(db, cmds, case_names[0])
+    if count_k == 0: exit(0)
 #
 model_pth = None
 model_opt = None

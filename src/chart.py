@@ -112,9 +112,9 @@ for name in case_names:
 #
 if '-import' in cmds:
     # 対象は先頭のケース名に限定
-    if import_tracking_data(db, cmds, case_names[0]) is False:
-        exit(0)
-#
+    count_t, count_k, count_e = import_tracking_data(db, cmds, case_names[0])
+    if count_t == 0 or count_k == 0: exit(0)
+
 # 表示対象のキーポイントを指定するコマンドオプションの解析
 #
 selkeys:str = [key for key in args if key in key_names]

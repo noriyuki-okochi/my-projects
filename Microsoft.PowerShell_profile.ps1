@@ -326,7 +326,7 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -t $case $maskon $evalon --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon --
         }
         else{
             # 動画再生・GRU解析
@@ -404,7 +404,7 @@ function chart {
     }
     elseif ($import -ne '') {
         # 解析結果ポイントデータファイルのデータをデータベースに登録
-        python ./src/chart.py  -d -case $import  -import
+        python ./src/chart.py  -d -case $import  -import -m -f0 0 right_wrist -second box_h
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -487,7 +487,7 @@ function kyudo {
     }
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録
-        python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import
+        python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -m -f0 0
     }    
     elseif ($case -ne '') {
         # 解析結果データをグラフ表示
