@@ -1222,7 +1222,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     # 評価用のデータ保存、採点
     if Eval_enabled:
         Eval(frame = annotated_frame, xy = (10, 170), cv2 = cv2)
-        Eval(Section_no, 1 if Completed else 0, Step_counter, Split_sec, \
+        Eval(Frame_counter, Section_no, 1 if Completed else 0, Step_counter, Split_sec, \
              RL_angle, ER_angle, SL_angle, Alart_id)
     
     # セクション名を編集
@@ -1247,7 +1247,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     if Section_no == 4 or Section_no == 5 or Section_no == 6:
         cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     if Section_no == 7 or Section_no == 8:
-        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
     #
@@ -1618,7 +1618,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # セクション番号を設定  
         Section_no = key - ord('0')
         if Section_no == 0:
-            if Eval_enabled: Eval(0)        # 評価用のデータをリセット 
+            if Eval_enabled: Eval(section = 0)  # 評価用のデータをリセット 
             print(f"姿勢解析を開始します")
         else:  print(f"セクション番号を設定: {Section_no}")
         Completed = False
