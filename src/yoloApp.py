@@ -807,6 +807,9 @@ def section_completed(section_no, myResult:MyResult):
     elif section_no == 8:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))} ]")
+        _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
+        _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
+        mylog.log(INFO, f">>>   angR-ELWR={ER_angle:.1f}°, angL-SHWR={SL_angle:.1f}°")
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
         if normR < thsd(PRM[0]) and normL < thsd(PRM[1]):
@@ -1247,7 +1250,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     if Section_no == 4 or Section_no == 5 or Section_no == 6:
         cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     if Section_no == 7 or Section_no == 8:
-        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
     #
