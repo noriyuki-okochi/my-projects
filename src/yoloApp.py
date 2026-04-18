@@ -306,7 +306,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 #
 def section_started(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    global ER_angle
+    global ER_angle, SL_angle, RL_angle
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -320,7 +320,10 @@ def section_started(section_no, myResult:MyResult):
     normL, anglL = arrow[Kn2idx['left_wrist']]                      # 左手首の移動ベクトルの長さと角度
     normS, _ = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
     xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
+
     _, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
+    _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
+    _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
     
     started = False
     # 共通の開始条件を取得
@@ -447,7 +450,6 @@ def section_started(section_no, myResult:MyResult):
     
     # 6-Kai  ->  7-Hanare        
     elif section_no == 6:  
-        _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
         mylog.log(INFO, f">>>   angR-EW={ER_angle:.1f}°")
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
@@ -540,7 +542,10 @@ def section_completed(section_no, myResult:MyResult):
     xy_nose = keyPoints.xy('nose')                                  # 鼻の座標
 
     lenY, _ = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
+
     _, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
+    _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
+    _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
         
     completed = False
     # 共通の開始条件を取得
@@ -794,11 +799,7 @@ def section_completed(section_no, myResult:MyResult):
             #    Step_counter = 1  # 連続回数をリセット
     
     # 7-Hanare        
-    elif section_no == 7:  
-        _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
-        _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
-        mylog.log(INFO, f">>>   angR-ELWR={ER_angle:.1f}°, angL-SHWR={SL_angle:.1f}°")
-        
+    elif section_no == 7:          
         Step_counter = Step_counter + 1
         Stkp.push( [(0,PRM[0])] )  
         if Step_counter > PRM[0]: completed = True
@@ -807,10 +808,6 @@ def section_completed(section_no, myResult:MyResult):
     elif section_no == 8:  
         mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
         mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))} ]")
-        _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')   # 右肘から右手首へのベクトルの長さと角度を計算
-        _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
-        mylog.log(INFO, f">>>   angR-ELWR={ER_angle:.1f}°, angL-SHWR={SL_angle:.1f}°")
-
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
         if normR < thsd(PRM[0]) and normL < thsd(PRM[1]):
             # 右手首と左手首の移動ベクトルの長さが50以下の場合（姿勢の保持で完了）
