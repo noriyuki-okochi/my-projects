@@ -503,7 +503,6 @@ class MyEval:
         self.frame
         self.lv_no = 0                  # レベル番号
         self.cycle = 0                  # セクションのサイクル
-        self.deduction = 0              # 減点数
             
     # CSVファイルを開いてヘッダーを書き込む
     def open_csv(self,case_name: str, lv_no: int, path: str):
@@ -555,10 +554,33 @@ class MyEval:
         # 警告リストの初期化
         self.alarts.clear()                                        
         print(f"[my_evaluate]: reset.")
+        
+    def check_deduction(self):
+        section = self.section
+        deduction = 0
+
+        if self.eval['alart_cnt'] > 0:
+            # 警告の有無をチェックして減点する
+            deduction += 10
+            mylog.log(INFO, f"[my_evaluate]: section({self.section}) alart_cnt={self.eval['alart_cnt']}  deduction=10")            
+        if section == 6:
+            # 会の保持時間をチェックして減点する
+           if self.eval['split_tm'] < 2.5: 
+                deduction += 5
+                mylog.log(INFO, f"[my_evaluate]: section({self.section})  split_tm={self.eval['split_tm']:.2f} < 2.5  deduction=5")
+        elif section == 8:
+            # 残身の保持時間をチェックして減点する
+            if self.eval['split_tm'] < 1.5:
+                deduction += 5
+                mylog.log(INFO, f"[my_evaluate]: section({self.section})  split_tm={self.eval['split_tm']:.2f} < 1.5  deduction=5")
+        #
+        # その他のセクションの減点条件をチェックして減点数を計算する
+        #
+        return deduction
          
     # 評価データの更新
-    def __call__(self, frame_no=-1,section=-1, completed=0, step=0, split=0, \
-                        rl_angle=0.0, er_angle=0.0, sl_angle=0.0, alart=0, \
+    def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
+                        rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, alart:int=0, \
                         frame=None, xy=None, cv2=None):
         # 
         if frame is not None: self.frame = frame
@@ -568,8 +590,7 @@ class MyEval:
         
         self.frame_no = frame_no
         if alart != 0:
-            # 警告がある場合、評価データに加点
-            self.deduction = 10
+            # 警告がある場合、警告カウントを増やして、警告リストに追加
             self.eval['alart_cnt'] += 1
             self.alarts.append(alart)
         if section != self.section:
@@ -585,9 +606,10 @@ class MyEval:
                 self.reset()
 
             elif self.section > 0:
-                # 評価点数の減算                
-                self.eval['score'] -= self.deduction if self.deduction <= self.eval['score'] else 0                                            # その他の減点
-                print(f"[my_evaluate]: section({self.section})  evaluated.") 
+                # 評価点数の減算
+                deduction = self.check_deduction()  # 減点数の計算                
+                self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0                                            # その他の減点
+                print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction}, score={self.eval['score']})") 
                 mylog.log(INFO, f"[my_evaluate]:section={self.section}  score={self.eval['score']}  alart={self.eval['alart_cnt']}"\
                                 f"  split={self.eval['split_tm']:.2f}"\
                                 f"  rl={self.eval['rl_angle']:.2f}  er={self.eval['er_angle']:.2f}  sl={self.eval['sl_angle']:.2f}"\
@@ -601,7 +623,6 @@ class MyEval:
                 self.eval['alart_cnt'] = 0      # 警告カウントはセクションごとにリセット   
                 self.eval['push_cnt'] = 0
                 self.eval['pull_cnt'] = 0
-                self.deduction = 0              # 減点数はセクションごとにリセット
                 
         elif completed != self.completed:
             if self.csvfd is not None:
@@ -612,7 +633,7 @@ class MyEval:
                 if section == 9:
                     self.print() 
                     self.score_on = True
-                    self.reset()  # 9節完了で評価データを初期化
+                    self.reset()  # 9節完了で評価データを初期
                 
         elif self.section > 0:
             if step != self.step and self.csvfd is not None: 

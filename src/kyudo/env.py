@@ -185,27 +185,27 @@ Param_max = 10    # パラメータの最大個数
 #
 # アラートID、メッセージの定義
 #
-Alart_Asibumi= 1     # 「正対不完全」のアラートID
-Alart_Monomi = 3     # 「物見を定まらず」のアラートID
-Alart_Daisan = 4     # 「大三移行不安定」のアラートID
-Alart_KaiNasi = 5    # 「会なし離れ」のアラートID
-Alart_KaiFusoku = 6  # 「会不十分な離れ」のアラートID
-Alart_Hanare = 7     # 「離れタイミングずれ」のアラートID
+Alart_Asibumi= 10     # 「正対不完全」のアラートID
+Alart_Monomi = 30     # 「物見を定まらず」のアラートID
+Alart_Daisan = 40     # 「大三移行不安定」のアラートID
+Alart_KaiNasi = 50    # 「会なし離れ」のアラートID
+Alart_KaiFusoku = 60  # 「会不十分な離れ」のアラートID
+Alart_Hanare = 70     # 「離れタイミングずれ」のアラートID
 #
 Alart_msg = {
    0:'',
-   1:'Warning:Detected illegal action in section-1.(SEITAI fukanzen)',
-   10:'<警告>：「正対不完全」を検知しました。',
-   3:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
-   30:'<警告>：「物見定まらず」を検知しました。',
-   4:'Warning:Detected illegal action in section-5.(DAISAN fumeikaku)',
-   40:'<警告>：「大三移行不安定」を検知しました。',
-   5:'Warning:Detected illegal action in section-5.(KAI nasi)',
-   50:'<警告>：「会なし離れ」を検知しました。',
-   6:'Warning:Detected illegal action in section-6.(KAI fusoku)',
-   60:'<警告>：「会不十分な離れ」を検知しました。',
-   7:'Warning:Detected illegal action in section-7.(Timing un-match)',
-   70:'<警告>：「弓手押しタイミングの遅れ」を検知しました。'
+   10:'Warning:Detected illegal action in section-1.(SEITAI fukanzen)',
+   100:'<警告>：「正対不完全」を検知しました。',
+   30:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
+   300:'<警告>：「物見定まらず」を検知しました。',
+   40:'Warning:Detected illegal action in section-5.(DAISAN fumeikaku)',
+   400:'<警告>：「大三移行不安定」を検知しました。',
+   50:'Warning:Detected illegal action in section-5.(KAI nasi)',
+   500:'<警告>：「会なし離れ」を検知しました。',
+   60:'Warning:Detected illegal action in section-6.(KAI fusoku)',
+   600:'<警告>：「会不十分な離れ」を検知しました。',
+   70:'Warning:Detected illegal action in section-7.(Timing un-match)',
+   700:'<警告>：「弓手押しタイミングの遅れ」を検知しました。'
 }
 # 
 # テキスト属性
