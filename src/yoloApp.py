@@ -102,6 +102,8 @@ def help():
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-h] [-g[<level>[<color>]]]\n"\
         + "                         [-v] [-d<debug-level>] [--]")
+    print(" --- Notation---")
+    print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
     print(" --- Option ---")
     print(" -a(ll-video-file)")
     print(" -m(anual-plot::dont use YOLO plot)")
@@ -121,7 +123,7 @@ def help():
     print(" -z(:hide the faces by mosaic)")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
-    print(" -S(kip illegal-action-check")
+    print(" -S(kip illegal-action-check): section-no=3,5")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
     print(" -h(elp)")
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")

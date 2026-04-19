@@ -56,14 +56,16 @@ key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("kyudoApp.py -case {-L(ist)|'<case-name1>[,<case_name2>'] [-D(elete)|-R(name)]}  [-import [<csv-file-path>]] \n"\
-         + "        [{<key_name1>|[ <key_name2>...]|*}|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
-         + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second {<col_name1>[ <col_name2>...]}] [-range '<min>[,<max>']]\n"\
+    print("kyudoApp.py  [-L(ist)|-case {'<case-name1>[,<case_name2>'] [-D(elete)|-R(name)]}  [-import [<csv-file-path>]] \n"\
+         + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
+         + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
          + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
          + "        [-valid <case_name>|none]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
+    print(" --- Notation---")
+    print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
     exit(0)
 # 
 cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
