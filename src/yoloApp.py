@@ -1224,8 +1224,9 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     # 評価用のデータ保存、採点
     if Eval_enabled:
         Eval(frame = annotated_frame, xy = (10, 170), cv2 = cv2)
-        Eval(Frame_counter, Section_no, 1 if Completed else 0, Step_counter, Split_sec, \
-             RL_angle, ER_angle, SL_angle, Alart_id)
+        Eval(Frame_counter, Section_no, 1 if Completed else 0, \
+            Step_counter, Split_sec, \
+            RL_angle, ER_angle, SL_angle, Alart_id)
     
     # セクション名を編集
     section_name, Section_color = edit_section_name(Section_no, Step_counter)   
@@ -2581,6 +2582,7 @@ def main():
     if Tracking_only: 
         Db.csvfile1.close()
         Db.csvfile2.close()
+        Eval.csvfd.close()
     if Cv2Video is not None:
         Cv2Video.release()
     Db.close() 
