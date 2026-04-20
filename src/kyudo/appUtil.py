@@ -533,7 +533,9 @@ class MyEval:
         self.csvfd.flush()
         
     # CSVファイルに評価データを書き込む
-    def out_csv(self, score=None):        
+    def out_csv(self, score=None):
+        if self.csvfd is None:
+            return        
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
         time_epoc = int(time.mktime(d.timetuple()))
@@ -582,20 +584,25 @@ class MyEval:
         #
         if section == 6:
             # 会の保持時間をチェックして減点する
-            if self.eval['split_tm'] < 2.5: 
-                deduction += 5
-                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < 2.5  deduction=5")
-                self.deduct_msgs.append(f"会の時間が短い({self.eval['split_tm']:.2f}秒)")
+            (value, score), msg = Diduct_params['s6_split_tm']
+            if self.eval['split_tm'] < value: 
+                deduction += score
+                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < {value}  deduction={score}")
+                self.deduct_msgs.append(f"{msg}({self.eval['split_tm']:.2f}秒)")
         elif section == 8:
             # 残身の保持時間をチェックして減点する
-            if self.eval['split_tm'] < 1.5:
-                deduction += 5
-                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < 1.5  deduction=5")
-                self.deduct_msgs.append(f"残身の時間が短い({self.eval['split_tm']:.2f}秒)")
-            if self.eval['sl_angle'] > 15.0:
-                deduction += 5
-                mylog.log(INFO, f"[my_evaluate]:section({section})  sl_angle={self.eval['sl_angle']:.2f} > 15.0  deduction=5")
-                self.deduct_msgs.append(f"弓手の下がりが大きい({self.eval['sl_angle']:.2f}度)")
+            (value, score), msg = Diduct_params['s8_split_tm']
+            if self.eval['split_tm'] < value:
+                deduction += score
+                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < {value}  deduction={score}")
+                self.deduct_msgs.append(f"{msg}({self.eval['split_tm']:.2f}秒)")
+            
+            # 弓手の下がりの角度をチェックして減点する
+            (value, score), msg = Diduct_params['s8_sl_angle']
+            if self.eval['sl_angle'] > value:
+                deduction += score
+                mylog.log(INFO, f"[my_evaluate]:section({section})  sl_angle={self.eval['sl_angle']:.2f} > {value}  deduction={score}")
+                self.deduct_msgs.append(f"{msg}({self.eval['sl_angle']:.2f}度)")
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
