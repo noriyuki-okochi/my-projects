@@ -8,7 +8,6 @@ import os
 import time
 from datetime import datetime
 from copy import copy 
-from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import pandas as pd
 import copy
@@ -907,27 +906,6 @@ def draw_kpts_line(annotated_frame, points):
     draw_kpt_line(annotated_frame, points, eye_line,  color=(255, 0, 0), weight=2, radius=3)    # 目
     #draw_kpt_line(annotated_frame, points, rhw_line,  color=(255, 0, 0), weight=2, radius=None)    # 目
 #
-# 日本語テキストの描画
-#
-def draw_text(imag, message, point, color ):
-    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
-    font_path = 'meiryob.ttc'
-    font_size = 20
-    '''
-    b, g, r = color
-    font_color = (r, g, b)
-    '''
-    font = ImageFont.truetype( font_path, font_size )
-    font_color = color
-    #
-    img_pil = Image.fromarray( imag )
-    draw = ImageDraw.Draw( img_pil )
-    _, y1, _, y2 = draw.textbbox( point, message, font )
-    h = y2 - y1
-    x, y = point
-    draw.text( (x, y - h), message, font_color, font )
-    return np.array( img_pil )
-#
 # 表示セクション名と色を返す関数 
 def edit_section_name(no, counter):
     # セクション名を編集する
@@ -1223,7 +1201,6 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     #
     # 評価用のデータ保存、採点
     if Eval_enabled:
-        Eval(frame = annotated_frame, xy = (10, 170), cv2 = cv2)
         Eval(Frame_counter, Section_no, 1 if Completed else 0, \
             Step_counter, Split_sec, \
             RL_angle, ER_angle, SL_angle, Alart_id)
@@ -1253,7 +1230,14 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
         cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
-    #
+    # 評価結果の描画
+    if Eval_enabled and Eval.score_on:
+        cv2.putText(annotated_frame, Eval.score_text, (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 2)
+        # 減点理由の表示
+        # annotated_frame = draw_text(annotated_frame, '減点', (10, 200), YELLOW)
+        for i, msg in enumerate(Eval.deduct_msgs):
+            annotated_frame = draw_text(annotated_frame, f"{i+1}.{msg}", (10, 200 + i*30), GREEN, 18)
+#
     return annotated_frame
 #
 # キー入力の現在モード('PWR','PWT'）を編集する関数
@@ -1832,10 +1816,11 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         ctl['grid_shift'] = (0, 0)
         # フレーム間インターバルをデフォルトにリセット
         ctl['iwait'] = ctl['iwait_init']
+        # 評価スコアの表示をオフにする
+        Eval.score_on = False 
+        Eval.deduct_msgs.clear() 
         #
         print(f"{ctl}")
-        # 評価スコアの表示をオフにする
-        Eval.score_on = False  
         
     elif key == ord('?'):
         print(f"{ctl}")
