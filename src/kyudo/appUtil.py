@@ -8,6 +8,7 @@ import pandas as pd
 import math
 from datetime import datetime
 import time
+from PIL import Image, ImageFont, ImageDraw
 #
 # local package
 from  kyudo.env import * 
@@ -474,6 +475,23 @@ class FeaturePdf:
             self.set_current_pdf(0, 0)
             self.add_previous_pdf()
 #
+# 日本語テキストの描画
+#    color = (r, g, b)
+#
+def draw_text(imag, message, point, color , font_size=20):
+    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
+    font_path = 'meiryob.ttc'
+    font = ImageFont.truetype( font_path, font_size )
+    font_color = color
+    #
+    img_pil = Image.fromarray( imag )
+    draw = ImageDraw.Draw( img_pil )
+    _, y1, _, y2 = draw.textbbox( point, message, font )
+    h = y2 - y1
+    x, y = point
+    draw.text( (x, y - h), message, font_color, font )
+    return np.array( img_pil )            
+#
 #    射法八節姿勢解析評価点数のクラス定義
 #
 class MyEval:
@@ -487,22 +505,20 @@ class MyEval:
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                       }              
-        self.section = -1               # 現在のセクション（節） 番号(0-9)
-        self.completed = 0              # 現在の完了状態(0/1)
-        self.step = -1                  # ステップ番号
-        self.evals = []                 # 評価データリスト(9節分)
-        self.alarts = []                # 警告リスト
-        self.frame = None               # 評価結果表示用のフレーム
-        self.xy = (10, 170)             # 評価結果表示位置
-        self.cv2 = None                 # 評価結果表示用のcv2モジュール
-        self.score_on = False           # 総合評価点数表示のON/OFF
-        self.score_text = ""            # 総合評価点数表示用のテキスト
-        self.csvpath = None             # 評価結果保存用のCSVファイルパス
-        self.csvfd = None               # 評価結果保存用のCSVファイルオブジェクト
-        self.case_name = None           # 評価ケース名
-        self.frame
-        self.lv_no = 0                  # レベル番号
-        self.cycle = 0                  # セクションのサイクル
+        self.section: int = -1              # 現在のセクション（節） 番号(0-9)
+        self.completed: int = 0             # 現在の完了状態(0/1)
+        self.step: int = -1                 # ステップ番号
+        self.evals: list = []               # 評価データリスト(9節分)
+        self.alarts: list = []              # 警告リスト
+        self.deduct_msgs: list = []         # 減点リスト
+        self.score_on: bool = False         # 総合評価点数表示のON/OFF
+        self.score_text: str = ""           # 総合評価点数表示用のテキスト
+        self.csvpath: str = None            # 評価結果保存用のCSVファイルパス
+        self.csvfd = None                   # 評価結果保存用のCSVファイルオブジェクト
+        self.case_name: str = None          # 評価ケース名
+        self.frame_no: int = -1             # フレーム番号
+        self.lv_no: int = 0                 # レベル番号
+        self.cycle: int = 0                 # セクションのサイクル
             
     # CSVファイルを開いてヘッダーを書き込む
     def open_csv(self,case_name: str, lv_no: int, path: str):
@@ -541,7 +557,6 @@ class MyEval:
         self.section = -1               # 現在のセクション（節） 番号(0-9)
         self.completed = 0              # 現在の完了状態(0/1)
         self.step = -1                  # ステップ番号
-        self.deduction = 0              # 減点数
         # 評価データの初期化
         self.eval = { 'completed': 0, 'score': 10, 'split_tm': 0, \
                       'rl_angle': 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
@@ -552,48 +567,69 @@ class MyEval:
         for i in range(9): 
             self.evals.append(self.eval.copy())                 
         # 警告リストの初期化
-        self.alarts.clear()                                        
+        self.alarts.clear()  
+        #self.deduct_msgs.clear()                                      
         print(f"[my_evaluate]: reset.")
         
-    def check_deduction(self):
-        section = self.section
+    # 評価点数の減算条件をチェックして減点数を計算する    
+    def check_deduction(self, section: int):
         deduction = 0
 
         if self.eval['alart_cnt'] > 0:
             # 警告の有無をチェックして減点する
             deduction += 10
-            mylog.log(INFO, f"[my_evaluate]: section({self.section}) alart_cnt={self.eval['alart_cnt']}  deduction=10")            
+            mylog.log(INFO, f"[my_evaluate]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction=10")            
+        #
         if section == 6:
             # 会の保持時間をチェックして減点する
-           if self.eval['split_tm'] < 2.5: 
+            if self.eval['split_tm'] < 2.5: 
                 deduction += 5
-                mylog.log(INFO, f"[my_evaluate]: section({self.section})  split_tm={self.eval['split_tm']:.2f} < 2.5  deduction=5")
+                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < 2.5  deduction=5")
+                self.deduct_msgs.append(f"会の時間が短い({self.eval['split_tm']:.2f}秒)")
         elif section == 8:
             # 残身の保持時間をチェックして減点する
             if self.eval['split_tm'] < 1.5:
                 deduction += 5
-                mylog.log(INFO, f"[my_evaluate]: section({self.section})  split_tm={self.eval['split_tm']:.2f} < 1.5  deduction=5")
+                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < 1.5  deduction=5")
+                self.deduct_msgs.append(f"残身の時間が短い({self.eval['split_tm']:.2f}秒)")
+            if self.eval['sl_angle'] > 15.0:
+                deduction += 5
+                mylog.log(INFO, f"[my_evaluate]:section({section})  sl_angle={self.eval['sl_angle']:.2f} > 15.0  deduction=5")
+                self.deduct_msgs.append(f"弓手の下がりが大きい({self.eval['sl_angle']:.2f}度)")
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
         return deduction
          
+    # 評価結果の表示
+    def print(self):
+        if not self.score_on: 
+            # セクションごとの評価点数の合計を計算
+            score = 0
+            score_str = ""
+            for i in range(8): 
+                score += self.evals[i]['score']
+                score_str += f",{self.evals[i]['score']}"
+            #
+            score_str = score_str[1:]   # 先頭のカンマを削除                    
+            self.score_text = f"total score:{score}({score_str}), alart:{len(self.alarts)}"
+            print(f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
+            mylog.log(INFO, f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
+        return 
+    #
     # 評価データの更新
+    #
     def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
-                        rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, alart:int=0, \
-                        frame=None, xy=None, cv2=None):
+                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, alart:int=0):
         # 
-        if frame is not None: self.frame = frame
-        if xy is not None: self.xy = xy
-        if cv2 is not None: self.cv2 = cv2
-        if section == -1 : return       # 表示に必要な情報のみを更新する場合は、評価データの処理は行わない
-        
         self.frame_no = frame_no
+        
         if alart != 0:
             # 警告がある場合、警告カウントを増やして、警告リストに追加
             self.eval['alart_cnt'] += 1
             self.alarts.append(alart)
         if section != self.section:
+            # セクションが変わった場合
             if (section == 0) or (section < self.section):
                 if section != 0 : 
                     # セクションが0以外で前のセクションより小さい場合、
@@ -607,7 +643,7 @@ class MyEval:
 
             elif self.section > 0:
                 # 評価点数の減算
-                deduction = self.check_deduction()  # 減点数の計算                
+                deduction = self.check_deduction(self.section)  # 減点数の計算                
                 self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0                                            # その他の減点
                 print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction}, score={self.eval['score']})") 
                 mylog.log(INFO, f"[my_evaluate]:section={self.section}  score={self.eval['score']}  alart={self.eval['alart_cnt']}"\
@@ -625,6 +661,7 @@ class MyEval:
                 self.eval['pull_cnt'] = 0
                 
         elif completed != self.completed:
+            # 完了状態が変わった場合
             if self.csvfd is not None:
                 # 完了ステータスの変化でCSVファイルに評価データを書き込む
                 self.out_csv(score=0)       
@@ -641,9 +678,11 @@ class MyEval:
                 self.out_csv(score=0)
             # 評価データの設定
             self.eval['split_tm'] = split
-            self.eval['rl_angle'] = rl_angle
-            self.eval['er_angle'] = er_angle
-            self.eval['sl_angle'] = sl_angle
+            if completed == 0:
+                # 移行中の角度データを更新
+                self.eval['rl_angle'] = rl_angle
+                self.eval['er_angle'] = er_angle
+                self.eval['sl_angle'] = sl_angle
             # 5節のとき、引き分けの「押し」／「引き」回数をカウント
             if section == 5:
                 if step == 11:      self.eval['push_cnt'] += 1
@@ -657,24 +696,6 @@ class MyEval:
         self.completed = completed
         self.step = step
     
-    # 評価結果の表示
-    def print(self):
-        if self.frame is not None and self.cv2 is not None:
-            if not self.score_on: 
-                # セクションごとの評価点数の合計を計算
-                score = 0
-                score_str = ""
-                for i in range(8): 
-                    score += self.evals[i]['score']
-                    score_str += f",{self.evals[i]['score']}"
-                #
-                score_str = score_str[1:]   # 先頭のカンマを削除                    
-                self.score_text = f"total score:{score}({score_str}), alart:{len(self.alarts)}"
-                print(f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
-                mylog.log(INFO, f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
-            #  総合評価点数の表示
-            self.cv2.putText(self.frame, self.score_text, self.xy, self.cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)        
-        return 
 #
 # 動作解析パラメータ取得関数
 # action_param_tbls: 動作解析パラメータテーブルリスト
