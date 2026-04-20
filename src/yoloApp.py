@@ -8,7 +8,6 @@ import os
 import time
 from datetime import datetime
 from copy import copy 
-from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import pandas as pd
 import copy
