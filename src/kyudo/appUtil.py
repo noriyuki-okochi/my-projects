@@ -582,27 +582,21 @@ class MyEval:
             deduction += 10
             mylog.log(INFO, f"[my_evaluate]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction=10")            
         #
-        if section == 6:
-            # 会の保持時間をチェックして減点する
-            (value, score), msg = Diduct_params['s6_split_tm']
-            if self.eval['split_tm'] < value: 
-                deduction += score
-                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < {value}  deduction={score}")
-                self.deduct_msgs.append(f"{msg}({self.eval['split_tm']:.2f}秒)")
-        elif section == 8:
-            # 残身の保持時間をチェックして減点する
-            (value, score), msg = Diduct_params['s8_split_tm']
-            if self.eval['split_tm'] < value:
-                deduction += score
-                mylog.log(INFO, f"[my_evaluate]:section({section})  split_tm={self.eval['split_tm']:.2f} < {value}  deduction={score}")
-                self.deduct_msgs.append(f"{msg}({self.eval['split_tm']:.2f}秒)")
-            
-            # 弓手の下がりの角度をチェックして減点する
-            (value, score), msg = Diduct_params['s8_sl_angle']
-            if self.eval['sl_angle'] > value:
-                deduction += score
-                mylog.log(INFO, f"[my_evaluate]:section({section})  sl_angle={self.eval['sl_angle']:.2f} > {value}  deduction={score}")
-                self.deduct_msgs.append(f"{msg}({self.eval['sl_angle']:.2f}度)")
+        # セクションごとの減点条件をチェックして減点数を計算する
+        for key_nm, data in Diduct_params.items():  # key_nm: 's<section_no>_<key of check data>'
+            sect_no = int(key_nm[1])                # セクション番号を取得（例: 's8_rl_angle' -> 8）
+            key = key_nm[3:]                        # 評価データのキーを取得（例: 's8_rl_angle' -> 'rl_angle'）
+            if sect_no == section:
+                # セクションに対応する減点条件をチェックして減点する
+                (ope, value, score), msg = data
+                if ope == '<'   : bret = True if self.eval[key] < value else False
+                elif ope == '>' : bret = True if self.eval[key] > value else False
+                else: continue
+                if bret == True: 
+                    deduction += score
+                    mess = msg.split('.')  # メッセージを'.'でリスト分割
+                    self.deduct_msgs.append(f"{mess[0]}({self.eval[key]:.2f}{mess[1]})")
+                    mylog.log(INFO, f"[my_evaluate]:section({section}) {key}={self.eval[key]:.2f} {ope} {value} deduction={score}")   
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
