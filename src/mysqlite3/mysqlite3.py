@@ -460,7 +460,9 @@ class MyDb:
         data_list = []
         for i in range(2):
             order = f"order by frame_no desc" if i == 0 else f"order by section,frame_no desc"
-            if section == 5:
+            if section == 4:
+                items = "section,case_name,er,sl,rl"
+            elif section == 5:
                 items = "section,case_name,pull*100/(push+pull) as pull_ratio"
             elif section == 6:
                 items = "section,case_name,split,sl,rl"

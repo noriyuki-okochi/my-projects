@@ -865,8 +865,9 @@ def rename_frame_info(db:MyDb, from_name, to_name):
 #
 def print_eval_data(db:MyDb, case_names:list):
     
-    eval_sections = [ 5, 6, 8]
+    eval_sections = [ 4, 5, 6, 8]
     headers = [
+                " <section>  <case>       <er(°)>     <sl(°)>   <rl(°)>",
                 " <section>  <case>        <pull(%)>  <sl(°)>   <rl(°)>",
                 " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>",
                 " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>"
