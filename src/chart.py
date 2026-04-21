@@ -44,7 +44,7 @@ key_names:str = [name for name in Kn2idx]
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("chart.py -case {-L(ist)|'<case_name1>[,<case_name2>']} [-D(elete)] [-import [<csv-file-path>]] \n"\
+    print("chart.py -case -L(ist)|{'<case_name1>[,<case_name2>'] -D(elete)|-import [<csv-file-path>]} \n"\
          + "        [{<key_name1>{ <key_name2>}...]|*] [-key] [-range '<min>[,<max>']]\n"\
          + "        [-second <col_name>] [-span] [-SMA <window>] [-WMA <window>]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -64,6 +64,7 @@ if '-key' in cmds:
     print("キーポイントリスト：")
     print(key_names)
     exit(0)
+    
 if '-case' in cmds:
     i = cmds.index('-case')
     if len(cmds) > (i + 1):
@@ -73,6 +74,11 @@ if '-case' in cmds:
             # ケース比較時の、比較ケース名を追加
             case_names.append(names[1])
             case_compare = True
+
+if len(case_names) == 0:
+    print("[chart]:error:'-case <name>' must be specified.")
+    exit(0)
+
             
 if len(case_names) > 0 and case_names[0] == '-L':
     #
@@ -94,10 +100,6 @@ if len(case_names) > 0 and '-D' in opts:
         delete_frame_info(db, name)
     exit(0)
     
-if len(case_names) == 0:
-    print("[chart]:error:'-case <name>' must be specified.")
-    exit(0)
-
 # ケース名の存在チェック
 for name in case_names:
     db.case_name = name

@@ -646,7 +646,7 @@ class MyEval:
                 # 評価点数の減算
                 deduction = self.check_deduction(self.section)  # 減点数の計算                
                 self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0                                            # その他の減点
-                print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction}, score={self.eval['score']})") 
+                print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction})") 
                 mylog.log(INFO, f"[my_evaluate]:section={self.section}  score={self.eval['score']}  alart={self.eval['alart_cnt']}"\
                                 f"  split={self.eval['split_tm']:.2f}"\
                                 f"  rl={self.eval['rl_angle']:.2f}  er={self.eval['er_angle']:.2f}  sl={self.eval['sl_angle']:.2f}"\
@@ -863,4 +863,27 @@ def rename_frame_info(db:MyDb, from_name, to_name):
         #
     return None            
 #
+def print_eval_data(db:MyDb, case_names:list):
+    
+    eval_sections = [ 5, 6, 8]
+    headers = [
+                " <section>  <case>        <pull(%)>  <sl(°)>   <rl(°)>",
+                " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>",
+                " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>"
+            ]
+
+    if case_names[0] == '*':
+        case_names.clear()
+        # 全ケース名を取得してリストに格納する
+        fdf = db.pandas_read_frame()
+        rows,_ = fdf.shape
+        for i in range(rows):
+            case_names.append(fdf.iloc[i]['case_name'])
+    
+    for i, section in enumerate(eval_sections):
+        print(f"\n{headers[i]}")
+        for case_name in case_names:
+            eval_data_l = db.get_print_eval_data(section, case_name)
+            for line in eval_data_l:
+                print(f"{line}")
 #eof
