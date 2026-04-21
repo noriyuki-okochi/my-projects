@@ -135,7 +135,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [1.000, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 5, None, None, None, None, None],             # 3.弓構え
         [1.000, 0.015, -45.0, 45.0, 9, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 3, 0.050, None, None],          # 5.引分け
@@ -152,7 +152,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.005, 0.005, 0.005, 0.005, 5, 0.050, None, None],          # 5.引分け
@@ -169,7 +169,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 5, 0.050, None, None],          # 5.引分け
@@ -186,7 +186,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.025, 0.025, -45.0, 45.0, 5, None, None, None],            # 4.打起こし
         [0.008, 0.008, 0.008, 0.008, 4, 0.050, None, None],          # 5.引分け
@@ -203,7 +203,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.030, 0.035, 5, None, None, None, None, None],             # 2.胴作り
+        [0.040, 0.035, 5, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 3, 0.050, None, None],          # 5.引分け
@@ -220,7 +220,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.030, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 5, 0.050, None, None],          # 5.引分け
