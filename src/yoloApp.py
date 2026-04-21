@@ -1820,7 +1820,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         Eval.score_on = False 
         Eval.deduct_msgs.clear() 
         #
-        print(f"{ctl}")
+        #print(f"{ctl}")
         
     elif key == ord('?'):
         print(f"{ctl}")
