@@ -418,7 +418,8 @@ function kyudo {
         [string]$predict,
         [int]$input_frames = 0,
         [string]$input_key = '',
-        [float]$eta = 0.001
+        [float]$eta = 0.001,
+        [string]$eval=''
     )
     # ハイパーパラメータ取得
     $val_list = $env:HYPER_PARAM.Split(' ')
@@ -437,10 +438,11 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list	case|case_name|key|pt                ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
-        write-output '>kyudo  -deletet <登録ケース名>	                     ：登録ケース名、データファイルを削除する'
-        write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>   ：登録ケース名をリネームする'
-        write-output '>kyudo  -import  <登録ケース名>                      ：解析結果データファイルのデータをデータベースに登録する'
+        write-output '>kyudo  -list	case|case_name|key|pt                     ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
+        write-output '>kyudo  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
+        write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
+        write-output '>kyudo  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
+        write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'... ：評価データを表示する"
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
         write-output '>kyudo  -train   <登録ケース名> [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
         write-output '>kyudo  -predict <登録ケース名> [-model <モデルファイル>]      	                            ：解析結果データで予測する'
@@ -479,6 +481,10 @@ function kyudo {
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録
         python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -m -f0 0
+    }    
+    elseif ($eval -ne '') {
+        # 評価データ表示
+        python ./src/kyudoApp.py -d  -case $eval -eval
     }    
     elseif ($case -ne '') {
         # 解析結果データをグラフ表示
