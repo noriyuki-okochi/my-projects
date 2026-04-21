@@ -453,4 +453,51 @@ class MyDb:
             #
             act_param_tbl['param'].append(raw_vals)
         return rec_count
+#
+# get print eval_data of each case_name(return print-data-list)
+#
+    def get_print_eval_data(self, section, case_name):
+        data_list = []
+        for i in range(2):
+            order = f"order by frame_no desc" if i == 0 else f"order by section,frame_no desc"
+            if section == 5:
+                items = "section,case_name,pull*100/(push+pull) as pull_ratio"
+            elif section == 6:
+                items = "section,case_name,split,sl,rl"
+            elif section == 8:
+                items = "section,case_name,split,sl,rl"
+            else:
+                print(f"[get_print_eval_data]:error: section={section} is invalid.")
+                return None 
+            # SQL文を作成して実行
+            sql = f"select {items} from eval_data where case_name='{case_name}'"\
+                  f" and  (section%10)={section} and completed=1 {order} limit 1"
+            df = pandas.read_sql_query(sql, con=self.conn)
+            if df.shape[0] == 0:
+                break                # no data for this section
+            
+            # 検索データを整形してリストに追加
+            text = ""
+            for _, val in df.iloc[0].to_dict().items():
+                text += f"{val:10.1f}" if isinstance(val, float) else f"{val:10} "
+            # 
+            if section == 5:
+                # 大三の'sl_angle','rl_angle'のデータも追加して表示する
+                sql = f"select sl,rl from eval_data where case_name='{case_name}'"\
+                      f" and  (section%10)={section} and step=10 {order} limit 1"
+                df_a = pandas.read_sql_query(sql, con=self.conn)
+                if df_a.shape[0] > 0:
+                    text += f"{df_a.iloc[0]['sl']:10.1f}{df_a.iloc[0]['rl']:10.1f}"
+            #  
+            data_list.append(text)
+            # sectionが10以上の場合は、２立ち分のデータがある可能性があるので、ループを続ける
+            if df.iloc[0]['section'] < 10:
+                break               # １立ちのみなので、ループを抜ける
+
+        if len(data_list) == 2:
+            # 2立ち分のデータがある場合は、順番を入れ替える
+            data_list[0], data_list[1] = data_list[1], data_list[0]
+
+        return data_list
+
 #eof

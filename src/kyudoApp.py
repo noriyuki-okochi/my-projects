@@ -56,7 +56,7 @@ key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("kyudoApp.py  [-L(ist)|-case {'<case-name1>[,<case_name2>'] [-D(elete)|-R(name)]}  [-import [<csv-file-path>]] \n"\
+    print("kyudoApp.py -case -L(ist)|{*|<case-name>{,<case_name>'}... -D(elete)|-R(name)|-import [<csv-file-path>]|-eval}\n"\
          + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -121,6 +121,7 @@ case_names:str = []
 if '-case' in cmds:
     i = cmds.index('-case')
     if len(cmds) > (i + 1):
+        # ケース名の指定は、カンマ区切りで複数指定可能
         names = cmds[i +1].split(',')
         for name in names:
             name = name.strip()
@@ -129,6 +130,10 @@ if '-case' in cmds:
             # ケース比較時の、比較ケース名を追加
             case_compare = True
             
+if len(case_names) == 0:
+    print("[kyudoApp]:error:'-case <name>' must be specified.")
+    exit(1)
+
 if len(case_names) > 0 and case_names[0].upper() == '-L':
     #
     # 登録済ケースの一覧表示
@@ -140,7 +145,7 @@ if len(case_names) > 0 and case_names[0].upper() == '-L':
         if case_names[0] == '-L':
             print(f"----({i+1})----")
             print(fdf.iloc[i])        
-        else:
+        else:   # '-l'はケース名のみ表示
             print(f"{(i+1):2} {fdf.iloc[i]['case_name']}")        
     exit(0)
 
@@ -158,11 +163,7 @@ if case_compare and '-R' in opts:
     #
     rename_frame_info(db, case_names[0], case_names[1])
     exit(0)
-    
-if len(case_names) == 0:
-    print("[kyudoApp]:error:'-case <name>' must be specified.")
-    exit(1)
-
+        
 valid_case:str = []
 if '-valid' in cmds:
     #検証対象ケース名の指定
@@ -175,6 +176,7 @@ names = case_names.copy()
 if len(valid_case) > 0 and valid_case[0] not in names:
     names.append(valid_case[0])
 for name in names:
+    if name == '*': continue
     db.case_name = name
     FPS, count = db.get_fps()
     if FPS is None:
@@ -183,7 +185,12 @@ for name in names:
     if count == 0 and '-import' not in cmds:
         print(f"[kyudoApp]error:'{name} import count is zero.")
         exit(1)
-#print(f"[kyudoApp]info:FPS={FPS:.3f}, import_count={count}")
+#
+if '-eval' in cmds:
+    # 指定ケースの評価用データを出力する
+    print_eval_data(db, case_names)
+    exit(0)
+
 #
 # CSVデータのインポートを指定するコマンドオプションの解析
 #
