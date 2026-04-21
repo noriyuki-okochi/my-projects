@@ -863,14 +863,23 @@ def rename_frame_info(db:MyDb, from_name, to_name):
         #
     return None            
 #
+# 評価データの表示関数
+# db: MyDbデータベースオブジェクト
+# case_names: 表示ケース名リスト（'*'の場合、全ケース表示）
 def print_eval_data(db:MyDb, case_names:list):
-    
+    # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
     eval_sections = [ 4, 5, 6, 8]
     headers = [
                 " <section>  <case>       <er(°)>     <sl(°)>   <rl(°)>",
                 " <section>  <case>        <pull(%)>  <sl(°)>   <rl(°)>",
                 " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>",
                 " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>"
+            ]
+    items_l = [ 
+                "section, case_name, er, sl, rl",
+                "section, case_name, pull*100/(push+pull) as pull_ratio, sl, rl",
+                "section, case_name, split, sl, rl",
+                "section, case_name, split, sl, rl"
             ]
 
     if case_names[0] == '*':
@@ -880,11 +889,12 @@ def print_eval_data(db:MyDb, case_names:list):
         rows,_ = fdf.shape
         for i in range(rows):
             case_names.append(fdf.iloc[i]['case_name'])
-    
+            
+    # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
     for i, section in enumerate(eval_sections):
         print(f"\n{headers[i]}")
         for case_name in case_names:
-            eval_data_l = db.get_print_eval_data(section, case_name)
+            eval_data_l = db.get_print_eval_data(section, case_name, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
 #eof
