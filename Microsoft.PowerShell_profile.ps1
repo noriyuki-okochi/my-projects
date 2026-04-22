@@ -1,5 +1,6 @@
 # Sqlite3データベースパス設定
 $env:DB_PATH = './yolo-kyudo_local.db'
+#$env:DB_PATH = './yolo-kyudo.db'
 #
 # 動画ファイル検索位置設定
 $env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
@@ -201,6 +202,8 @@ function yoloAp {
         [switch]$eval,
         [string]$case,
         [string]$multi='',
+        [string]$comp='',
+        [string]$at='1,1',
         [string]$gru,
         [string]$v8='s',
         [string]$v26='',
@@ -259,6 +262,7 @@ function yoloAp {
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
+        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
@@ -296,6 +300,18 @@ function yoloAp {
     elseif ($multi -ne '') {         
         # マルチ動画再生
         python ./src/yoloApp.py -d1 -a -multi $multi --
+    }
+    elseif ($comp -ne '') {         
+        $case_list = $comp.Split(',')
+        $i = $case_list.Length
+        if ( $i -eq 1 ) {
+            # 単一ケース動画再生（指定ケースの動画ファイルを再生）
+            python ./src/yoloApp.py -d1 -o $comp -at $at -m --
+        }
+        else{
+            # マルチ動画再生（指定ケースの動画ファイルを重ねて再生）
+            python ./src/yoloApp.py -d1 -o $comp -multi $at -r --
+        }
     }
     elseif ($clip) {        
         # 動画切り取り

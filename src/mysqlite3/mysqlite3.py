@@ -475,7 +475,7 @@ class MyDb:
             if section == 5:
                 # 大三の'sl_angle','rl_angle'のデータも追加して表示する
                 sql = f"select sl,rl from eval_data where case_name='{case_name}'"\
-                      f" and  (section%10)={section} and step=10 {order} limit 1"
+                      f" and  (section%10)={section} and step=10 {order}"
                 df_a = pandas.read_sql_query(sql, con=self.conn)
                 if df_a.shape[0] > 0:
                     print_text += f"{df_a.iloc[0]['sl']:10.1f}{df_a.iloc[0]['rl']:10.1f}"

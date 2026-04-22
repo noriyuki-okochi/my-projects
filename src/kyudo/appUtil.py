@@ -567,7 +567,7 @@ class MyEval:
         # 評価データリストの初期化    
         self.evals.clear()                                        
         for i in range(9): 
-            self.evals.append(self.eval.copy())                 
+            self.evals.append(self.eval.copy()) 
         # 警告リストの初期化
         self.alarts.clear()  
         #self.deduct_msgs.clear()                                      
@@ -610,7 +610,7 @@ class MyEval:
             score_str = ""
             for i in range(8): 
                 score += self.evals[i]['score']
-                score_str += f",{self.evals[i]['score']}"
+                score_str += f",{self.evals[i]['score']:2d}"
             #
             score_str = score_str[1:]   # 先頭のカンマを削除                    
             self.score_text = f"total score:{score}({score_str}), alart:{len(self.alarts)}"
@@ -641,7 +641,8 @@ class MyEval:
                     self.cycle += 1
                 # 評価データの初期化
                 self.reset()
-
+                if section == 2: self.eval['score'] = 5       # 2節は5点、以外は10点満点
+                    
             elif self.section > 0:
                 # 評価点数の減算
                 deduction = self.check_deduction(self.section)  # 減点数の計算                
@@ -656,7 +657,8 @@ class MyEval:
                               
                 # 現在の評価データを保存
                 self.evals[self.section - 1] = self.eval.copy()
-                self.eval['score'] = 10         # スコアはセクションごとにリセット（10点満点）   
+                # 次のセクションの評価データを初期化
+                self.eval['score'] = 5 if section == 2 else 10       # 2節は5点、以外は10点満点
                 self.eval['alart_cnt'] = 0      # 警告カウントはセクションごとにリセット   
                 self.eval['push_cnt'] = 0
                 self.eval['pull_cnt'] = 0
@@ -674,9 +676,14 @@ class MyEval:
                     self.reset()  # 9節完了で評価データを初期
                 
         elif self.section > 0:
-            if step != self.step and self.csvfd is not None: 
-                # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
-                self.out_csv(score=0)
+            if step != self.step: 
+                if section == 2 and step == 40 and self.step == 30:
+                    mylog.log(INFO, f"[my_evaluate]: section({section}) step({step})  score up 5 points.")
+                    #print( f"[my_evaluate]: section({section}) step({step})  score up 5 points.score={self.eval['score']}")
+                    self.eval['score'] += 5     # 2節のステップ40（箆調べ）は5点加算して10点満点とする
+                if self.csvfd is not None:
+                    # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
+                    self.out_csv(score=0)
             # 評価データの設定
             self.eval['split_tm'] = split
             if completed == 0:
@@ -870,16 +877,16 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
     eval_sections = [ 4, 5, 6, 8]
     headers = [
-                " <section>  <case>       <er(°)>     <sl(°)>   <rl(°)>",
-                " <section>  <case>        <pull(%)>  <sl(°)>   <rl(°)>",
-                " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>",
-                " <section>  <case>      <split(sec.)> <sl(°)>  <rl(°)>"
+                " <section>  <case>        <frame>    <er(°)>     <sl(°)>   <rl(°)>",
+                " <section>  <case>        <frame>     <pull(%)>  <sl(°)>   <rl(°)>",
+                " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>",
+                " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>"
             ]
     items_l = [ 
-                "section, case_name, er, sl, rl",
-                "section, case_name, pull*100/(push+pull) as pull_ratio, sl, rl",
-                "section, case_name, split, sl, rl",
-                "section, case_name, split, sl, rl"
+                "section, case_name, frame_no, er, sl, rl",
+                "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
+                "section, case_name, frame_no, split, sl, rl",
+                "section, case_name, frame_no, split, sl, rl"
             ]
 
     if case_names[0] == '*':
@@ -888,6 +895,7 @@ def print_eval_data(db:MyDb, case_names:list):
         fdf = db.pandas_read_frame()
         rows,_ = fdf.shape
         for i in range(rows):
+            if fdf.iloc[i]['import'] == 0: continue
             case_names.append(fdf.iloc[i]['case_name'])
             
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
