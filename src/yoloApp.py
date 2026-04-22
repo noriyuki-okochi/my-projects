@@ -1862,7 +1862,8 @@ def main():
     file_name = [None, None]  
     #
     case_name = None                                # ケース名（デフォルト：動画ファイル名）
-    case_path = []                                # ケース内設定の動画ファイルのパス
+    case_path = []                                  # ケース内設定の動画ファイルのパス
+    case_name_l = []                                # ケース名リスト
     #
     # キー操作制御パラメータ
     keyCtl = {
@@ -1934,6 +1935,7 @@ def main():
         if i + 1 < len(args) and (not args[i + 1].startswith('-')):
             cases = [case.strip() for case in args[i + 1].split(',')]
             for case in cases:
+                case_name_l.append(case)
                 Db.case_name = case
                 fps = Db.get_fps()   
                 if fps is None:
@@ -2367,8 +2369,13 @@ def main():
     #    
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
-    mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
-    print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
+    if len(case_name_l) > 0:
+        mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name_l}")
+        print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name_l}")
+    else:
+        mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
+        print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
+    
     mylog.log(INFO, f"[main]:フレーム情報: {file_name[0]}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
     print(f"[main]:フレーム情報: {file_name[0]}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
         
