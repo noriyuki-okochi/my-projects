@@ -459,9 +459,9 @@ class MyDb:
     def get_print_eval_data(self, case_name, section, step, items):
         print_list = []
         for i in range(2):
-            order = f"order by frame_no desc" if i == 0 else f"order by section,frame_no desc"
+            order = f"order by section desc,frame_no" if i == 0 else f"order by section,frame_no"
             # SQL文を作成
-            if step == 0:                       # 完了移行時直前のデータを取得（角度データは完了移行後は更新していない）
+            if step == 0:                       # 完了移行先頭のデータを取得（角度データは完了移行後は更新していない）
                 sql = f"select {items} from eval_data where case_name='{case_name}'"\
                       f" and  (section%10)={section} and completed=1 {order} limit 1"
                       
