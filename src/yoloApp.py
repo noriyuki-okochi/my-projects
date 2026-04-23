@@ -1862,7 +1862,7 @@ def main():
     file_name = [None, None]  
     #
     case_name = None                                # ケース名（デフォルト：動画ファイル名）
-    case_path = []                                  # ケース内設定の動画ファイルのパス
+    case_img_path = []                                  # ケース内設定の動画ファイルのパス
     case_name_l = []                                # ケース名リスト
     #
     # キー操作制御パラメータ
@@ -1936,13 +1936,15 @@ def main():
             cases = [case.strip() for case in args[i + 1].split(',')]
             for case in cases:
                 case_name_l.append(case)
-                Db.case_name = case
-                fps = Db.get_fps()   
+                fps = Db.get_fps(case)   
                 if fps is None:
                     print(f"> '{case}' not found in frame_info table.")
                     return
-                path, _ = Db.get_file_path()
-                case_path.append(path)
+                path = get_case_img_path(Db, idir, case)
+                if path is None:
+                    print(f">  image file for '{case}' not found.")
+                    return
+                case_img_path.append(path)
         else:
             print("(-o)ケース名の指定がありません")
             return
@@ -2222,8 +2224,8 @@ def main():
         # 動画ファイルを選択する
         files = 2 if multi_frames  else 1
         for i in range( files ):
-            if len(case_path) > 0:
-                file_name[i] = case_path[i]
+            if len(case_img_path) > 0:
+                file_name[i] = case_img_path[i]
             else:
                 file_name[i] = filedialog.askopenfilename(
                     title = "動画ファイルを選択してください",
