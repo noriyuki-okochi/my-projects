@@ -842,7 +842,21 @@ def delete_frame_info(db:MyDb, case_name):
     
     else:
         print(f"[delete_frame_info]:error: case_name='{case_name}' not found.")
-    return            
+    return 
+#
+# 登録ケースの画像ファイルパス取得関数
+# db: MyDbデータベースオブジェクト
+# idir: 画像ファイルの格納ディレクトリ
+# case_name: ケース名   
+def get_case_img_path(db:MyDb, idir: str, case_name: str):
+    img_path = None
+    path, _ = db.get_file_path(case_name)
+    # 画像ファイルのパスを生成して返す
+    # 例: path='c:\users/usr/picture/Rool/case1.jpeg' -> img_path='idir/case1.jpeg'
+    if path is not None:
+        filename = os.path.basename(path)           # ファイル名を取得
+        img_path = os.path.join(idir, filename)     # 画像ファイルのパスを生成
+    return img_path
 #
 # 登録ケース名の変更関数
 # db: MyDbデータベースオブジェクト
@@ -875,23 +889,25 @@ def rename_frame_info(db:MyDb, from_name, to_name):
 # case_names: 表示ケース名リスト（'*'の場合、全ケース表示）
 def print_eval_data(db:MyDb, case_names:list):
     # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
-    eval_sections = [ 4, 5, 6, 8]
+    # 解析対象節番号('<section>.<step>')リスト
+    eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
                 " <section>  <case>        <frame>    <er(°)>     <sl(°)>   <rl(°)>",
-                " <section>  <case>        <frame>     <pull(%)>  <sl(°)>   <rl(°)>",
+                " <section>  <case>        <frame>    <pull(%)>   <sl(°)>   <rl(°)>",
+                "",
                 " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>",
                 " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>"
             ]
     items_l = [ 
                 "section, case_name, frame_no, er, sl, rl",
+                "section, case_name, frame_no, sl, rl",
                 "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, split, sl, rl",
                 "section, case_name, frame_no, split, sl, rl"
             ]
-
+    # ケース名リストが'*'の場合、全ケース名を取得してリストに格納する
     if case_names[0] == '*':
         case_names.clear()
-        # 全ケース名を取得してリストに格納する
         fdf = db.pandas_read_frame()
         rows,_ = fdf.shape
         for i in range(rows):
@@ -899,10 +915,14 @@ def print_eval_data(db:MyDb, case_names:list):
             case_names.append(fdf.iloc[i]['case_name'])
             
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
-    for i, section in enumerate(eval_sections):
-        print(f"\n{headers[i]}")
+    for i, section_str in enumerate(eval_sections):
+        nums = section_str.split('.')
+        section = int(nums[0])
+        step = int(nums[1])
+        if headers[i] != '':
+            print(f"\n{headers[i]}")
         for case_name in case_names:
-            eval_data_l = db.get_print_eval_data(section, case_name, items_l[i])
+            eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
 #eof
