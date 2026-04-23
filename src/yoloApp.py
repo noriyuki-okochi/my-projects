@@ -1931,9 +1931,8 @@ def main():
 
     if '-o' in opts:
         # ケース名を取得
-        i = args.index('-o')
-        if i + 1 < len(args) and (not args[i + 1].startswith('-')):
-            cases = [case.strip() for case in args[i + 1].split(',')]
+        cases = get_opt_values(args, '-o', type='c', sep=',')
+        if len(cases) > 0:
             for case in cases:
                 case_name_l.append(case)
                 fps = Db.get_fps(case)   
@@ -1951,15 +1950,11 @@ def main():
     if '-multi' in opts:
         multi_frames = True     # 生画像を表示するオプション
         raw_video = True        # 生画像を表示するオプション
-        i = args.index('-multi')
-        if len(args) > (i + 1):
-            startf = args[i +1].split(',')
-            if len(startf) > 1 :
-                if startf[0].isnumeric():
-                    multi_fstart[0] = int(startf[0])
-                if startf[1].isnumeric():
-                    multi_fstart[1] = int(startf[1])
-        print(f"multi-frames:開始フレーム={multi_fstart}")
+        fstart = get_opt_values(args, '-multi', type='n', sep=',')
+        for i, val in enumerate(fstart):
+            if i < 2:
+                multi_fstart[i] = val
+        print(f"main]:開始フレーム={multi_fstart}")
        
     if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
         manual_plot = True
@@ -1974,8 +1969,8 @@ def main():
         
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
-        i = args.index('-gru')
-        if len(args) > (i + 1) and args[i + 1][0] != '-' : model_pth = args[i +1]
+        opt_vals = get_opt_values(args, '-gru')
+        if len(opt_vals) > 0: model_pth = opt_vals[0]
         if model_pth is None:
             print("モデル名の指定がありません")
             return
@@ -2092,10 +2087,10 @@ def main():
     #
     if '-I' in opts:            # 動作開始解析パラメータの初期登録
         param_nms = []
-        i = args.index('-I')
-        if i + 1 < len(args) and (not args[i + 1].startswith('-')):
-            if args[i + 1] in InitAction_param_nms:
-                param_nms.append( args[i + 1] )     # パラメータテーブルframe名を取得
+        opt_vals = get_opt_values(args, '-I')
+        if len(opt_vals) > 0:
+            if opt_vals[0] in InitAction_param_nms:
+                param_nms.append( opt_vals[0] )     # パラメータテーブルframe名を取得
         else:
             param_nms = list(InitAction_param_nms)
         for nm in param_nms:
@@ -2397,9 +2392,9 @@ def main():
     #
     # コマンドライン引数でフレームカウンターを指定するオプションの処理
     if '-at' in opts:
-        i = args.index('-at')
-        if len(args) > (i + 1) and args[i + 1].isnumeric():
-            Frame_counter = int(args[i + 1])
+        opt_vals = get_opt_values(args, '-at', 'n')  # '-at'オプションの値を取得
+        if len(opt_vals) > 0:
+            Frame_counter = opt_vals[0]
             max_frame = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
             Frame_counter = max(1, min(Frame_counter, max_frame))  # フレームカウンターを1以上、最大フレーム数以下に制限
             print(f"[main]:開始フレームを{Frame_counter}に設定しました")
