@@ -459,11 +459,12 @@ class MyDb:
     def get_print_eval_data(self, case_name, section, step, items):
         print_list = []
         for i in range(2):
-            order = f"order by section desc,frame_no" if i == 0 else f"order by section,frame_no"
+            #print(f"get_print_eval_data({i}): section={section} step={step}")
+            order = f"order by section desc,frame_no desc" if i == 0 else f"order by section,frame_no desc"
             # SQL文を作成
-            if step == 0:                       # 完了移行先頭のデータを取得（角度データは完了移行後は更新していない）
+            if step == 0:                       # 完了移行直前のデータを取得
                 sql = f"select {items} from eval_data where case_name='{case_name}'"\
-                      f" and  (section%10)={section} and completed=1 {order} limit 1"
+                      f" and  (section%10)={section} and completed=0 {order} limit 1"
                       
             # 以下は、完了移行前のステップのデータを取得するための措置
             elif section == 5 and step == 10:   # 大三移行時のデータを取得
