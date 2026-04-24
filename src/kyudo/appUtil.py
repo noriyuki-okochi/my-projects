@@ -882,7 +882,7 @@ def rename_frame_info(db:MyDb, from_name, to_name):
     if fps is None:
         print(f"[rename_frame_info]:error: case_name='{from_name}' not found.")
     else:
-        tables = [ 'tracking_data', 'kyudo_data' , 'frame_info' ]
+        tables = [ 'tracking_data', 'kyudo_data' , 'eval_data', 'frame_info' ]
         for tbl in tables:
             rcnt = db.copy_case(tbl, from_name, to_name)
             if rcnt is None:
