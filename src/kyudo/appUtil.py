@@ -733,13 +733,62 @@ def near_points(p1, p2, threshold=10):
         # ベクトルの長さが閾値以下の場合、近いと判断
         ans = True
     return ans
+#
+# コマンドライン引数からオプションの値を取得する関数
+# args: コマンドライン引数リスト
+# opt: オプション名（例: '-import'）
+# type: 値の型（'n': 数値, 'c': 文字列）
+# sep: 区切り文字（例: ','）
+def get_opt_values(args:list, opt:str, type:str='c', sep:str=None):
+    values = []
+    i = args.index(opt)
+    if len(args) > (i + 1) and not args[i+1].startswith('-'):
+        value_strs = []
+        if sep is not None:
+            value_strs = [arg.strip() for arg in args[i+1].split(sep)]
+        else:
+            value_strs.append( args[i+1] )            
+        for val_str in value_strs:
+            if type == 'n':
+                if val_str.isnumeric(): values.append( int(val_str) )
+            elif type == 'c':
+                values.append( val_str )
+    return values
+#
+# CSVデータのインポート関数
+# csvfile: CSVファイルパス
+# db: MyDbデータベースオブジェクト
+# tbl_name: 登録するテーブル名
+# case_name: ケース名
+def import_csv_to_db(csvfile:str, db:MyDb, tbl_name:str, case_name:str):
+    if  os.path.isfile(csvfile) == False:
+        # ファイルが存在しないとき終了
+        print(f"[import_csv_to_db]error: csv-file({csvfile}) not found.")
+        return 0
+    
+    # CSVファイルを読み込む
+    df = pd.read_csv(csvfile)
+    #print(f"[import_csv_to_db]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
+    if df['case_name'][0] != case_name:
+        # ケース名が異なるとき、ケース名を置換して登録する
+        print(f"[import_csv_to_db]:case_name:{df['case_name'][0]} changed to '{case_name}'")
+        df['case_name'] = case_name
 
+    # 登録済データの削除
+    if tbl_name == 'tracking_data': db.delete_tracking_data()
+    elif tbl_name == 'kyudo_data': db.delete_kyudo_data()
+    elif tbl_name == 'eval_data': db.delete_eval_data()
+          
+    # DBへデータ登録
+    df.to_sql(tbl_name, db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
+    print(f"[import_csv_to_db]info:import '{csvfile}' to '{tbl_name}'{df.shape}.")
+    return df.shape[0]
 #
 # CSVデータのインポート関数
 # db: MyDbデータベースオブジェクト
 # cmds: コマンドライン引数リスト
 # case_name: ケース名   
-# 戻り値: 成功=True, 失敗=False
+# 戻り値: インポートレコード数(tracking_data, kyudo_data, eval_data)
 #
 def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     if case_name == '' : 
@@ -747,73 +796,39 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     db.case_name = case_name 
     _, count = db.get_fps()
     csvfile = ''
-    i = cmds.index('-import')
-    if len(cmds) > (i + 1):
-        # トラッキングCSVファイルの切り出し
-        if not cmds[i+1].startswith('-'): csvfile = cmds[i+1]
+    # コマンドラインで指定されたトラッキングCSVファイルの切り出し
+    opt_vals = get_opt_values(cmds, '-import', 'c')
+    if len(opt_vals) > 0:
+        csvfile = opt_vals[0]
     
     # コマンドラインで指定のない時はframe_infoテーブルから取得
     if csvfile == '':
         _, csvfile = db.get_file_path()
         if csvfile == '' :
-            print(f"[import_tracking_data]error:No tracking data. you must import csv-file.")
+            print(f"[import_tracking_data]error:No tracking data. you must operate to create csv-file.")
             return (0,0,0)
     
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[import_tracking_data]error: csv-file({csvfile}) not found.")
-        return (0,0,0)
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[import_tracking_data]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
-    if df['case_name'][0] != case_name:
-        print(f"[import_tracking_data]:case_name:{df['case_name'][0]} changed to '{case_name}'")
-        df['case_name'] = case_name
+    # ---- トラッキングデータをtrack_dataテーブルへ登録 ----
+    count_t = import_csv_to_db(csvfile, db, 'tracking_data', case_name)
+    if count_t == 0: return (0,0,0)
     
-    # DBへトラッキングデータ登録
-    db.delete_tracking_data()      # 登録済データの削除
-    df.to_sql('tracking_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[import_tracking_data]info:import '{csvfile}' to 'tracking_data'{df.shape}.")
-    count_t = df.shape[0]
     # インポート実行回数更新
     count += 1
     db.update_frame_info('import', count)
     
-    # 姿勢解析データをkyudo_dataテーブルへ登録
+    # ---- 姿勢解析データをkyudo_dataテーブルへ登録 ----
     csvfile = csvfile.replace('track','kyudo')
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[import_kyudo_data]error: csv-file({csvfile}) not found.")
-        return (count_t,0,0)    
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[import_kyudo_data]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
-    if df['case_name'][0] != case_name:
-        print(f"[import_kyudo_data]:case_name:{df['case_name'][0]} changed to '{case_name}'")
-        df['case_name'] = case_name
+    count_k = import_csv_to_db(csvfile, db, 'kyudo_data', case_name)
+    if count_k == 0: return (count_t,0,0)
     
-    db.delete_kyudo_data()         # 登録済データの削除
-    df.to_sql('kyudo_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[import_kyudo_data]info:import '{csvfile}' to 'kyudo_data'{df.shape}.")
-    count_k = df.shape[0]
-    
-    # 評価データをeval_dataテーブルへ登録
+    # ---- 評価データをeval_dataテーブルへ登録 ----
     csvfile = csvfile.replace('kyudo','eval')
-    if csvfile == '' or os.path.isfile(csvfile) == False:
-        # ファイルが存在しないとき終了
-        print(f"[import_eval_data]error: csv-file({csvfile}) not found.")
-        return (count_t, count_k, 0)
-    # CSVファイルを読み込む
-    df = pd.read_csv(csvfile)
-    print(f"[import_eval_data]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
-    if df['case_name'][0] != case_name:
-        print(f"[import_eval_data]:case_name:{df['case_name'][0]} changed to '{case_name}'")
-        df['case_name'] = case_name
-    
-    db.delete_eval_data()         # 登録済データの削除
-    df.to_sql('eval_data', db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
-    print(f"[import_eval_data]info:import '{csvfile}' to 'eval_data'{df.shape}.")
-    return (count_t, count_k, df.shape[0])
+    count_e = import_csv_to_db(csvfile, db, 'eval_data', case_name)
+    if count_e == 0: return (count_t, count_k, 0)
+
+    print(f"[import_tracking_data]info:import count={count}")
+
+    return (count_t, count_k, count_e)
 #
 # 登録ケースの削除関数
 # db: MyDbデータベースオブジェクト
@@ -842,7 +857,21 @@ def delete_frame_info(db:MyDb, case_name):
     
     else:
         print(f"[delete_frame_info]:error: case_name='{case_name}' not found.")
-    return            
+    return 
+#
+# 登録ケースの画像ファイルパス取得関数
+# db: MyDbデータベースオブジェクト
+# idir: 画像ファイルの格納ディレクトリ
+# case_name: ケース名   
+def get_case_img_path(db:MyDb, idir: str, case_name: str):
+    img_path = None
+    path, _ = db.get_file_path(case_name)
+    # 画像ファイルのパスを生成して返す
+    # 例: path='c:\users/usr/picture/Rool/case1.jpeg' -> img_path='idir/case1.jpeg'
+    if path is not None:
+        filename = os.path.basename(path)           # ファイル名を取得
+        img_path = os.path.join(idir, filename)     # 画像ファイルのパスを生成
+    return img_path
 #
 # 登録ケース名の変更関数
 # db: MyDbデータベースオブジェクト
@@ -875,23 +904,25 @@ def rename_frame_info(db:MyDb, from_name, to_name):
 # case_names: 表示ケース名リスト（'*'の場合、全ケース表示）
 def print_eval_data(db:MyDb, case_names:list):
     # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
-    eval_sections = [ 4, 5, 6, 8]
+    # 解析対象節番号('<section>.<step>')リスト
+    eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
                 " <section>  <case>        <frame>    <er(°)>     <sl(°)>   <rl(°)>",
-                " <section>  <case>        <frame>     <pull(%)>  <sl(°)>   <rl(°)>",
+                " <section>  <case>        <frame>    <pull(%)>   <sl(°)>   <rl(°)>",
+                "",
                 " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>",
                 " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>"
             ]
     items_l = [ 
                 "section, case_name, frame_no, er, sl, rl",
+                "section, case_name, frame_no, sl, rl",
                 "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, split, sl, rl",
                 "section, case_name, frame_no, split, sl, rl"
             ]
-
+    # ケース名リストが'*'の場合、全ケース名を取得してリストに格納する
     if case_names[0] == '*':
         case_names.clear()
-        # 全ケース名を取得してリストに格納する
         fdf = db.pandas_read_frame()
         rows,_ = fdf.shape
         for i in range(rows):
@@ -899,10 +930,14 @@ def print_eval_data(db:MyDb, case_names:list):
             case_names.append(fdf.iloc[i]['case_name'])
             
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
-    for i, section in enumerate(eval_sections):
-        print(f"\n{headers[i]}")
+    for i, section_str in enumerate(eval_sections):
+        nums = section_str.split('.')
+        section = int(nums[0])
+        step = int(nums[1])
+        if headers[i] != '':
+            print(f"\n{headers[i]}")
         for case_name in case_names:
-            eval_data_l = db.get_print_eval_data(section, case_name, items_l[i])
+            eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
 #eof

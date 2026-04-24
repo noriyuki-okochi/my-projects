@@ -456,39 +456,42 @@ class MyDb:
 #
 # get print eval_data of each case_name(return print-data-list) 
 #
-    def get_print_eval_data(self, section, case_name, items):
+    def get_print_eval_data(self, case_name, section, step, items):
         print_list = []
         for i in range(2):
-            order = f"order by frame_no desc" if i == 0 else f"order by section,frame_no desc"
-            # SQL文を作成して実行
-            sql = f"select {items} from eval_data where case_name='{case_name}'"\
-                  f" and  (section%10)={section} and completed=1 {order} limit 1"
+            #print(f"get_print_eval_data({i}): section={section} step={step}")
+            order = f"order by section desc,frame_no desc" if i == 0 else f"order by section,frame_no desc"
+            # SQL文を作成
+            if step == 0:                       # 完了移行直前のデータを取得
+                sql = f"select {items} from eval_data where case_name='{case_name}'"\
+                      f" and  (section%10)={section} and completed=0 {order} limit 1"
+                      
+            # 以下は、完了移行前のステップのデータを取得するための措置
+            elif section == 5 and step == 10:   # 大三移行時のデータを取得
+                sql = f"select {items} from eval_data where case_name='{case_name}'"\
+                      f" and  (section%10)={section} and step={step} and completed=0 {order}"                        
+            # SQL文を実行
             df = pandas.read_sql_query(sql, con=self.conn)
             if df.shape[0] == 0:
                 break                # no data for this section
             
             # 検索データを整形してリストに追加
             print_text = ""
-            for _, val in df.iloc[0].to_dict().items():
+            for c, val in df.iloc[0].to_dict().items():
                 print_text += f"{val:10.1f}" if isinstance(val, float) else f"{val:10} "
-            # 
-            if section == 5:
-                # 大三の'sl_angle','rl_angle'のデータも追加して表示する
-                sql = f"select sl,rl from eval_data where case_name='{case_name}'"\
-                      f" and  (section%10)={section} and step=10 {order}"
-                df_a = pandas.read_sql_query(sql, con=self.conn)
-                if df_a.shape[0] > 0:
-                    print_text += f"{df_a.iloc[0]['sl']:10.1f}{df_a.iloc[0]['rl']:10.1f}"
-            #  
+                # 以下は、完了移行前のステップのデータを表示するための措置
+                if section == 5 and step == 10 and c == 'frame_no':
+                    # 大三移行時の角度データを表示するため、空白を追加
+                    print_text += " "*10    
+                    
+            # テキストを出力行リストに追加  
             print_list.append(print_text)
-            # sectionが10以上の場合は、２立ち分のデータがある可能性があるので、ループを続ける
             if df.iloc[0]['section'] < 10:
                 break               # １立ちのみなので、ループを抜ける
 
+        # 2立ち分のデータがある場合は、順番を入れ替える
         if len(print_list) == 2:
-            # 2立ち分のデータがある場合は、順番を入れ替える
             print_list[0], print_list[1] = print_list[1], print_list[0]
 
         return print_list
-
 #eof
