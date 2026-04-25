@@ -753,7 +753,7 @@ def get_opt_values(args:list, opt:str, type:str='c', sep:str=None):
                 if val_str.isnumeric(): values.append( int(val_str) )
             elif type == 'c':
                 values.append( val_str )
-    return values
+    return values, i+1
 #
 # CSVデータのインポート関数
 # csvfile: CSVファイルパス
@@ -797,7 +797,7 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     _, count = db.get_fps()
     csvfile = ''
     # コマンドラインで指定されたトラッキングCSVファイルの切り出し
-    opt_vals = get_opt_values(cmds, '-import', 'c')
+    opt_vals, _ = get_opt_values(cmds, '-import', 'c')
     if len(opt_vals) > 0:
         csvfile = opt_vals[0]
     

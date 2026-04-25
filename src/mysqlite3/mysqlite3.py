@@ -487,11 +487,29 @@ class MyDb:
             # テキストを出力行リストに追加  
             print_list.append(print_text)
             if df.iloc[0]['section'] < 10:
-                break               # １立ちのみなので、ループを抜ける
+                break               # 甲矢のみなので、ループを抜ける
 
-        # 2立ち分のデータがある場合は、順番を入れ替える
+        # 乙矢のデータがある場合は、順番を入れ替える
         if len(print_list) == 2:
             print_list[0], print_list[1] = print_list[1], print_list[0]
 
         return print_list
+#
+# 登録ケース名の評価データからsection,stepに該当するフレーム番号を取得する
+#
+    def get_frame_no_at(self, case_name:str, sect:int, step:int):
+        #print(f"[get_frame_no_at]: case={case_name},section={sect}, step={step}")
+        # SQL文を作成
+        if step == 0:   
+            # 完了移行直前のデータを取得
+            sql = f"select frame_no from eval_data where case_name='{case_name}'"\
+                    f" and  section={sect} and completed=0 order by frame_no desc limit 1"
+        else:           
+            # 完了移行前のステップのデータを取得するための措置
+            sql = f"select frame_no from eval_data where case_name='{case_name}'"\
+                    f" and  section={sect} and step={step} and completed=0 limit 1"                        
+        # SQL文を実行
+        df = pandas.read_sql_query(sql, con=self.conn)
+        return df.iloc[0]['frame_no'] if len(df) > 0 else None
+
 #eof
