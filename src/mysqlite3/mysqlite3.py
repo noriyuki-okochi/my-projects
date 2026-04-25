@@ -478,11 +478,15 @@ class MyDb:
             # 検索データを整形してリストに追加
             print_text = ""
             for c, val in df.iloc[0].to_dict().items():
-                print_text += f"{val:10.1f}" if isinstance(val, float) else f"{val:10} "
+                if c == 'section': 
+                    v = f"{val:2.0f}.{step}"
+                    val = float(v)
+                print_text += f"{val:12.2f}" if isinstance(val, float) \
+                                else f"{val:12} " if isinstance(val, int) else f"{val:>12}"
                 # 以下は、完了移行前のステップのデータを表示するための措置
                 if section == 5 and step == 10 and c == 'frame_no':
                     # 大三移行時の角度データを表示するため、空白を追加
-                    print_text += " "*10    
+                    print_text += " "*12    
                     
             # テキストを出力行リストに追加  
             print_list.append(print_text)
