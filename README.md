@@ -65,9 +65,9 @@
 
   コマンド：help, yoloAp, chart, kyudo, model  
 
-   > yoloAp -help  
+   > <コマンド> -help  
 
-   yoloApコマンドのオプション指定方法をコンソールに表示する
+   コマンドのオプション指定方法をコンソールに表示する
 
 ## ＜実行例＞
 
