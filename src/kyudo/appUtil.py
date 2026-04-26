@@ -753,7 +753,7 @@ def get_opt_values(args:list, opt:str, type:str='c', sep:str=None):
                 if val_str.isnumeric(): values.append( int(val_str) )
             elif type == 'c':
                 values.append( val_str )
-    return values
+    return values, i+1
 #
 # CSVデータのインポート関数
 # csvfile: CSVファイルパス
@@ -797,7 +797,7 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     _, count = db.get_fps()
     csvfile = ''
     # コマンドラインで指定されたトラッキングCSVファイルの切り出し
-    opt_vals = get_opt_values(cmds, '-import', 'c')
+    opt_vals, _ = get_opt_values(cmds, '-import', 'c')
     if len(opt_vals) > 0:
         csvfile = opt_vals[0]
     
@@ -907,11 +907,11 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象節番号('<section>.<step>')リスト
     eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                " <section>  <case>        <frame>    <er(°)>     <sl(°)>   <rl(°)>",
-                " <section>  <case>        <frame>    <pull(%)>   <sl(°)>   <rl(°)>",
+                "   <section>    <case>        <frame>    <er(°)>       <sl(°)>     <rl(°)>",
+                "   <section>    <case>        <frame>    <pull(%)>     <sl(°)>     <rl(°)>",
                 "",
-                " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>",
-                " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>"
+                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>",
+                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>"
             ]
     items_l = [ 
                 "section, case_name, frame_no, er, sl, rl",

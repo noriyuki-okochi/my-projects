@@ -61,6 +61,8 @@ SL_angle:float = 0.0        # 左腕の角度
 ER_angle:float = 0.0        # 右肘ー＞右手首の角度
 HR_angle:float = 0.0        # 右腰ー＞右手首の角度
 RSE_angle:float = 0.0       # 右肩ー＞右肘の角度
+Pull_counter:int = 0        # 引き分け時「引き」カウンター
+Push_counter:int = 0        # 引き分け時、「押し」カウンター
 # カメラの位置を定義
 Camera_position:int = 0     # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
 CameraPos:str = ''          # カメラの位置名
@@ -526,7 +528,7 @@ def section_started(section_no, myResult:MyResult):
 #
 def section_completed(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    global RL_angle, SL_angle, ER_angle
+    global RL_angle, SL_angle, ER_angle, Pull_counter, Push_counter
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -743,11 +745,15 @@ def section_completed(section_no, myResult:MyResult):
             elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
                 mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
                 Stkp.push( [(2,PRM[2])] )  
-                if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
+                if normL > thsd(PRM[2]): 
                     # 「押し」を優先的に判定する
+                    Step_counter = 11         # 「押し」
+                    Push_counter += 1
                 else:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
-                    if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
+                    if normR > thsd(PRM[2]):  
+                        Step_counter = 12     # 「引き」
+                        Pull_counter += 1
             
             else: Step_counter = 13
 
@@ -917,7 +923,9 @@ def edit_section_name(no, counter):
         stepKey = no*100 + counter
         #print(f"stepKey={stepKey}")
         if stepKey in Step_names:
-            name += f"（{Step_names[stepKey]}）"            # 大三
+            name += f"（{Step_names[stepKey]}）"            # 大三 etc.
+            if stepKey == 511: name += f" {Push_counter:2d}"
+            elif stepKey == 512: name += f" {Pull_counter:2d}"
         else :
             if Debug_opt > 1 : name += f"（{counter}）"     # その他
             else : pass   
@@ -1040,7 +1048,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
 #  
 def manual_analize_start(section_no, myResult:MyResult):
     global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
-    global Completed, Step_counter, Nop_counter
+    global Completed, Step_counter, Nop_counter, Pull_counter, Push_counter
     global Step_error, Alart_section, Alart_id
     
     # 動作の開始を判定
@@ -1052,6 +1060,7 @@ def manual_analize_start(section_no, myResult:MyResult):
         Split_sec = 0.0
         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
         Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
+        if Section_no == 4: Pull_counter,Push_counter = 0,0 # 「引き分け」引き・押しのカウンターリセット
         if Section_no != 9: 
             Section_no = Section_no + 1                     # セクション番号をインクリメント
             Step_counter = 0                                # セクション内の動作カウンター
@@ -1220,13 +1229,16 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
         
     # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
     cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
+    # 節(Section_no)、ステップ(Step_counter)情報の描画
     annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
+    # 保持時間(split)の描画
     if Split_last == 0.0:
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     else:
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 経過時間(lap)の描画
     cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 角度情報(XX_angle)の描画
     if Section_no == 4 or Section_no == 5 or Section_no == 6:
         cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     if Section_no == 7 or Section_no == 8:
@@ -1862,7 +1874,7 @@ def main():
     file_name = [None, None]  
     #
     case_name = None                                # ケース名（デフォルト：動画ファイル名）
-    case_img_path = []                                  # ケース内設定の動画ファイルのパス
+    case_img_path = []                              # ケース内設定の動画ファイルのパス
     case_name_l = []                                # ケース名リスト
     #
     # キー操作制御パラメータ
@@ -1930,11 +1942,10 @@ def main():
             rotate_video = True # 動画を90度回転して表示するオプション   
 
     if '-o' in opts:
-        # ケース名を取得
-        cases = get_opt_values(args, '-o', type='c', sep=',')
+        # 動画ファイルの選択をケース名で指定する
+        cases, _ = get_opt_values(args, '-o', type='c', sep=',')
         if len(cases) > 0:
             for case in cases:
-                case_name_l.append(case)
                 fps = Db.get_fps(case)   
                 if fps is None:
                     print(f"> '{case}' not found in frame_info table.")
@@ -1943,18 +1954,52 @@ def main():
                 if path is None:
                     print(f">  image file for '{case}' not found.")
                     return
+                case_name_l.append(case)
                 case_img_path.append(path)
         else:
             print("(-o)ケース名の指定がありません")
             return
     if '-multi' in opts:
-        multi_frames = True     # 生画像を表示するオプション
-        raw_video = True        # 生画像を表示するオプション
-        fstart = get_opt_values(args, '-multi', type='n', sep=',')
-        for i, val in enumerate(fstart):
-            if i < 2:
-                multi_fstart[i] = val
-        print(f"main]:開始フレーム={multi_fstart}")
+        # 再生開始のフレーム番号を指定する
+        multi_frames = True     # 複数画像を再生するオプション
+        raw_video = True        # 生画像を再生するオプション
+        fstart, idx = get_opt_values(args, '-multi', 'n', sep=',')
+        if len(fstart) > 0:
+            # フレーム番号指定
+            for i, val in enumerate(fstart):
+                if i < 2:       # 最大２ファイルまで
+                    multi_fstart[i] = val
+        elif len(case_name_l) == 2:
+            # <section>.<step>指定
+            at_l = []
+            fstart = args[idx].split(',')
+            for val_s in fstart:
+                at = val_s.strip().split('.')
+                if at[0].isnumeric() and at[1].isnumeric(): 
+                    at_l.append(at)
+            # 指定数のチェック
+            s = len(at_l)
+            if s == 1: at_l.append(at_l[0])     # 第１指定のみの時、第２にコピー
+            elif s == 0:
+                print(f"[main]:無効なフレーム番号が指定されました.")
+                return                
+            # 指定ケース毎に該当フレーム番号を取得する
+            for i, case in enumerate(case_name_l):
+                frame_no = -1
+                ret = Db.get_frame_no_at(case, int(at_l[i][0]), int(at_l[i][1]))
+                frame_no = -1 if ret is None else ret
+                if frame_no == -1: 
+                    print(f"[main]:該当するフレームが見つかりません.:"\
+                            f"case={case},section={int(at_l[i][0])}, step={int(at_l[i][1])}")
+                    break
+                multi_fstart[i] = frame_no
+            if frame_no == -1:
+                print(f"[main]:無効なフレーム番号が指定されました.")
+                return                
+        else:
+            print(f"[main]:無効なフレーム番号が指定されました.")
+            return
+        print(f"[main]:開始フレーム={multi_fstart}")
        
     if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
         manual_plot = True
@@ -1969,7 +2014,7 @@ def main():
         
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
         nn_gru = True
-        opt_vals = get_opt_values(args, '-gru')
+        opt_vals, _ = get_opt_values(args, '-gru')
         if len(opt_vals) > 0: model_pth = opt_vals[0]
         if model_pth is None:
             print("モデル名の指定がありません")
@@ -2087,7 +2132,7 @@ def main():
     #
     if '-I' in opts:            # 動作開始解析パラメータの初期登録
         param_nms = []
-        opt_vals = get_opt_values(args, '-I')
+        opt_vals, _ = get_opt_values(args, '-I')
         if len(opt_vals) > 0:
             if opt_vals[0] in InitAction_param_nms:
                 param_nms.append( opt_vals[0] )     # パラメータテーブルframe名を取得
@@ -2392,15 +2437,24 @@ def main():
     #
     # コマンドライン引数でフレームカウンターを指定するオプションの処理
     if '-at' in opts:
-        opt_vals = get_opt_values(args, '-at', 'n')  # '-at'オプションの値を取得
-        if len(opt_vals) > 0:
-            Frame_counter = opt_vals[0]
-            max_frame = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
-            Frame_counter = max(1, min(Frame_counter, max_frame))  # フレームカウンターを1以上、最大フレーム数以下に制限
-            print(f"[main]:開始フレームを{Frame_counter}に設定しました")
-            Frame_counter -= 1  
-            # フレームカウンターを指定されたフレームに設定 
-            cap[0].set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+        frame_no = -1
+        opt_vals, _ = get_opt_values(args, '-at', 'n', sep='.')  # '-at'オプションの値を取得
+        count = len(opt_vals)
+        if count == 1:                              # フレーム番号指定
+            frame_no = opt_vals[0]
+        elif count == 2 and len(case_name_l) > 0:   # <section>.<step>指定
+            no = Db.get_frame_no_at(case_name_l[0], opt_vals[0], opt_vals[1]) 
+            frame_no = -1 if no is None else no
+        else: pass
+        if frame_no == -1:    
+            print(f"[main]:無効なフレーム番号が指定されました.")
+            return
+        max_frame = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
+        Frame_counter = max(1, min(frame_no, max_frame))  # フレームカウンターを1以上、最大フレーム数以下に制限
+        print(f"[main]:開始フレームを{Frame_counter}に設定しました")
+        Frame_counter -= 1  
+        # フレームカウンターを指定されたフレームに設定 
+        cap[0].set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
     #
     # ウィンドウの更新間隔とキー入力待ち時間の初期値を設定
     if raw_video is True:
@@ -2522,12 +2576,18 @@ def main():
                             areas = get_mosaic_areas(myResult)
                             for rect in areas:
                                 annotated_frame = mosaic_area( annotated_frame, rect[0], rect[1], rect[2], rect[3] )
-
                 else:
                     # YOLOv8のplot関数を使用してフレームに描画  
                     # 　kpt_line=False： キーポイントのマークのみを描画）
                     annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
                     #annotated_frame = plot( myResult )
+                '''
+                if multi_frames and cap[1] is not None:
+                    # 画面を重ねて表示
+                    ret, frame1 = cap[1].read()
+                    if ret is True: 
+                        annotated_frame = multi_frame_display(annotated_frame, frame1)
+                '''
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
         #
