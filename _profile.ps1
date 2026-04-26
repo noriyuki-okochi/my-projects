@@ -193,6 +193,7 @@ function yoloAp {
         [string]$case,
         [string]$multi='',
         [string]$comp='',
+        [string]$at='1,1',
         [string]$gru,
         [string]$v8='s',
         [string]$v26='',
@@ -361,7 +362,7 @@ function chart {
         write-output '・コマンド -オプション'
         write-output '>chart  -list_case                    ：登録済ケース名の一覧を表示する'
         write-output '>chart  -list_key                     ：ポイントキー名の一覧を表示する'
-        write-output '>chart  -import <登録ケース名>                ：解析結果ポイントデータファイルのデータをデータベースに登録する'
+        write-output '>chart  -import <登録ケース名>                 ：解析結果ポイントデータファイルのデータをデータベースに登録する'
         write-output ">chart  -case   <登録ケース名> -key '<キー名>{,<キー名>}...' ：解析結果ポイントデータをグラフ表示する"
         write-output '>chart  -h	  ：コマンドの詳細パラメータを表示する'
     } 
@@ -495,7 +496,7 @@ function kyudo {
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録
         python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -m -f0 0
-    }    
+    } 
     elseif ($eval -ne '') {
         # 評価データ表示
         python ./src/kyudoApp.py -d  -case $eval -eval
