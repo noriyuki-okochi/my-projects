@@ -291,7 +291,7 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon --
+        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon --
     }
     elseif ($raw) {         
         # 動画生再生
