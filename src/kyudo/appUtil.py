@@ -907,11 +907,11 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象節番号('<section>.<step>')リスト
     eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                " <section>  <case>        <frame>    <er(°)>     <sl(°)>   <rl(°)>",
-                " <section>  <case>        <frame>    <pull(%)>   <sl(°)>   <rl(°)>",
+                "   <section>    <case>        <frame>    <er(°)>       <sl(°)>     <rl(°)>",
+                "   <section>    <case>        <frame>    <pull(%)>     <sl(°)>     <rl(°)>",
                 "",
-                " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>",
-                " <section>  <case>        <frame>  <split(sec.)> <sl(°)>  <rl(°)>"
+                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>",
+                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>"
             ]
     items_l = [ 
                 "section, case_name, frame_no, er, sl, rl",

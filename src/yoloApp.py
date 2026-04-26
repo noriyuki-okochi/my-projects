@@ -61,6 +61,8 @@ SL_angle:float = 0.0        # 左腕の角度
 ER_angle:float = 0.0        # 右肘ー＞右手首の角度
 HR_angle:float = 0.0        # 右腰ー＞右手首の角度
 RSE_angle:float = 0.0       # 右肩ー＞右肘の角度
+Pull_counter:int = 0        # 引き分け時「引き」カウンター
+Push_counter:int = 0        # 引き分け時、「押し」カウンター
 # カメラの位置を定義
 Camera_position:int = 0     # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
 CameraPos:str = ''          # カメラの位置名
@@ -526,7 +528,7 @@ def section_started(section_no, myResult:MyResult):
 #
 def section_completed(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    global RL_angle, SL_angle, ER_angle
+    global RL_angle, SL_angle, ER_angle, Pull_counter, Push_counter
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -743,11 +745,15 @@ def section_completed(section_no, myResult:MyResult):
             elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
                 mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
                 Stkp.push( [(2,PRM[2])] )  
-                if normL > thsd(PRM[2]):  Step_counter = 11         # 「押し」
+                if normL > thsd(PRM[2]): 
                     # 「押し」を優先的に判定する
+                    Step_counter = 11         # 「押し」
+                    Push_counter += 1
                 else:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
-                    if normR > thsd(PRM[2]):  Step_counter = 12     # 「引き」
+                    if normR > thsd(PRM[2]):  
+                        Step_counter = 12     # 「引き」
+                        Pull_counter += 1
             
             else: Step_counter = 13
 
@@ -917,7 +923,9 @@ def edit_section_name(no, counter):
         stepKey = no*100 + counter
         #print(f"stepKey={stepKey}")
         if stepKey in Step_names:
-            name += f"（{Step_names[stepKey]}）"            # 大三
+            name += f"（{Step_names[stepKey]}）"            # 大三 etc.
+            if stepKey == 511: name += f" {Push_counter:2d}"
+            elif stepKey == 512: name += f" {Pull_counter:2d}"
         else :
             if Debug_opt > 1 : name += f"（{counter}）"     # その他
             else : pass   
@@ -1040,7 +1048,7 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
 #  
 def manual_analize_start(section_no, myResult:MyResult):
     global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
-    global Completed, Step_counter, Nop_counter
+    global Completed, Step_counter, Nop_counter, Pull_counter, Push_counter
     global Step_error, Alart_section, Alart_id
     
     # 動作の開始を判定
@@ -1052,6 +1060,7 @@ def manual_analize_start(section_no, myResult:MyResult):
         Split_sec = 0.0
         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
         Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
+        if Section_no == 4: Pull_counter,Push_counter = 0,0 # 「引き分け」引き・押しのカウンターリセット
         if Section_no != 9: 
             Section_no = Section_no + 1                     # セクション番号をインクリメント
             Step_counter = 0                                # セクション内の動作カウンター
@@ -1220,13 +1229,16 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
         
     # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
     cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    #cv2.putText(annotated_frame, f"section: {section_name}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Section_color, 2)
+    # 節(Section_no)、ステップ(Step_counter)情報の描画
     annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
+    # 保持時間(split)の描画
     if Split_last == 0.0:
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     else:
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 経過時間(lap)の描画
     cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 角度情報(XX_angle)の描画
     if Section_no == 4 or Section_no == 5 or Section_no == 6:
         cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     if Section_no == 7 or Section_no == 8:
