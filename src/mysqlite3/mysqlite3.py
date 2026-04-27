@@ -4,6 +4,7 @@
 #     
 import sqlite3
 import pandas
+import os
 import time
 from datetime import datetime
 # local modules
@@ -91,11 +92,13 @@ class MyDb:
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
         
+        img_file = os.path.basename(data_list[0])        # 画像ファイル名を取得
         values = f"'{self.case_name}', '{data_list[0]}', {data_list[1]:.3f}, {data_list[2]}, {data_list[3]}, '{data_list[4]}',"\
+               + f" '{img_file}:', "\
                + f" '{timestamp}', '{timestamp}'"
             
         sql = "insert into frame_info"\
-            + "(case_name, img_path, fps, height, width, csv_path, updated_at, inserted_at)"\
+            + "(case_name, img_path, fps, height, width, csv_path, memo, updated_at, inserted_at)"\
             + f" values({values})"
 
         self.cur.execute(sql)
@@ -110,6 +113,7 @@ class MyDb:
             + f" {col_name} = {value},"\
             + f" updated_at='{timestamp}'"\
             + f" where case_name='{self.case_name}'"
+            
         self.cur.execute(sql)
         self.commit()
 #
