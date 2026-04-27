@@ -4,15 +4,23 @@ import numpy as np
 ##############################
 # 共通定数
 ##############################
+# データベースの初期ファイルパス名
 DB_PATH = './yolo-kyudo.db'
 path = os.getenv('DB_PATH')
 if path != None:
     DB_PATH = path
-#   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
+    
+# 画像-カメラロールの初期ディレクトリ
 PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
 path = os.getenv('ROLL_PATH')
 if path != None:
     PICT_PATH = path
+    
+# 画像重ねのアルファ値
+ADD_WEIGHT = '0.7'
+weight = os.getenv('ADD_WEIGHT')
+if weight != None:
+    Add_WEIGHT = weight
 
 V8_models_l = ['V8n', 'V8s', 'V8m', 'V26s', 'V26m' ]  # YOLOv8,26モデルのリスト   
 # セクション名の定義

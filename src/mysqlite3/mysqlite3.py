@@ -465,22 +465,30 @@ class MyDb:
             if step == 0:                       # 完了移行直前のデータを取得
                 sql = f"select {items} from eval_data where case_name='{case_name}'"\
                       f" and  (section%10)={section} and completed=0 {order} limit 1"
+                # 完了移行後の最後のデータを取得（'split'を取得するためのSQL）
+                sql1 = f"select {items} from eval_data where case_name='{case_name}'"\
+                      f" and  (section%10)={section} and completed=1 {order} limit 1"
                       
             # 以下は、完了移行前のステップのデータを取得するための措置
             elif section == 5 and step == 10:   # 大三移行時のデータを取得
                 sql = f"select {items} from eval_data where case_name='{case_name}'"\
                       f" and  (section%10)={section} and step={step} and completed=0 {order}"                        
             # SQL文を実行
+            df1 = None
             df = pandas.read_sql_query(sql, con=self.conn)
-            if df.shape[0] == 0:
-                break                # no data for this section
+            if df.shape[0] == 0:      break                # no data for this section
+            if 'split' in items : 
+                df1 = pandas.read_sql_query(sql1, con=self.conn)
+                if df1.shape[0] == 0: break
             
             # 検索データを整形してリストに追加
             print_text = ""
             for c, val in df.iloc[0].to_dict().items():
-                if c == 'section': 
+                if c == 'section':              # <section>.<step>の形式に編集する 
                     v = f"{val:2.0f}.{step}"
                     val = float(v)
+                if c == 'split':                # 'split'はSQL1で取得したデータを採用する
+                    val = df1.iloc[0]['split'] 
                 print_text += f"{val:12.2f}" if isinstance(val, float) \
                                 else f"{val:12} " if isinstance(val, int) else f"{val:>12}"
                 # 以下は、完了移行前のステップのデータを表示するための措置

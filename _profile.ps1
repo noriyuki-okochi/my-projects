@@ -25,6 +25,8 @@ $modelx = $env:MODEL_TYPE
 $env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
+# 重ね画像アルファ値設定
+$env:ADD_WEIGHT="0.7"
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -80,7 +82,8 @@ function model {
         [string]$hp='',
         [string]$path='',
         [float]$l2=0.0,
-        [int]$key=0
+        [int]$key=0,
+        [float]$add=1.0
     )
     if ($help) {
         write-output '・コマンド -オプション'
@@ -91,6 +94,7 @@ function model {
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
+        write-output ">model -add '<add-weight-alpha>'  ：重ね画像アルファ値を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
         write-output ">actvenv	                    ：仮想環境をアクティベートする"
     }
@@ -154,6 +158,12 @@ function model {
             $str = '・L2正則化係数が ' + $l2_lambda + ' に設定されました。'
             write-output $str
         }
+        elseif ( $add -lt 1.0 ) {
+            $env:ADD_WEIGHT="$add"
+            $add_alpha = $env:ADD_WEIGHT
+            $str = '・重ね画像アルファ値が ' + $add_alpha + ' に設定されました。'
+            write-output $str
+        }
         else{
             write-output '>>' 
             $str = '・モデルオプション    ：  ' + $env:MODEL_TYPE
@@ -165,6 +175,8 @@ function model {
             $str = '・入力データキー      ： ' + $env:INPUT_KEY
             write-output $str
             $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
+            write-output $str
+            $str = '・重ね画像アルファ値  ： ' + $env:ADD_WEIGHT
             write-output $str
             $str = '・登録済ケースリスト  ： ' + $env:CASE_LIST 
             Write-Output $str
