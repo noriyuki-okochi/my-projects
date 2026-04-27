@@ -447,6 +447,8 @@ function kyudo {
         [string]$delete,
         [string]$rename='',
         [string]$to='',
+        [string]$update='',
+        [string]$memo='',
         [string]$import,
         [string]$case,
         [string]$train,
@@ -478,6 +480,7 @@ function kyudo {
         write-output '>kyudo  -list	case|case_name|key|pt                     ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
+        write-output ">kyudo  -update  <登録ケース名> -memo '<メモ>'            ：登録ケース名のメモを更新する"
         write-output '>kyudo  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
         write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'... ：評価データを表示する"
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
@@ -514,6 +517,10 @@ function kyudo {
     elseif ($rename -ne '' -and $to -ne '') {
         # 登録ケース名リネーム
         python ./src/kyudoApp.py -d -case $rename,$to -R
+    }
+    elseif ($update -ne '' -and $memo -ne '') {
+        # 登録ケースのメモ更新
+        python ./src/kyudoApp.py -d -case $update -U $memo
     }
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録
