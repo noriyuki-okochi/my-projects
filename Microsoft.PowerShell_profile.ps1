@@ -209,6 +209,7 @@ function yoloAp {
         [switch]$update,
         [switch]$man,
         [switch]$raw,
+        [switch]$yolo,
         [switch]$clip,
         [switch]$rotate,
         [switch]$eval,
@@ -269,13 +270,14 @@ function yoloAp {
     if ($help) {
         write-output '・コマンド -オプション'
         write-output '>yoloAp -update [-v8 {s|m}] -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
-        write-output '>yoloAp -raw		               ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
-        write-output '>yoloAp -clip	[-rotate]	       ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
+        write-output '>yoloAp -raw	[-at <開始フレーム>]    ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
+        write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
+        write-output '>yoloAp -yolo	[-at <開始フレーム>]    ：選択した動画ファイルを骨格解析して再生する'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
-        write-output ">yoloAp -one <登録ケース名1> [-at <開始フレーム1>]         ：指定したケースの動画ファイルを再生する"
+        write-output ">yoloAp -one <登録ケース名1> [-at <開始フレーム1>]         ：指定したケースの動画ファイルを生再生する"
         write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
@@ -309,7 +311,11 @@ function yoloAp {
     }
     elseif ($raw) {         
         # 動画生再生
-        python ./src/yoloApp.py -d1 -a  -r -w --
+        python ./src/yoloApp.py -d1 -a  -r -w -at $at --
+    }
+    elseif ($yolo) {         
+        # 動画生再生
+        python ./src/yoloApp.py -d1 -a  -at $at --
     }
     elseif ($multi -ne '') {         
         # マルチ動画再生
