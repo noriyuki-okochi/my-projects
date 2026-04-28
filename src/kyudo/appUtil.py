@@ -9,6 +9,7 @@ import math
 from datetime import datetime
 import time
 from PIL import Image, ImageFont, ImageDraw
+import cv2
 #
 # local package
 from  kyudo.env import * 
@@ -163,6 +164,36 @@ class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
     Skip:bool = False
+    # キーポイントの接続ラインを定義
+    Arm_line = [Kn2idx['right_wrist'], 
+                Kn2idx['right_elbow'], 
+                Kn2idx['right_shoulder'],
+                Kn2idx['left_shoulder'], 
+                Kn2idx['left_elbow'],
+                Kn2idx['left_wrist']]       # 右手首ー＞左手首のキーポイントインデックス
+    Body_line = [Kn2idx['right_shoulder'], 
+                Kn2idx['right_hip'], 
+                Kn2idx['left_hip'], 
+                Kn2idx['left_shoulder']]    # 胴体のキーポイントインデックスright_ankle
+    LegR_line = [Kn2idx['right_hip'], 
+                Kn2idx['right_knee']] 
+#                Kn2idx['right_ankle']]      # 右脚のキーポイントインデックス
+    LegL_line = [Kn2idx['left_hip'], 
+                Kn2idx['left_knee']] 
+#                Kn2idx['left_ankle']]       # 左脚のキーポイントインデックスhhhqq
+    
+    Eye_line = [Kn2idx['right_eye'], 
+                Kn2idx['left_eye']]         # 目のキーポイントインデックス
+#
+    Rhw_line = [Kn2idx['right_hip'], 
+                Kn2idx['right_wrist']]      # 右腰ー＞右手首のキーポイントインデックス
+    ArmR_line = [Kn2idx['right_wrist'], 
+                Kn2idx['right_elbow'], 
+                Kn2idx['right_shoulder']]   # 右手首ー＞右肩のキーポイントインデックス
+    BodyR_line = [Kn2idx['right_shoulder'], 
+                Kn2idx['right_hip'], 
+                Kn2idx['right_knee'], 
+                Kn2idx['right_ankle']]      # 右胴体ー＞足首のキーポイントインデックス
     
     def __init__(self, result, frame, boxid=None):
         if boxid is None:
@@ -323,6 +354,27 @@ class MyResult(Keypoint):
             mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
 
+    # キーポイントの接続ライン（腕、胴、目）を描画する関数
+    def plot(self, annotated_frame):        
+        # キーポイントの接続ラインを描画
+        draw_kpt_line(annotated_frame, self.points, MyResult.Arm_line,  color=(0, 255, 0), weight=2, radius=3)      # 右手首ー＞左手首 
+        draw_kpt_line(annotated_frame, self.points, MyResult.Body_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
+        draw_kpt_line(annotated_frame, self.points, MyResult.Eye_line,  color=(255, 0, 0), weight=2, radius=3)      # 目
+        return annotated_frame
+
+    # キーポイントの接続ライン（腕）を描画する関数
+    def plot1(self, annotated_frame):
+        # キーポイントの接続ラインを描画
+        draw_kpt_line(annotated_frame, self.points, MyResult.Arm_line,  color=(0, 255, 0), weight=2, radius=3)      # 右手首ー＞左手首 
+        return annotated_frame
+    
+    # キーポイントの接続ライン（右腕、右胴、右足）を描画する関数
+    def plot2(self, annotated_frame):        
+        # キーポイントの接続ラインを描画
+        draw_kpt_line(annotated_frame, self.points, MyResult.ArmR_line,  color=(0, 255, 0), weight=2, radius=3)     # 右手首ー＞右肩 
+        draw_kpt_line(annotated_frame, self.points, MyResult.BodyR_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
+        return annotated_frame
+
 ##    特徴量のデータフレームクラス
 class FeaturePdf:
     # 入力データ次元数に応じた特徴量のカラム名リスト
@@ -474,23 +526,6 @@ class FeaturePdf:
             self.set_kyudo_data_list( zero_data_list )
             self.set_current_pdf(0, 0)
             self.add_previous_pdf()
-#
-# 日本語テキストの描画
-#    color = (r, g, b)
-#
-def draw_text(imag, message, point, color , font_size=20):
-    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
-    font_path = 'meiryob.ttc'
-    font = ImageFont.truetype( font_path, font_size )
-    font_color = color
-    #
-    img_pil = Image.fromarray( imag )
-    draw = ImageDraw.Draw( img_pil )
-    _, y1, _, y2 = draw.textbbox( point, message, font )
-    h = y2 - y1
-    x, y = point
-    draw.text( (x, y - h), message, font_color, font )
-    return np.array( img_pil )            
 #
 #    射法八節姿勢解析評価点数のクラス定義
 #
@@ -704,6 +739,47 @@ class MyEval:
         self.completed = completed
         self.step = step
     
+#
+# 日本語テキストの描画
+#    color = (r, g, b)
+#
+def draw_text(imag, message, point, color , font_size=20):
+    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
+    font_path = 'meiryob.ttc'
+    font = ImageFont.truetype( font_path, font_size )
+    font_color = color
+    #
+    img_pil = Image.fromarray( imag )
+    draw = ImageDraw.Draw( img_pil )
+    _, y1, _, y2 = draw.textbbox( point, message, font )
+    h = y2 - y1
+    x, y = point
+    draw.text( (x, y - h), message, font_color, font )
+    return np.array( img_pil )            
+#
+#キーポイントをフレームに描画する関数
+'''
+    #:param annotated_frame: 描画対象のフレーム
+    #:param points: キーポイントの座標
+    #:param idxs: キーポイントのインデックスリスト
+    #:param color: キーポイントの色
+    #:param weight: 線の太さ
+    #:param radius: キーポイントの半径（Noneの場合は描画しない）
+'''
+def draw_kpt_line(annotated_frame, points, idxs,  color=(0, 255, 0), weight=2, radius=None):
+    for i, idx  in enumerate(idxs):
+        if i == 0:
+            x1, y1 = map(int, points[idx])
+            if x1 == 0 or y1 == 0: break
+        else:
+            x2, y2 = map(int, points[idx])
+            if x2 == 0 or y2 == 0: break
+            cv2.line(annotated_frame, (x1, y1), (x2, y2), color, weight)  # 緑色のライン
+            x1, y1 = x2, y2  # 次のラインの始点を更新
+        if radius is not None:
+            # キーポイントの半径が指定されている場合、キーポイントを描画
+            cv2.circle(annotated_frame, (x1, y1), radius, color, -1)
+#
 #
 # 動作解析パラメータ取得関数
 # action_param_tbls: 動作解析パラメータテーブルリスト
