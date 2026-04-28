@@ -100,12 +100,12 @@ Add_beta:float = 1.0 - Add_alpha
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]]|[-multi [[<frame1_no>],[<frame2_no>]]]|[-r]|[-m|[-t|-u] <case_name>\n"\
+    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval] [-w] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
-        + "                         [-I ['<frame_name>' -s<step-no>]] [-h] [-g[<level>[<color>]]]\n"\
-        + "                         [-v] [-d<debug-level>] [--] [-at <frame_no>]")
+        + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
+        + "                         [-h] [-v] [-d<debug-level>] [--] [-at <frame_no>]")
     print(" --- Notation---")
     print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
     print(" --- Option ---")
@@ -2548,21 +2548,21 @@ def main():
                 preResult.clear()
                 annotated_frame = frame
             else:
-                # 補正用の直近リングバッファに保存
-                preResult.append( myResult )
-                
-                # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
-                myResult.calc_arrow_length_angles(prePointsBuffer)
-
-                # {Sample_frames}フレーム毎に検出結果を保存
-                if (Frame_counter%Sample_frames) == 0 or Frame_counter < Sample_frames:
-                    # 検出結果（補正済）を保存 
-                    prePointsBuffer.append( myResult )                        
-                    mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
-                                + f"フレーム={Frame_counter}, buffer_length={prePointsBuffer.length}")
-
                 # 検出結果をフレームに描画
                 if manual_plot:
+                    # 補正用の直近リングバッファに保存
+                    preResult.append( myResult )
+                    
+                    # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
+                    myResult.calc_arrow_length_angles(prePointsBuffer)
+
+                    # {Sample_frames}フレーム毎に検出結果を保存
+                    if (Frame_counter%Sample_frames) == 0 or Frame_counter < Sample_frames:
+                        # 検出結果（補正済）を保存 
+                        prePointsBuffer.append( myResult )                        
+                        mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
+                                    + f"フレーム={Frame_counter}, buffer_length={prePointsBuffer.length}")
+
                     # 生画像に手動（OpenCV）で描画
                     # 射法八節の姿勢解析を実行
                     if Tracking_only or Update_tracking: 
