@@ -204,6 +204,7 @@ function yoloAp {
         [switch]$eval,
         [string]$case,
         [string]$multi='',
+        [string]$one='',
         [string]$comp='',
         [string]$at='1,1',
         [string]$gru,
@@ -264,6 +265,7 @@ function yoloAp {
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
+        write-output ">yoloAp -one <登録ケース名1> [-at <開始フレーム1>]         ：指定したケースの動画ファイルを再生する"
         write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
@@ -302,6 +304,10 @@ function yoloAp {
     elseif ($multi -ne '') {         
         # マルチ動画再生
         python ./src/yoloApp.py -d1 -a -multi $multi --
+    }
+    elseif ($one -ne '') {         
+        # マルチ動画再生
+        python ./src/yoloApp.py -d1 -o  $one -at $at -r --
     }
     elseif ($comp -ne '') {         
         $case_list = $comp.Split(',')
