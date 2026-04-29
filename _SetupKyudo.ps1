@@ -31,10 +31,23 @@ $roll_path = "C:/Users/$env:USERNAME/Pictures/Camera Roll/"
 Write-Host  ">>デフォルトの動画フォルダ：'$roll_path'"
 $answer = Read-Host "> デフォルトの動画フォルダを '$roll_path' 以外に変更しますか? (Y/n)"
 if ($answer -eq "Y") {
-    $roll_path_new = Read-Host "> 新しい動画フォルダのパスを入力してください (例: C:/Users/YourName/Pictures/Camera Roll/)"
-    (Get-content $profile_pass) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content $profile_pass
-    (Get-content ./StartKyudo.ps1) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content .\StartKyudo.ps1
-    Write-Host  ">>Updated ROLL_PATH to '$roll_path_new' in $profile_pass."
+    #$roll_path_new = Read-Host "> 新しい動画フォルダのパスを入力してください (例: C:/Users/YourName/Pictures/Camera Roll/)"
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.RootFolder = 'Desktop'
+    $dialog.Description = 'デフォルトの動画フォルダを選択してください'
+    # フォルダ選択の有無を判定
+    if($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){
+
+        $roll_path_new = $dialog.SelectedPath
+        Write-Host  ">>'$roll_path_new' selected:"
+        (Get-content $profile_pass) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content $profile_pass
+        (Get-content ./StartKyudo.ps1) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content .\StartKyudo.ps1
+        Write-Host  ">>Updated ROLL_PATH to '$roll_path_new' in $profile_pass."
+    }
+    else {
+        Write-Host  ">>canceled."
+    }
 }
 # Python 3のインストール確認
 $version = & python -V 2>&1 
