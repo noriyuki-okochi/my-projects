@@ -990,11 +990,11 @@ def print_eval_data(db:MyDb, case_names:list):
                 "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>"
             ]
     items_l = [ 
-                "section, case_name, frame_no, er, sl, rl",
-                "section, case_name, frame_no, sl, rl",
+                "section, case_name, frame_no, (-1*er), (-1*sl), (-1*rl)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl)",
                 "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
-                "section, case_name, frame_no, split, sl, rl",
-                "section, case_name, frame_no, split, sl, rl"
+                "section, case_name, frame_no, split, (-1*sl), (-1*rl)",
+                "section, case_name, frame_no, split, (-1*sl), (-1*rl)"
             ]
     # ケース名リストが'*'の場合、全ケース名を取得してリストに格納する
     if case_names[0] == '*':
