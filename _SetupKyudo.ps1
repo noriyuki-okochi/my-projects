@@ -42,10 +42,11 @@ if ($answer -eq "Y") {
         $roll_path_new = $dialog.SelectedPath
         Write-Host  ">>'$roll_path_new' selected:"
         if($ans){
-            (Get-content $profile_pass) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content $profile_pass
+            (Get-content $profile_pass) | ForEach-Object { $_ -replace $roll_path, $roll_path_new } | Set-Content $profile_pass
+            Write-Host  ">>Updated ROLL_PATH to '$roll_path_new' in $profile_pass."
         }
-        (Get-content ./StartKyudo.ps1) | ForEach-Object { $_ -replace '$roll_path', $roll_path_new } | Set-Content .\StartKyudo.ps1
-        Write-Host  ">>Updated ROLL_PATH to '$roll_path_new' in $profile_pass."
+        (Get-content ./StartKyudo.ps1) | ForEach-Object { $_ -replace $roll_path, $roll_path_new } | Set-Content .\StartKyudo.ps1
+        Write-Host  ">>Updated ROLL_PATH to '$roll_path_new' in StartKyudo.ps1."
     }
     else {
         Write-Host  ">>canceled."
