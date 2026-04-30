@@ -302,11 +302,21 @@ function yoloAp {
     }
     elseif ($raw) {         
         # 動画生再生
+        $l = $at.split(',')
+        if( $l.Length -gt 1 ){
+            # 未指定（デフォルト）時、1を再設定
+            $at = '1'
+        }
         python ./src/yoloApp.py -d1 -a  -r -w --
     }
     elseif ($yolo) {         
         # 動画生再生
         python ./src/yoloApp.py -d1 -a $v -kpt $kpt -w -at $at --
+        $l = $at.split(',')
+        if( $l.Length -gt 1 ){
+            # 未指定（デフォルト）時、1を再設定
+            $at = '1'
+        }
     }
     elseif ($multi -ne '') {         
         # マルチ動画再生
