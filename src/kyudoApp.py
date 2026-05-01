@@ -143,8 +143,9 @@ if len(case_names) > 0 and case_names[0].upper() == '-L':
         if case_names[0] == '-L':
             print(f"----({i+1})----")
             print(fdf.iloc[i])        
-        else:   # '-l'はケース名のみ表示
-            print(f"{(i+1):2} {fdf.iloc[i]['case_name']}")        
+        else:   # '-l'はケース名、メモのみ表示
+            df = fdf.sort_values(by='case_name')
+            print(f"{(i+1):2} {df.iloc[i]['case_name']:>20}    {df.iloc[i]['memo']:<}")        
     exit(0)
 
 if len(case_names) > 0 and '-D' in opts:
