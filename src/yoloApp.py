@@ -1892,13 +1892,13 @@ def main():
         cases, _ = get_opt_values(args, '-o', type='c', sep=',')
         if len(cases) > 0:
             for case in cases:
-                fps = Db.get_fps(case)   
+                fps,_ = Db.get_fps(case)   
                 if fps is None:
                     print(f"> '{case}' not found in frame_info table.")
                     return
                 path = get_case_img_path(Db, idir, case)
                 if path is None:
-                    print(f">  image file for '{case}' not found.")
+                    print(f">  image file({path}) for '{case}' not found.")
                     return
                 case_name_l.append(case)
                 case_img_path.append(path)
