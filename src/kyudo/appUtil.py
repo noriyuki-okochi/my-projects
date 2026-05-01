@@ -714,7 +714,7 @@ class MyEval:
             if step != self.step: 
                 if section == 2 and step == 40 and self.step == 30:
                     mylog.log(INFO, f"[my_evaluate]: section({section}) step({step})  score up 5 points.")
-                    #print( f"[my_evaluate]: section({section}) step({step})  score up 5 points.score={self.eval['score']}")
+                    print( f"[my_evaluate]: section({section}) step({step})  score up 5 points.score={self.eval['score']}")
                     self.eval['score'] += 5     # 2節のステップ40（箆調べ）は5点加算して10点満点とする
                 if self.csvfd is not None:
                     # ステップの変化でCSVファイルに評価データ(score=0)を書き込む

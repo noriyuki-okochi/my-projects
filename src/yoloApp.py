@@ -386,16 +386,24 @@ def section_started(section_no, myResult:MyResult):
                       + f" skip....")
             return started   # 目の間隔が異常に広い場合、開始判定しない
 
-        if Step_counter == 30 and lenY < thsd(PRM[0]) :
-            # 目の間隔が狭くなる（箆調べ）
-            Step_counter = 40        
-        if Step_counter == 40 and lenY > thsd(PRM[0]):
-            # 箆調べからの戻り
-            Step_counter = 50
-            
+        if Step_counter == 30:
+            mylog.log(INFO, f">>>   lenY < {int(thsd(PRM[0]))})")
+            if lenY < thsd(PRM[0]) :
+                # 目の間隔が狭くなる（箆調べ）
+                Step_counter = 40        
+        if Step_counter == 40:
+            mylog.log(INFO, f">>>   lenY > {int(thsd(PRM[0]))})")
+            if lenY > thsd(PRM[0]):
+                # 箆調べからの戻り
+                Step_counter = 50
+        '''            
         mylog.log(INFO, f">>>   [ lenY > {int(thsd(PRM[0]))} and normR > {int(thsd(PRM[1]))} ]")
         Stkp.push( [(0,PRM[0]),(1,PRM[1]), (2,PRM[2])] )  
         if lenY > thsd(PRM[0]) and normR > thsd(PRM[1]):
+        '''
+        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[1]))} ]")
+        Stkp.push( [(1,PRM[1]), (2,PRM[2])] )  
+        if normR > thsd(PRM[1]):
             # 右手首の移動ベクトルの長さが10以上の場合（取りかけ動作開始）
             Step_counter += 1
             if (Step_counter%10) == PRM[2]: started = True
