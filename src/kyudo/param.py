@@ -109,6 +109,23 @@ CompleteAction_params = [
      ]
     },
    {'frame': '1.7-m',  # 約0.5秒
+     'step': 1,
+     'act': 0,
+     'param': [
+        [None, None, None, None, None, None, None, None],            # 0.
+        [0.180, 0.9, 0.015, 0.015, 0.015, 0.015, 1.000, 9],          # 1.足踏み
+        [50.0, 90.0, 120.0, 0.015, 2, 0.040, 2, 5, 0.03],            # 2.胴作り
+        [0.015, 0.015, 0.015, 0.015, 5, 0.027, 2, 0.04 ],            # 3.弓構え
+        [0.006, 0.006, 0.006, 0.006, 5, None, None, None],           # 4.打起こし
+        [0.008, 6, 0.015, 0.006, 1.000, 0.006, 1.000, 3, 0, 0.085],  # 5.引分け
+        [0.006, 0.006, 0.006, 0.006, 5, 0.050, 0.00, None],          # 6.会
+        [5, None, None, None, None, None, None, None],               # 7.離れ
+        [0.080, 0.080, 3, None, None, None, None, None],             # 8.残心
+        [25.0, 95.0, 0.030, 5, 0.085, None, None, None],             # 9.弓倒し
+        [0.900, None, None, None, None, None, None, None]            #10.共通
+     ]
+    },
+   {'frame': '1.7-m',  # 約0.5秒
      'step': 2,
      'act': 0,
      'param': [
@@ -135,7 +152,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [1.000, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 5, None, None, None, None, None],             # 3.弓構え
         [1.000, 0.015, -45.0, 45.0, 9, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 3, 0.050, None, None],          # 5.引分け
@@ -152,7 +169,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.005, 0.005, 0.005, 0.005, 5, 0.050, None, None],          # 5.引分け
@@ -169,7 +186,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 5, 0.050, None, None],          # 5.引分け
@@ -186,7 +203,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.025, 0.025, -45.0, 45.0, 5, None, None, None],            # 4.打起こし
         [0.008, 0.008, 0.008, 0.008, 4, 0.050, None, None],          # 5.引分け
@@ -203,10 +220,27 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.040, 0.035, 5, None, None, None, None, None],             # 2.胴作り
+        [0.035, 0.035, 5, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 3, 0.050, None, None],          # 5.引分け
+        [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
+        [0.085, None, None, None, None, None, None, None],           # 7.離れ
+        [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
+        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.900, None, None, None, None, None, None, None]            #10.共通
+     ]
+    },          
+    {'frame': '1.7-m',    # 約0.5秒
+     'step': 1,
+     'act': 1,
+     'param': [
+        [0.120, 0.140, None, None, None, None, None, None],          # 0.
+        [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
+        [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
+        [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
+        [0.006, 0.006, 0.006, 0.006, 5, 0.050, None, None],          # 5.引分け
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
@@ -220,7 +254,7 @@ StartAction_params = [
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
         [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
-        [0.040, 0.035, 3, None, None, None, None, None],             # 2.胴作り
+        [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
         [0.006, 0.006, 0.006, 0.006, 5, 0.050, None, None],          # 5.引分け
@@ -233,6 +267,16 @@ StartAction_params = [
     }          
 ]
 #
+# 体、顔の向きをエンコードする際の閾値設定
+#
+Body_front_threshold:float = 0.180      # 体の向きの閾値(tag2=1:正面,0:横)
+#Face_front_threshold:float = 0.055     # 顔の向きの閾値(tag1=1:正面,2:横)
+Face_front_threshold:float = 0.060      # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)
+Eyes_ratio_threshold:float = 0.0        # 目幅比率の閾値（補正しない場合は0.0に設定）
+Eyes_ratio_max:float = 0.1              # 目幅比率の最大値
+Eyes_ratio_min:float = 0.01             # 目幅比率の最小値
+#
+#
 # 評価の減点条件のパラメータ定義
 #
 Diduct_params = {
@@ -241,4 +285,5 @@ Diduct_params = {
     's8_split_tm': (('<',1.5, 5),   '残身の時間が短い.秒'),         # 残身の時間がこの値未満の場合に減点する
     's8_sl_angle': (('>',5.0, 10),  '弓手の下がりが大きい.度')      # 弓手の下がりがこの値を超える場合に減点する
 }
+#
 # eof
