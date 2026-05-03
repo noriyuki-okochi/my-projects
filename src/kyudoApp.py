@@ -175,12 +175,17 @@ if '-valid' in cmds:
     if len(cmds) > (i + 1) and cmds[i + 1] != 'none':
         valid_case.append(cmds[i +1])
         print(f"[kyudoApp]:valid_case:{valid_case}")
+#
+if '-eval' in cmds:
+    # 指定ケースの評価用データを出力する
+    print_eval_data(db, case_names)
+    exit(0)
+
 # ケース名の存在チェック
 names = case_names.copy()
 if len(valid_case) > 0 and valid_case[0] not in names:
     names.append(valid_case[0])
 for name in names:
-    if name == '*': continue
     db.case_name = name
     FPS, count = db.get_fps()
     if FPS is None:
@@ -189,11 +194,6 @@ for name in names:
     if count == 0 and '-import' not in cmds:
         print(f"[kyudoApp]error:'{name} import count is zero.")
         exit(1)
-#
-if '-eval' in cmds:
-    # 指定ケースの評価用データを出力する
-    print_eval_data(db, case_names)
-    exit(0)
 
 #
 # CSVデータのインポートを指定するコマンドオプションの解析

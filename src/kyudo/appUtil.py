@@ -713,8 +713,8 @@ class MyEval:
         elif self.section > 0:
             if step != self.step: 
                 if section == 2 and step == 40 and self.step == 30:
-                    mylog.log(INFO, f"[my_evaluate]: section({section}) step({step})  score up 5 points.")
-                    print( f"[my_evaluate]: section({section}) step({step})  score up 5 points.score={self.eval['score']}")
+                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
+                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
                     self.eval['score'] += 5     # 2節のステップ40（箆調べ）は5点加算して10点満点とする
                 if self.csvfd is not None:
                     # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
@@ -996,14 +996,24 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, split, (-1*sl), (-1*rl)",
                 "section, case_name, frame_no, split, (-1*sl), (-1*rl)"
             ]
-    # ケース名リストが'*'の場合、全ケース名を取得してリストに格納する
+    
+    # 対象のケース名を抽出する
+    case_names_l = []
+    fdf = db.pandas_read_frame()
     if case_names[0] == '*':
-        case_names.clear()
-        fdf = db.pandas_read_frame()
+        # ケース名リストが'*'の場合、全ケース名を取得してリストを作成
         rows,_ = fdf.shape
         for i in range(rows):
             if fdf.iloc[i]['import'] == 0: continue
-            case_names.append(fdf.iloc[i]['case_name'])
+            case_names_l.append(fdf.iloc[i]['case_name'])
+    else:
+        # リストの文字列を含むケース名を取得してリストを作成
+        for name in case_names:
+            sdf = fdf[fdf['case_name'].str.contains(name)]            
+            rows,_ = sdf.shape
+            for i in range(rows):
+                if sdf.iloc[i]['import'] == 0: continue
+                case_names_l.append(sdf.iloc[i]['case_name'])
             
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
     for i, section_str in enumerate(eval_sections):
@@ -1012,7 +1022,7 @@ def print_eval_data(db:MyDb, case_names:list):
         step = int(nums[1])
         if headers[i] != '':
             print(f"\n{headers[i]}")
-        for case_name in case_names:
+        for case_name in case_names_l:
             eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
