@@ -643,7 +643,7 @@ def section_completed(section_no, myResult:MyResult):
             else:
                 Step_counter = int(Step_counter/10)*10  # 連続回数をリセット    
         else:
-            mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°")
+            mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°, SL_angl= {SL_angle:.1f}")
             mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and angSE > {PRM[2]:.1f} ]")
             
             Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
@@ -915,6 +915,8 @@ def correct_action_by_rules(action, section, completed):
             if action == 1 and RSE_angle < 120.0:   # 動作完了が早すぎる（肩肘の角度が不十分）
                 r_action = 0
             if action == 1 and ER_angle < 0.0:      # 動作完了が早すぎる（肘手首の角度が不十分）
+                r_action = 0
+            if action == 1 and SL_angle > 70.0:     # 動作完了が早すぎる（左腕の角度が不十分）
                 r_action = 0
             if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
                 r_action = 0
@@ -1423,7 +1425,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
     # 評価結果の描画
     if Eval_enabled and Eval.score_on:
-        cv2.putText(annotated_frame, Eval.score_text, (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 2)
+        cv2.putText(annotated_frame, Eval.score_text, (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)
         # 減点理由の表示
         # annotated_frame = draw_text(annotated_frame, '減点', (10, 200), YELLOW)
         for i, msg in enumerate(Eval.deduct_msgs):
