@@ -90,7 +90,7 @@ function model {
         [string]$case='',
         [string]$pt='',
         [string]$hp='',
-        [string]$path='',
+        [string]$roll='',
         [float]$l2=0.0,
         [int]$key=0,
         [float]$add=1.0
@@ -103,7 +103,7 @@ function model {
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
-        write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
+        write-output ">model -roll '<picture-roll-path>'：動画ファイルの検索位置を設定する"
         write-output ">model -add '<add-weight-alpha>'  ：重ね画像アルファ値を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
         write-output ">actv26env	                  ：V26仮想環境をアクティベートする"
@@ -145,9 +145,9 @@ function model {
             $str = '・学習済モデルが ' + $modelpt + ' に設定されました。'
             write-output $str
         }
-        elseif ( $path -ne '' ) {
-            $env:ROLL_PATH="$path"
-            $str = '・動画ファイル検索位置が ' + $path + ' に設定されました。'
+        elseif ( $roll -ne '' ) {
+            $env:ROLL_PATH="$roll"
+            $str = '・動画ファイル検索位置が ' + $roll + ' に設定されました。'
             write-output $str
         }
         elseif ( $hp -ne '' ) {
