@@ -902,7 +902,7 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     count_e = import_csv_to_db(csvfile, db, 'eval_data', case_name)
     if count_e == 0: return (count_t, count_k, 0)
 
-    print(f"[import_tracking_data]info:import count={count}")
+    #print(f"[import_tracking_data]info:import count={count}")
 
     return (count_t, count_k, count_e)
 #
@@ -914,20 +914,20 @@ def delete_frame_info(db:MyDb, case_name):
     if csvfile is not None:
         if db.delete_case(case_name) == True:
             print(f"[delete_frame_info]:info: case_name='{case_name}' deleted.")
-            rcnt = db.delete_case_records('tracking_data', case_name)
-            print(f"[delete_frame_info]:info: {rcnt} records deleted from tracking_data.")
-            rcnt = db.delete_case_records('kyudo_data', case_name)
-            print(f"[delete_frame_info]:info: {rcnt} records deleted from kyudo_data.")
+            for tbl in [ 'tracking_data', 'kyudo_data' , 'eval_data' ]:
+                rcnt = db.delete_case_records(tbl, case_name)
+                print(f"[delete_frame_info]:info: {rcnt} records deleted from {tbl}.")
         #
         print(f"> '{csvfile}' will be deleted. continue?. [y/n].")
         ans = input('>>')
         if ans == 'y': 
             try:
-                os.remove( csvfile )
-                print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
-                csvfile = csvfile.replace('track', 'kyudo')
-                os.remove( csvfile )
-                print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
+                p_base = 'track'
+                for n_base in ['track', 'kyudo', 'eval']:
+                    csvfile = csvfile.replace(p_base, n_base)
+                    os.remove( csvfile )
+                    print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
+                    p_base = n_base
             except:
                 print(f"[delete_frame_info]:info: '{csvfile}' not found.")
     
@@ -958,8 +958,7 @@ def rename_frame_info(db:MyDb, from_name, to_name):
     if fps is None:
         print(f"[rename_frame_info]:error: case_name='{from_name}' not found.")
     else:
-        tables = [ 'tracking_data', 'kyudo_data' , 'eval_data', 'frame_info' ]
-        for tbl in tables:
+        for tbl in [ 'tracking_data', 'kyudo_data' , 'eval_data', 'frame_info' ]:
             rcnt = db.copy_case(tbl, from_name, to_name)
             if rcnt is None:
                 # コピー対象ケース名が存在しないとき

@@ -161,11 +161,11 @@ class MyDb:
                 print(f"[copy_case]:error: {e}")
                 i = -1
             else:
-                print(f"[copy_case]:info: copied {i} records.")
+                #print(f"[copy_case]:info: copied {i} records.")
                 if i != rcnt:
                     print(f"[copy_case]:error: copy count mismatch. from='{from_name}' to='{to_name}'")
         else:
-            print(f"[copy_case]:info: case_name='{from_name}' not found.")
+            print(f"[copy_case]:info: case_name='{from_name}' not found in {tbl}.")
         return None if i == -1 else i if i == rcnt else (-1)*i 
 #
 # insert tracking-data.(db)
