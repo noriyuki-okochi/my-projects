@@ -92,7 +92,7 @@ class MyDb:
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
         
-        img_file = os.path.basename(data_list[0])        # 画像ファイル名を取得
+        img_file = os.path.basename(data_list[0])        # 'memo'に初期設定する画像ファイル名を取得
         values = f"'{self.case_name}', '{data_list[0]}', {data_list[1]:.3f}, {data_list[2]}, {data_list[3]}, '{data_list[4]}',"\
                + f" '{img_file}:', "\
                + f" '{timestamp}', '{timestamp}'"
@@ -151,7 +151,7 @@ class MyDb:
     def copy_case(self, tbl, from_name, to_name):
         df = pandas.read_sql_query(f"SELECT * FROM {tbl} WHERE case_name='{from_name}'", self.conn)
         i = -1
-        print(f"[copy_case]:info: {tbl} df:{df.shape}")
+        #print(f"[copy_case]:info: {tbl} df:{df.shape}")
         rcnt = df.shape[0]
         if rcnt > 0:
             try:
