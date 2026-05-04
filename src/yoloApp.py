@@ -1659,6 +1659,20 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
             ctl['key_data'] = ''            # キー入力データをクリア
             print(f"フレーム={Frame_counter}")
+
+    elif key == ord('\t') and ctl['at_case'] is not None:
+        # 次セクション完了フレームへジャンプ 
+        frame = Db.get_frame_no_at(ctl['at_case'], ctl['at_section'] + 1, 0)
+        if frame is not None:
+            Frame_counter = min(frame, ctl['frame_count']) 
+            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            ctl['at_section'] += 1
+            print(f"フレーム={Frame_counter} at ({ctl['at_section']})")
+            
+            if ctl['at_section'] == 9: ctl['at_section'] =  11
+            
+        elif ctl['at_section'] < 19: ctl['at_section'] += 1
+        else: ctl['at_section'] = 1
                     
     elif key == ord('n') and Update_tracking:
         # 節の動作開始（次の節へ移行）を更新
@@ -1791,6 +1805,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         Eval.score_on = False 
         Eval.deduct_msgs.clear() 
         #
+        ctl['at_section'] = 1
         #print(f"{ctl}")
         
     elif key == ord('?'):
@@ -1856,7 +1871,9 @@ def main():
         'grid': False,                              # グリッド表示有無
         'grid_shape': (6, 6),                       # グリッド分割数(行,列)
         'grid_shift': (0, 0),                       # グリッド表示シフト量(行,列)
-        'zoom_rect': None                           # ズーム領域
+        'zoom_rect': None,                          # ズーム領域
+        'at_case': None,
+        'at_section':0
     }
     # print command line(arguments)
     args = sys.argv
@@ -2409,6 +2426,10 @@ def main():
         elif count == 2 and len(case_name_l) > 0:   # <section>.<step>指定
             no = Db.get_frame_no_at(case_name_l[0], opt_vals[0], opt_vals[1]) 
             frame_no = -1 if no is None else no
+            if frame_no != -1:
+                # キー操作（tab)の情報
+                keyCtl['at_case'] = case_name_l[0]
+                keyCtl['at_section'] = opt_vals[0]
         else: pass
         if frame_no == -1:    
             print(f"[main]:無効なフレーム番号が指定されました.")
