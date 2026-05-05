@@ -102,7 +102,7 @@ def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval] [-w] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
         + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [--] [-at <frame_no>]")
@@ -125,7 +125,7 @@ def help():
     print(" -W(window-size::ring-buffer-size: default=8)")
     print(" -V(8-pose model-file):default=v8s")
     print(" -eval(:print rating score)")
-    print(" -w(rite-video-file)")
+    print(" -w(rite-video-file) <FPS-multi-ratio>")
     print(" -z(:hide the faces by mosaic)")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
@@ -136,8 +136,8 @@ def help():
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-3>: 0:none, 1:info, 2:debug, 3:more-debug")
-    print(" --:auto-pause imidiately after starting the processing")
     print(" -at <frame_no>: auto-pause at the specified frame number")
+    print(" --:auto-pause imidiately after starting the processing")
     print(" --- Key Operation ---")
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
@@ -158,6 +158,8 @@ def help():
     print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(グリッド幅の割合<分子><分母>)）")
     print(" 0 :姿勢解析開始")
     print(" 1-8:節の開始")
+    print(" Sp:節の完了移行")
+    print(" Tb:次節の完了")
     print(" k(K) :再生速度アップ")
     print(" l(L) :再生速度ダウン")
     print(" p :一時停止／再開")
@@ -1516,7 +1518,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
                 # 動画ファイルの書き込みオブジェクトを作成
                 frame_height, frame_width = annotated_frame.shape[0:2]
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
+                Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps*ctl['fps_ratio'], (frame_width, frame_height))
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
             mylog.log(INFO, ">> video write pause")
@@ -1872,8 +1874,9 @@ def main():
         'grid_shape': (6, 6),                       # グリッド分割数(行,列)
         'grid_shift': (0, 0),                       # グリッド表示シフト量(行,列)
         'zoom_rect': None,                          # ズーム領域
-        'at_case': None,
-        'at_section':0
+        'at_case': None,                            # '-o'指定のケース名
+        'at_section':0,                             # '-at'指定のセクション番号
+        'fps_ratio':1.0                             # '-w'指定の出力ファイルFPS算出係数
     }
     # print command line(arguments)
     args = sys.argv
@@ -2344,6 +2347,10 @@ def main():
 
         print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
         #print(f"os.sep: {os.sep}")
+        opt_vals, _ = get_opt_values(args, '-w', 'n', sep='.')  # '-w'オプションの値を取得
+        if len(opt_vals) > 1:
+            keyCtl['fps_ratio'] = float(f"{opt_vals[0]}.{opt_vals[1]}")
+            print(f"[main]:出力ファイル：FPS=Fps*{keyCtl['fps_ratio']:.3f}")
     #
     if not raw_video:
         #------------------------------------------------------------------------
