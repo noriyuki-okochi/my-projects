@@ -11,6 +11,7 @@ $HOME_DIR = 'f:/share/YOLO'
 set-location $HOME_DIR
 python -V
 write-output 'Hellow YOLO!!'
+$logfile = './log/console.log'
 #
 #
 # 環境変数の設定
@@ -209,6 +210,7 @@ function yoloAp {
         [switch]$update,
         [switch]$man,
         [switch]$raw,
+        [float]$fps=1.0,
         [switch]$yolo,
         [int]$kpt=0,
         [switch]$clip,
@@ -270,8 +272,8 @@ function yoloAp {
     #
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>yoloAp -update [-v8 {s|m}] -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
-        write-output '>yoloAp -raw	[-at <開始フレーム>]    ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
+        write-output '>yoloAp -update [-v8 {s|m}] -level <no>                    ：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
+        write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
@@ -308,7 +310,7 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon --
+        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon -- | Tee-Object $logfile
     }
     elseif ($raw) {         
         # 動画生再生
@@ -317,7 +319,7 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py -d1 -a  -r -w -at $at --
+        python ./src/yoloApp.py -d1 -a  -r -w $fps -at $at --
     }
     elseif ($yolo) {         
         # 動画姿勢解析再生
@@ -386,7 +388,7 @@ function yoloAp {
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon -- | Tee-Object $logfile
         }
     }
     else{
@@ -556,7 +558,7 @@ function kyudo {
     }
     elseif ($eval -ne '') {
         # 評価データ表示
-        python ./src/kyudoApp.py -d  -case $eval -eval
+        python ./src/kyudoApp.py -d  -case $eval -eval | Tee-Object $logfile
     }    
     elseif ($case -ne '') {
         # 解析結果データをグラフ表示
