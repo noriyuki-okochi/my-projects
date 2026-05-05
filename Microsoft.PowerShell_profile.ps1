@@ -310,7 +310,7 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon -- | Tee-Object $logfile
+        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon -- 
     }
     elseif ($raw) {         
         # 動画生再生
@@ -388,7 +388,7 @@ function yoloAp {
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon -- | Tee-Object $logfile
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon --
         }
     }
     else{
