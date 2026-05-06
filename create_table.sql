@@ -4,7 +4,7 @@ create table if not exists keypoints_config( id int NOT NULL,
                                     updated_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     PRIMARY KEY(id)
                                 );
--- drop table if exists frame_info;
+drop table if exists frame_info;
 create table if not exists frame_info( case_name text NOT NULL,
                                     img_path text,
                                     fps real NOT NULL,
@@ -14,6 +14,7 @@ create table if not exists frame_info( case_name text NOT NULL,
                                     start_frame int DEFAULT(0),
                                     stop_frame int DEFAULT(0),
                                     csv_path text,
+                                    memo text DEFAULT(''),
                                     updated_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     PRIMARY KEY(case_name)

@@ -4,15 +4,23 @@ import numpy as np
 ##############################
 # 共通定数
 ##############################
+# データベースの初期ファイルパス名
 DB_PATH = './yolo-kyudo.db'
 path = os.getenv('DB_PATH')
 if path != None:
     DB_PATH = path
-#   PICT_PATH = 'C:/Users/staff/OneDrive/画像/カメラロール/'    # 初期ディレクトリを指定
+    
+# 画像-カメラロールの初期ディレクトリ
 PICT_PATH = 'C:/Users/USER/Pictures/Camera Roll/' 
 path = os.getenv('ROLL_PATH')
 if path != None:
     PICT_PATH = path
+    
+# 画像重ねのアルファ値
+ADD_WEIGHT = '0.7'
+weight = os.getenv('ADD_WEIGHT')
+if weight != None:
+    Add_WEIGHT = weight
 
 V8_models_l = ['V8n', 'V8s', 'V8m', 'V26s', 'V26m' ]  # YOLOv8,26モデルのリスト   
 # セクション名の定義
@@ -170,13 +178,6 @@ Hyper_parameters = (Sequence_frames, \
 Learning_rate:float = 0.001  # 学習率   
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
-#
-Body_front_threshold:float = 0.180  # 体の向きの閾値(tag2=1:正面,0:横)
-#Face_front_threshold:float = 0.055  # 顔の向きの閾値(tag1=1:正面,2:横)
-Face_front_threshold:float = 0.060  # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)
-Eyes_ratio_threshold:float = 0.0    # 目幅比率の閾値（補正しない場合は0.0に設定）
-Eyes_ratio_max:float = 0.1          # 目幅比率の最大値
-Eyes_ratio_min:float = 0.01         # 目幅比率の最小値
 #
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定

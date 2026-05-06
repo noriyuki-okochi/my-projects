@@ -56,7 +56,7 @@ key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("kyudoApp.py -case -L(ist)|{*|<case-name>{,<case_name>'}... -D(elete)|-R(name)|-import [<csv-file-path>]|-eval}\n"\
+    print("kyudoApp.py -case -L(ist)|{*|<case-name>{,<case_name>'}... -D(elete)|-R(name)|-U(pdate) <memo>|-import [<csv-file-path>]|-eval}\n"\
          + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -135,9 +135,7 @@ if len(case_names) == 0:
     exit(1)
 
 if len(case_names) > 0 and case_names[0].upper() == '-L':
-    #
     # 登録済ケースの一覧表示
-    #
     fdf = db.pandas_read_frame()
     print(f"[kyudoApp]info:{fdf.shape}")
     rows, cols = fdf.shape
@@ -145,23 +143,29 @@ if len(case_names) > 0 and case_names[0].upper() == '-L':
         if case_names[0] == '-L':
             print(f"----({i+1})----")
             print(fdf.iloc[i])        
-        else:   # '-l'はケース名のみ表示
-            print(f"{(i+1):2} {fdf.iloc[i]['case_name']}")        
+        else:   # '-l'はケース名、メモのみ表示
+            df = fdf.sort_values(by='case_name')
+            print(f"{(i+1):2} {df.iloc[i]['case_name']:>20}    {df.iloc[i]['memo']:<}")        
     exit(0)
 
 if len(case_names) > 0 and '-D' in opts:
-    #
     # 登録済ケースの削除
-    #
     for name in case_names:
         delete_frame_info(db, name)
     exit(0)
 
 if case_compare and '-R' in opts:
-    #
     # 登録済ケース名の変更(関連テーブルも変更)
-    #
     rename_frame_info(db, case_names[0], case_names[1])
+    exit(0)
+
+if len(case_names) and '-U' in opts:
+    # 登録済ケースのMEMOを更新
+    memo_l, _ = get_opt_values(args, '-U', 'c')
+    if len(memo_l) > 0:
+        db.case_name = case_names[0]
+        text = f"'{memo_l[0]}'"
+        db.update_frame_info('memo', text)
     exit(0)
         
 valid_case:str = []
@@ -171,12 +175,17 @@ if '-valid' in cmds:
     if len(cmds) > (i + 1) and cmds[i + 1] != 'none':
         valid_case.append(cmds[i +1])
         print(f"[kyudoApp]:valid_case:{valid_case}")
+#
+if '-eval' in cmds:
+    # 指定ケースの評価用データを出力する
+    print_eval_data(db, case_names)
+    exit(0)
+
 # ケース名の存在チェック
 names = case_names.copy()
 if len(valid_case) > 0 and valid_case[0] not in names:
     names.append(valid_case[0])
 for name in names:
-    if name == '*': continue
     db.case_name = name
     FPS, count = db.get_fps()
     if FPS is None:
@@ -185,11 +194,6 @@ for name in names:
     if count == 0 and '-import' not in cmds:
         print(f"[kyudoApp]error:'{name} import count is zero.")
         exit(1)
-#
-if '-eval' in cmds:
-    # 指定ケースの評価用データを出力する
-    print_eval_data(db, case_names)
-    exit(0)
 
 #
 # CSVデータのインポートを指定するコマンドオプションの解析

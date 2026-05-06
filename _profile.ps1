@@ -25,6 +25,8 @@ $modelx = $env:MODEL_TYPE
 $env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
+# 重ね画像アルファ値設定
+$env:ADD_WEIGHT="0.7"
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -80,7 +82,8 @@ function model {
         [string]$hp='',
         [string]$path='',
         [float]$l2=0.0,
-        [int]$key=0
+        [int]$key=0,
+        [float]$add=1.0
     )
     if ($help) {
         write-output '・コマンド -オプション'
@@ -91,6 +94,7 @@ function model {
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -path '<picture-roll-path>'：動画ファイルの検索位置を設定する"
+        write-output ">model -add '<add-weight-alpha>'  ：重ね画像アルファ値を設定する"
         write-output ">model		                  ：現在の環境変数（モデルタイプ、データ入力キー、GRUモデルファイル、L2正則化係数、ハイパーパラメータ、学習データリスト）を表示する"
         write-output ">actvenv	                    ：仮想環境をアクティベートする"
     }
@@ -154,6 +158,12 @@ function model {
             $str = '・L2正則化係数が ' + $l2_lambda + ' に設定されました。'
             write-output $str
         }
+        elseif ( $add -lt 1.0 ) {
+            $env:ADD_WEIGHT="$add"
+            $add_alpha = $env:ADD_WEIGHT
+            $str = '・重ね画像アルファ値が ' + $add_alpha + ' に設定されました。'
+            write-output $str
+        }
         else{
             write-output '>>' 
             $str = '・モデルオプション    ：  ' + $env:MODEL_TYPE
@@ -165,6 +175,8 @@ function model {
             $str = '・入力データキー      ： ' + $env:INPUT_KEY
             write-output $str
             $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
+            write-output $str
+            $str = '・重ね画像アルファ値  ： ' + $env:ADD_WEIGHT
             write-output $str
             $str = '・登録済ケースリスト  ： ' + $env:CASE_LIST 
             Write-Output $str
@@ -187,11 +199,14 @@ function yoloAp {
         [switch]$update,
         [switch]$man,
         [switch]$raw,
+        [switch]$yolo,
+        [int]$kpt=0,
         [switch]$clip,
         [switch]$rotate,
         [switch]$eval,
         [string]$case,
         [string]$multi='',
+        [string]$one='',
         [string]$comp='',
         [string]$at='1,1',
         [string]$gru,
@@ -248,10 +263,12 @@ function yoloAp {
         write-output '>yoloAp -update [-v8 {s|m}] -level <no>：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -raw		               ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yoloAp -clip	[-rotate]	       ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
+        write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
+        write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを再生する"
         write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
@@ -285,11 +302,34 @@ function yoloAp {
     }
     elseif ($raw) {         
         # 動画生再生
+        $l = $at.split(',')
+        if( $l.Length -gt 1 ){
+            # 未指定（デフォルト）時、1を再設定
+            $at = '1'
+        }
         python ./src/yoloApp.py -d1 -a  -r -w --
     }
+    elseif ($yolo) {         
+        # 動画姿勢解析再生
+        python ./src/yoloApp.py -d1 -a $v -kpt $kpt -w -at $at --
+        $l = $at.split(',')
+        if( $l.Length -gt 1 ){
+            # 未指定（デフォルト）時、1を再設定
+            $at = '1'
+        }
+    }
     elseif ($multi -ne '') {         
-        # マルチ動画再生
+        # マルチ指定動画再生
         python ./src/yoloApp.py -d1 -a -multi $multi --
+    }
+    elseif ($one -ne '') {         
+        # 単一ケース指定再生
+        $l = $at.split(',')
+        if( $l.Length -gt 1 ){
+            # 未指定（デフォルト）時、1を再設定
+            $at = '1'
+        }
+        python ./src/yoloApp.py -d1 -o  $one -at $at -r --
     }
     elseif ($comp -ne '') {         
         $case_list = $comp.Split(',')
@@ -425,6 +465,8 @@ function kyudo {
         [string]$delete,
         [string]$rename='',
         [string]$to='',
+        [string]$update='',
+        [string]$memo='',
         [string]$import,
         [string]$case,
         [string]$train,
@@ -456,6 +498,7 @@ function kyudo {
         write-output '>kyudo  -list	case|case_name|key|pt                     ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
+        write-output ">kyudo  -update  <登録ケース名> -memo '<メモ>'            ：登録ケース名のメモを更新する"
         write-output '>kyudo  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
         write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'... ：評価データを表示する"
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
@@ -492,6 +535,10 @@ function kyudo {
     elseif ($rename -ne '' -and $to -ne '') {
         # 登録ケース名リネーム
         python ./src/kyudoApp.py -d -case $rename,$to -R
+    }
+    elseif ($update -ne '' -and $memo -ne '') {
+        # 登録ケースのメモ更新
+        python ./src/kyudoApp.py -d -case $update -U $memo
     }
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録

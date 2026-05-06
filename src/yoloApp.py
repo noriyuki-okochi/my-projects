@@ -91,18 +91,21 @@ Hybrid_model:bool = False       # GRUモデルとロジック解析の併用フ�
 V8_model:str = 'v8s'            # YOLOv8のモデルファイル名
 # ビデオ出力設定
 Cv2Video = None                 # OpenCVのビデオライターインスタンス
+Add_alpha:float = float(ADD_WEIGHT)   # 画像重ねのアルファ値
+Add_beta:float = 1.0 - Add_alpha
+
 #
 # YOLOv8とOpenPoseの組み合わせ例（Ultralytics YOLOv8 + YOLOv8-poseモデル利用）
 # このコードは、YOLOv8を使用してカメラまたは動画ファイルから骨格検出を行うものです。
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]]|[-multi [[<frame1_no>],[<frame2_no>]]]|[-r]|[-m|[-t|-u] <case_name>\n"\
+    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval] [-w] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
-        + "                         [-I ['<frame_name>' -s<step-no>]] [-h] [-g[<level>[<color>]]]\n"\
-        + "                         [-v] [-d<debug-level>] [--] [-at <frame_no>]")
+        + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
+        + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [--] [-at <frame_no>]")
     print(" --- Notation---")
     print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
     print(" --- Option ---")
@@ -122,18 +125,19 @@ def help():
     print(" -W(window-size::ring-buffer-size: default=8)")
     print(" -V(8-pose model-file):default=v8s")
     print(" -eval(:print rating score)")
-    print(" -w(rite-video-file)")
+    print(" -w(rite-video-file) <FPS-multi-ratio>")
     print(" -z(:hide the faces by mosaic)")
     print(" -p(arameter set in StartAction_parames)")
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check): section-no=3,5")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
+    print(" -kpt <no>: draw key-point-line type: default=0")
     print(" -h(elp)")
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
     print(" -v(erborse)")
     print(" -d(ebug-level)<0-3>: 0:none, 1:info, 2:debug, 3:more-debug")
-    print(" --:auto-pause imidiately after starting the processing")
     print(" -at <frame_no>: auto-pause at the specified frame number")
+    print(" --:auto-pause imidiately after starting the processing")
     print(" --- Key Operation ---")
     print(" s :スナップショットファイルの作成")
     print(" w :出力ファイルへの書き込み開始／停止")
@@ -154,6 +158,8 @@ def help():
     print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(グリッド幅の割合<分子><分母>)）")
     print(" 0 :姿勢解析開始")
     print(" 1-8:節の開始")
+    print(" Sp:節の完了移行")
+    print(" Tb:次節の完了")
     print(" k(K) :再生速度アップ")
     print(" l(L) :再生速度ダウン")
     print(" p :一時停止／再開")
@@ -382,16 +388,24 @@ def section_started(section_no, myResult:MyResult):
                       + f" skip....")
             return started   # 目の間隔が異常に広い場合、開始判定しない
 
-        if Step_counter == 30 and lenY < thsd(PRM[0]) :
-            # 目の間隔が狭くなる（箆調べ）
-            Step_counter = 40        
-        if Step_counter == 40 and lenY > thsd(PRM[0]):
-            # 箆調べからの戻り
-            Step_counter = 50
-            
+        if Step_counter == 30:
+            mylog.log(INFO, f">>>   lenY < {int(thsd(PRM[0]))})")
+            if lenY < thsd(PRM[0]) :
+                # 目の間隔が狭くなる（箆調べ）
+                Step_counter = 40        
+        if Step_counter == 40:
+            mylog.log(INFO, f">>>   lenY > {int(thsd(PRM[0]))})")
+            if lenY > thsd(PRM[0]):
+                # 箆調べからの戻り
+                Step_counter = 50
+        '''            
         mylog.log(INFO, f">>>   [ lenY > {int(thsd(PRM[0]))} and normR > {int(thsd(PRM[1]))} ]")
         Stkp.push( [(0,PRM[0]),(1,PRM[1]), (2,PRM[2])] )  
         if lenY > thsd(PRM[0]) and normR > thsd(PRM[1]):
+        '''
+        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[1]))} ]")
+        Stkp.push( [(1,PRM[1]), (2,PRM[2])] )  
+        if normR > thsd(PRM[1]):
             # 右手首の移動ベクトルの長さが10以上の場合（取りかけ動作開始）
             Step_counter += 1
             if (Step_counter%10) == PRM[2]: started = True
@@ -631,7 +645,7 @@ def section_completed(section_no, myResult:MyResult):
             else:
                 Step_counter = int(Step_counter/10)*10  # 連続回数をリセット    
         else:
-            mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°")
+            mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°, SL_angl= {SL_angle:.1f}")
             mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and angSE > {PRM[2]:.1f} ]")
             
             Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
@@ -857,64 +871,6 @@ def section_completed(section_no, myResult:MyResult):
     mylog.log(INFO, f">>>   completed({section_no}): completed={completed}")
     return completed
 #
-#キーポイントをフレームに描画する関数
-'''
-    #:param annotated_frame: 描画対象のフレーム
-    #:param points: キーポイントの座標
-    #:param idxs: キーポイントのインデックスリスト
-    #:param color: キーポイントの色
-    #:param weight: 線の太さ
-    #:param radius: キーポイントの半径（Noneの場合は描画しない）
-'''
-def draw_kpt_line(annotated_frame, points, idxs,  color=(0, 255, 0), weight=2, radius=None):
-    for i, idx  in enumerate(idxs):
-        if i == 0:
-            x1, y1 = map(int, points[idx])
-            if x1 == 0 or y1 == 0: break
-        else:
-            x2, y2 = map(int, points[idx])
-            if x2 == 0 or y2 == 0: break
-            cv2.line(annotated_frame, (x1, y1), (x2, y2), color, weight)  # 緑色のライン
-            x1, y1 = x2, y2  # 次のラインの始点を更新
-        if radius is not None:
-            # キーポイントの半径が指定されている場合、キーポイントを描画
-            cv2.circle(annotated_frame, (x1, y1), radius, color, -1)
-#
-# キーポイントの接続ラインを描画する関数
-#
-#def draw_kpts_line(annotated_frame, keypoints, ibox):
-def draw_kpts_line(annotated_frame, points):
-    # キーポイントの接続ラインを定義
-    arm_line = [Kn2idx['right_wrist'], 
-                Kn2idx['right_elbow'], 
-                Kn2idx['right_shoulder'],
-                Kn2idx['left_shoulder'], 
-                Kn2idx['left_elbow'],
-                Kn2idx['left_wrist']]       # 右手首ー＞左手首のキーポイントインデックス
-    body_line = [Kn2idx['right_shoulder'], 
-                Kn2idx['right_hip'], 
-                Kn2idx['left_hip'], 
-                Kn2idx['left_shoulder']]    # 胴体のキーポイントインデックス
-    legR_line = [Kn2idx['right_hip'], 
-                Kn2idx['right_knee']] 
-#                Kn2idx['right_ankle']]      # 右脚のキーポイントインデックス
-    legL_line = [Kn2idx['left_hip'], 
-                Kn2idx['left_knee']] 
-#                Kn2idx['left_ankle']]       # 左脚のキーポイントインデックスhhhqq
-    
-    eye_line = [Kn2idx['right_eye'], 
-                Kn2idx['left_eye']]         # 目のキーポイントインデックス
-    rhw_line = [Kn2idx['right_hip'], 
-                Kn2idx['right_wrist']]      # 右腰ー＞右手首のキーポイントインデックス
-    
-    # キーポイントの接続ラインを描画
-    draw_kpt_line(annotated_frame, points, arm_line,  color=(0, 255, 0), weight=2, radius=3)    # 右手首ー＞左手首 
-    draw_kpt_line(annotated_frame, points, body_line, color=(0, 255, 0), weight=2, radius=3)    # 胴体
-    #draw_kpt_line(annotated_frame, points, legR_line, color=(255, 0, 0), weight=2, radius=3)   # 右脚
-    #draw_kpt_line(annotated_frame, points, legL_line, color=(255, 0, 0), weight=2, radius=3)   # 左脚
-    draw_kpt_line(annotated_frame, points, eye_line,  color=(255, 0, 0), weight=2, radius=3)    # 目
-    #draw_kpt_line(annotated_frame, points, rhw_line,  color=(255, 0, 0), weight=2, radius=None)    # 目
-#
 # 表示セクション名と色を返す関数 
 def edit_section_name(no, counter):
     # セクション名を編集する
@@ -961,6 +917,8 @@ def correct_action_by_rules(action, section, completed):
             if action == 1 and RSE_angle < 120.0:   # 動作完了が早すぎる（肩肘の角度が不十分）
                 r_action = 0
             if action == 1 and ER_angle < 0.0:      # 動作完了が早すぎる（肘手首の角度が不十分）
+                r_action = 0
+            if action == 1 and SL_angle > 70.0:     # 動作完了が早すぎる（左腕の角度が不十分）
                 r_action = 0
             if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
                 r_action = 0
@@ -1128,133 +1086,6 @@ def manual_analize_completed(section_no, myResult:MyResult):
 # 特徴量データフレームのインスタンス
 InputPdf:FeaturePdf = None
 #
-# 検出結果をフレームに描画する関数
-#
-def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
-    global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
-    global Split_start, Split_sec, Split_last, Lap_start, Lap_sec
-    global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
-    
-    result = myResult.result
-    mylog.log(DEBUG, f"Tracking_enabled={Tracking_enabled}")
-    mylog.log(DEBUG, f"[plot]: {type(result.keypoints)},{len(result.keypoints)}個のキーポイント")
-
-    #if annotated_frame is None:
-        # YOLOv8のplot関数を使用してフレームに描画  
-        # 　kpt_line=False： キーポイントのマークのみを描画）
-        #annotated_frame = result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
-    #else:    
-    # 対象ボックスのキーポイントの接続ラインを描画
-    draw_kpts_line(annotated_frame, myResult.points)   
-
-    if Section_no < 2: 
-        # カメラの位置取得（足踏み完了まで）
-        CameraPos = get_camera_pos(myResult)                
-
-    # セクション情報を更新
-    arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
-    
-    if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
-        if Tracking_enabled or nn_gru:
-            # 姿勢解析入力データリストを作成、保存しておく
-            tracking_result(myResult, InputPdf, output_dim, csvout=False)
-        # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
-        if Lap_start > 0:    
-            # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
-            Step_error = False
-            Alart_id = 0
-            if nn_gru:
-                # GRUモデルによる姿勢解析
-                # カレントのデータフレームを作成、保存
-                n = InputPdf.set_current_pdf(Section_no, Completed)
-                if n == 0:
-                    mylog.log(DEBUG, f"[plot]: curPdf.shape={InputPdf.curPdf.shape}")
-                    mylog.log(DEBUG, f"[plot]: {InputPdf.curPdf.tail()}")
-                    if not InputPdf.is_ready():
-                        # シーケンスデータの準備をする
-                        InputPdf.add_previous_pdf()
-                        mylog.log(DEBUG, f"[plot]: prePdf.shape={InputPdf.prePdf.shape}")
-                        mylog.log(DEBUG, f"[plot]: {InputPdf.prePdf.tail()}")
-                    else:
-                        # 入力データフレームを取得
-                        input_pdf = InputPdf.get_input_pdf()
-                        # GRUモデルによる動作解析
-                        Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
-                        InputPdf.update_previous_pdf()
-                else:
-                    mylog.log(INFO, f"[plot]: set_current_pdf returned n={n}")
-                
-            # ハイブリッドモデルの場合、プログラムロジックによる姿勢解析も行う
-            if not nn_gru or Hybrid_model:
-                # プログラムロジックによる姿勢解析
-                if Section_no == 0 or Completed:
-                    # 動作の開始を判定
-                    Section_no, Completed = manual_analize_start(Section_no, myResult)
-                else:
-                    # 動作の完了を判定
-                    Section_no, Completed = manual_analize_completed(Section_no, myResult)
-            #
-            Db.section = Section_no                 # トラッキングデータのセクション番号を設定 
-            Db.step_counter = Step_counter          # トラッキングデータのセクション内の動作カウンターを設定             
-            Db.completed = 1 if Completed else 0
-
-            if Tracking_enabled:
-                # 解析結果のデータをCSVに出力する
-                tracking_result(myResult, InputPdf, output_dim, csvout=True)
-            if Update_enabled:
-                # トラッキングデータのテーブル（'section'/'completed'）を更新する
-                Db.update_tracking_section()  
-                if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
-    #
-    # セクション情報をフレームに描画
-    if Lap_start > 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
-    if Split_start > 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
-    if Section_no < 7:  Split_last = 0.0
-    #
-    # 評価用のデータ保存、採点
-    if Eval_enabled:
-        Eval(Frame_counter, Section_no, 1 if Completed else 0, \
-            Step_counter, Split_sec, \
-            RL_angle, ER_angle, SL_angle, Alart_id)
-    
-    # セクション名を編集
-    section_name, Section_color = edit_section_name(Section_no, Step_counter)   
-    others_color =  WHITE                       # その他の色（白）
-
-    if Alart_id > 0: 
-        #　警告メッセージ（全角文字）取得
-        Alart_message = Alart_msg[Alart_id*10]
-        print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
-        mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
-        
-    # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
-    cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    # 節(Section_no)、ステップ(Step_counter)情報の描画
-    annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
-    # 保持時間(split)の描画
-    if Split_last == 0.0:
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    else:
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    # 経過時間(lap)の描画
-    cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    # 角度情報(XX_angle)の描画
-    if Section_no == 4 or Section_no == 5 or Section_no == 6:
-        cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    if Section_no == 7 or Section_no == 8:
-        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    # 警告メッセージの描画
-    annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
-    # 評価結果の描画
-    if Eval_enabled and Eval.score_on:
-        cv2.putText(annotated_frame, Eval.score_text, (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 2)
-        # 減点理由の表示
-        # annotated_frame = draw_text(annotated_frame, '減点', (10, 200), YELLOW)
-        for i, msg in enumerate(Eval.deduct_msgs):
-            annotated_frame = draw_text(annotated_frame, f"{i+1}.{msg}", (10, 200 + i*30), GREEN, 18)
-#
-    return annotated_frame
-#
 # キー入力の現在モード('PWR','PWT'）を編集する関数
 #
 def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, clip_video, repeat_mode ):
@@ -1301,7 +1132,7 @@ def multi_frame_display(frame1, frame2):
     frame1 = cv2.resize(frame1, (w, h))
     frame2 = cv2.resize(frame2, (w, h))
     # 画像を重ねて表示
-    return cv2.addWeighted(frame1, 0.5, frame2, 0.5, 0) 
+    return cv2.addWeighted(frame1, Add_alpha, frame2, Add_beta, 0) 
 #
 # グリッド線を描画する関数 
 def draw_grid(img, grid_shape, grid_shift, color=(0, 255, 0), thickness=1):
@@ -1477,6 +1308,133 @@ def clip_process( frame , rotate = False):
         rectAreas.append( copy.copy(Rect_area) )
     return copy.deepcopy( rectAreas )
 #
+# 検出結果をフレームに描画する関数
+#
+def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
+    global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
+    global Split_start, Split_sec, Split_last, Lap_start, Lap_sec
+    global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
+    
+    result = myResult.result
+    mylog.log(DEBUG, f"Tracking_enabled={Tracking_enabled}")
+    mylog.log(DEBUG, f"[plot]: {type(result.keypoints)},{len(result.keypoints)}個のキーポイント")
+
+    #if annotated_frame is None:
+        # YOLOv8のplot関数を使用してフレームに描画  
+        # 　kpt_line=False： キーポイントのマークのみを描画）
+        #annotated_frame = result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
+    #else:    
+    # 対象ボックスのキーポイントの接続ラインを描画
+    myResult.plot(annotated_frame)   
+
+    if Section_no < 2: 
+        # カメラの位置取得（足踏み完了まで）
+        CameraPos = get_camera_pos(myResult)                
+
+    # セクション情報を更新
+    arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
+    
+    if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
+        if Tracking_enabled or nn_gru:
+            # 姿勢解析入力データリストを作成、保存しておく
+            tracking_result(myResult, InputPdf, output_dim, csvout=False)
+        # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
+        if Lap_start > 0:    
+            # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
+            Step_error = False
+            Alart_id = 0
+            if nn_gru:
+                # GRUモデルによる姿勢解析
+                # カレントのデータフレームを作成、保存
+                n = InputPdf.set_current_pdf(Section_no, Completed)
+                if n == 0:
+                    mylog.log(DEBUG, f"[plot]: curPdf.shape={InputPdf.curPdf.shape}")
+                    mylog.log(DEBUG, f"[plot]: {InputPdf.curPdf.tail()}")
+                    if not InputPdf.is_ready():
+                        # シーケンスデータの準備をする
+                        InputPdf.add_previous_pdf()
+                        mylog.log(DEBUG, f"[plot]: prePdf.shape={InputPdf.prePdf.shape}")
+                        mylog.log(DEBUG, f"[plot]: {InputPdf.prePdf.tail()}")
+                    else:
+                        # 入力データフレームを取得
+                        input_pdf = InputPdf.get_input_pdf()
+                        # GRUモデルによる動作解析
+                        Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
+                        InputPdf.update_previous_pdf()
+                else:
+                    mylog.log(INFO, f"[plot]: set_current_pdf returned n={n}")
+                
+            # ハイブリッドモデルの場合、プログラムロジックによる姿勢解析も行う
+            if not nn_gru or Hybrid_model:
+                # プログラムロジックによる姿勢解析
+                if Section_no == 0 or Completed:
+                    # 動作の開始を判定
+                    Section_no, Completed = manual_analize_start(Section_no, myResult)
+                else:
+                    # 動作の完了を判定
+                    Section_no, Completed = manual_analize_completed(Section_no, myResult)
+            #
+            Db.section = Section_no                 # トラッキングデータのセクション番号を設定 
+            Db.step_counter = Step_counter          # トラッキングデータのセクション内の動作カウンターを設定             
+            Db.completed = 1 if Completed else 0
+
+            if Tracking_enabled:
+                # 解析結果のデータをCSVに出力する
+                tracking_result(myResult, InputPdf, output_dim, csvout=True)
+            if Update_enabled:
+                # トラッキングデータのテーブル（'section'/'completed'）を更新する
+                Db.update_tracking_section()  
+                if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
+    #
+    # セクション情報をフレームに描画
+    if Lap_start > 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
+    if Split_start > 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
+    if Section_no < 7:  Split_last = 0.0
+    #
+    # 評価用のデータ保存、採点
+    if Eval_enabled:
+        Eval(Frame_counter, Section_no, 1 if Completed else 0, \
+            Step_counter, Split_sec, \
+            RL_angle, ER_angle, SL_angle, Alart_id)
+    
+    # セクション名を編集
+    section_name, Section_color = edit_section_name(Section_no, Step_counter)   
+    others_color =  WHITE                       # その他の色（白）
+
+    if Alart_id > 0: 
+        #　警告メッセージ（全角文字）取得
+        Alart_message = Alart_msg[Alart_id*10]
+        print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
+        mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
+        
+    # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
+    cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 節(Section_no)、ステップ(Step_counter)情報の描画
+    annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
+    # 保持時間(split)の描画
+    if Split_last == 0.0:
+        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    else:
+        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 経過時間(lap)の描画
+    cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 角度情報(XX_angle)の描画
+    if Section_no == 4 or Section_no == 5 or Section_no == 6:
+        cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if Section_no == 7 or Section_no == 8:
+        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    # 警告メッセージの描画
+    annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
+    # 評価結果の描画
+    if Eval_enabled and Eval.score_on:
+        cv2.putText(annotated_frame, Eval.score_text, (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)
+        # 減点理由の表示
+        # annotated_frame = draw_text(annotated_frame, '減点', (10, 200), YELLOW)
+        for i, msg in enumerate(Eval.deduct_msgs):
+            annotated_frame = draw_text(annotated_frame, f"{i+1}.{msg}", (10, 200 + i*30), GREEN, 18)
+#
+    return annotated_frame
+#
 # キー入力操作関数
 #
 def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
@@ -1560,7 +1518,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
                 # 動画ファイルの書き込みオブジェクトを作成
                 frame_height, frame_width = annotated_frame.shape[0:2]
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps, (frame_width, frame_height))
+                Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps*ctl['fps_ratio'], (frame_width, frame_height))
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
             mylog.log(INFO, ">> video write pause")
@@ -1703,6 +1661,20 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
             ctl['key_data'] = ''            # キー入力データをクリア
             print(f"フレーム={Frame_counter}")
+
+    elif key == ord('\t') and ctl['at_case'] is not None:
+        # 次セクション完了フレームへジャンプ 
+        frame = Db.get_frame_no_at(ctl['at_case'], ctl['at_section'] + 1, 0)
+        if frame is not None:
+            Frame_counter = min(frame, ctl['frame_count']) 
+            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            ctl['at_section'] += 1
+            print(f"フレーム={Frame_counter} at ({ctl['at_section']})")
+            
+            if ctl['at_section'] == 9: ctl['at_section'] =  11
+            
+        elif ctl['at_section'] < 19: ctl['at_section'] += 1
+        else: ctl['at_section'] = 1
                     
     elif key == ord('n') and Update_tracking:
         # 節の動作開始（次の節へ移行）を更新
@@ -1835,6 +1807,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         Eval.score_on = False 
         Eval.deduct_msgs.clear() 
         #
+        ctl['at_section'] = 1
         #print(f"{ctl}")
         
     elif key == ord('?'):
@@ -1900,7 +1873,10 @@ def main():
         'grid': False,                              # グリッド表示有無
         'grid_shape': (6, 6),                       # グリッド分割数(行,列)
         'grid_shift': (0, 0),                       # グリッド表示シフト量(行,列)
-        'zoom_rect': None                           # ズーム領域
+        'zoom_rect': None,                          # ズーム領域
+        'at_case': None,                            # '-o'指定のケース名
+        'at_section':0,                             # '-at'指定のセクション番号
+        'fps_ratio':1.0                             # '-w'指定の出力ファイルFPS算出係数
     }
     # print command line(arguments)
     args = sys.argv
@@ -1946,13 +1922,13 @@ def main():
         cases, _ = get_opt_values(args, '-o', type='c', sep=',')
         if len(cases) > 0:
             for case in cases:
-                fps = Db.get_fps(case)   
+                fps,_ = Db.get_fps(case)   
                 if fps is None:
                     print(f"> '{case}' not found in frame_info table.")
                     return
                 path = get_case_img_path(Db, idir, case)
                 if path is None:
-                    print(f">  image file for '{case}' not found.")
+                    print(f">  image file({path}) for '{case}' not found.")
                     return
                 case_name_l.append(case)
                 case_img_path.append(path)
@@ -2003,7 +1979,14 @@ def main():
        
     if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
         manual_plot = True
+
+    # キーポイントの描画形式番号を指定する
+    draw_kpt_no = 0
+    if '-kpt' in opts:
+        opt_vals, _ = get_opt_values(args, '-kpt', 'n')
+        if len(opt_vals) > 0: draw_kpt_no = opt_vals[0]
     
+    # GRUモデルパラメータ
     model_pth = None
     input_key = Input_key
     face_embed = False
@@ -2364,6 +2347,10 @@ def main():
 
         print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
         #print(f"os.sep: {os.sep}")
+        opt_vals, _ = get_opt_values(args, '-w', 'n', sep='.')  # '-w'オプションの値を取得
+        if len(opt_vals) > 1:
+            keyCtl['fps_ratio'] = float(f"{opt_vals[0]}.{opt_vals[1]}")
+            print(f"[main]:出力ファイル：FPS=Fps*{keyCtl['fps_ratio']:.3f}")
     #
     if not raw_video:
         #------------------------------------------------------------------------
@@ -2433,7 +2420,8 @@ def main():
         mylog.log(INFO, f"[main]:出力クラス区分数: {output_dim}")
         print(f"[main]:出力クラス区分数: {output_dim}")
     #   
-    Frame_counter = 1                   # フレームカウンターの初期化
+    # フレームカウンターの初期化
+    Frame_counter = 1 if not multi_frames else multi_fstart[0]
     #
     # コマンドライン引数でフレームカウンターを指定するオプションの処理
     if '-at' in opts:
@@ -2445,6 +2433,10 @@ def main():
         elif count == 2 and len(case_name_l) > 0:   # <section>.<step>指定
             no = Db.get_frame_no_at(case_name_l[0], opt_vals[0], opt_vals[1]) 
             frame_no = -1 if no is None else no
+            if frame_no != -1:
+                # キー操作（tab)の情報
+                keyCtl['at_case'] = case_name_l[0]
+                keyCtl['at_section'] = opt_vals[0]
         else: pass
         if frame_no == -1:    
             print(f"[main]:無効なフレーム番号が指定されました.")
@@ -2544,21 +2536,21 @@ def main():
                 preResult.clear()
                 annotated_frame = frame
             else:
-                # 補正用の直近リングバッファに保存
-                preResult.append( myResult )
-                
-                # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
-                myResult.calc_arrow_length_angles(prePointsBuffer)
-
-                # {Sample_frames}フレーム毎に検出結果を保存
-                if (Frame_counter%Sample_frames) == 0 or Frame_counter < Sample_frames:
-                    # 検出結果（補正済）を保存 
-                    prePointsBuffer.append( myResult )                        
-                    mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
-                                + f"フレーム={Frame_counter}, buffer_length={prePointsBuffer.length}")
-
                 # 検出結果をフレームに描画
                 if manual_plot:
+                    # 補正用の直近リングバッファに保存
+                    preResult.append( myResult )
+                    
+                    # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
+                    myResult.calc_arrow_length_angles(prePointsBuffer)
+
+                    # {Sample_frames}フレーム毎に検出結果を保存
+                    if (Frame_counter%Sample_frames) == 0 or Frame_counter < Sample_frames:
+                        # 検出結果（補正済）を保存 
+                        prePointsBuffer.append( myResult )                        
+                        mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
+                                    + f"フレーム={Frame_counter}, buffer_length={prePointsBuffer.length}")
+
                     # 生画像に手動（OpenCV）で描画
                     # 射法八節の姿勢解析を実行
                     if Tracking_only or Update_tracking: 
@@ -2577,17 +2569,20 @@ def main():
                             for rect in areas:
                                 annotated_frame = mosaic_area( annotated_frame, rect[0], rect[1], rect[2], rect[3] )
                 else:
-                    # YOLOv8のplot関数を使用してフレームに描画  
-                    # 　kpt_line=False： キーポイントのマークのみを描画）
-                    annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)
-                    #annotated_frame = plot( myResult )
-                '''
+                    if draw_kpt_no == 1:   annotated_frame = myResult.plot1(frame)
+                    elif draw_kpt_no == 2: annotated_frame = myResult.plot2(frame)
+                    else:
+                        # YOLOv8のplot関数を使用してフレームに描画  
+                        # 　kpt_line=False： キーポイントのマークのみを描画）
+                        annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                        
+                '''                
                 if multi_frames and cap[1] is not None:
                     # 画面を重ねて表示
                     ret, frame1 = cap[1].read()
                     if ret is True: 
                         annotated_frame = multi_frame_display(annotated_frame, frame1)
                 '''
+                
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
         #

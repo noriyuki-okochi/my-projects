@@ -4,6 +4,7 @@
 #     
 import sqlite3
 import pandas
+import os
 import time
 from datetime import datetime
 # local modules
@@ -91,11 +92,13 @@ class MyDb:
         d = datetime.now()
         timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
         
+        img_file = os.path.basename(data_list[0])        # 'memo'に初期設定する画像ファイル名を取得
         values = f"'{self.case_name}', '{data_list[0]}', {data_list[1]:.3f}, {data_list[2]}, {data_list[3]}, '{data_list[4]}',"\
+               + f" '{img_file}:', "\
                + f" '{timestamp}', '{timestamp}'"
             
         sql = "insert into frame_info"\
-            + "(case_name, img_path, fps, height, width, csv_path, updated_at, inserted_at)"\
+            + "(case_name, img_path, fps, height, width, csv_path, memo, updated_at, inserted_at)"\
             + f" values({values})"
 
         self.cur.execute(sql)
@@ -110,6 +113,7 @@ class MyDb:
             + f" {col_name} = {value},"\
             + f" updated_at='{timestamp}'"\
             + f" where case_name='{self.case_name}'"
+            
         self.cur.execute(sql)
         self.commit()
 #
@@ -147,7 +151,7 @@ class MyDb:
     def copy_case(self, tbl, from_name, to_name):
         df = pandas.read_sql_query(f"SELECT * FROM {tbl} WHERE case_name='{from_name}'", self.conn)
         i = -1
-        print(f"[copy_case]:info: {tbl} df:{df.shape}")
+        #print(f"[copy_case]:info: {tbl} df:{df.shape}")
         rcnt = df.shape[0]
         if rcnt > 0:
             try:
@@ -157,11 +161,11 @@ class MyDb:
                 print(f"[copy_case]:error: {e}")
                 i = -1
             else:
-                print(f"[copy_case]:info: copied {i} records.")
+                #print(f"[copy_case]:info: copied {i} records.")
                 if i != rcnt:
                     print(f"[copy_case]:error: copy count mismatch. from='{from_name}' to='{to_name}'")
         else:
-            print(f"[copy_case]:info: case_name='{from_name}' not found.")
+            print(f"[copy_case]:info: case_name='{from_name}' not found in {tbl}.")
         return None if i == -1 else i if i == rcnt else (-1)*i 
 #
 # insert tracking-data.(db)
@@ -465,22 +469,30 @@ class MyDb:
             if step == 0:                       # 完了移行直前のデータを取得
                 sql = f"select {items} from eval_data where case_name='{case_name}'"\
                       f" and  (section%10)={section} and completed=0 {order} limit 1"
+                # 完了移行後の最後のデータを取得（'split'を取得するためのSQL）
+                sql1 = f"select {items} from eval_data where case_name='{case_name}'"\
+                      f" and  (section%10)={section} and completed=1 {order} limit 1"
                       
             # 以下は、完了移行前のステップのデータを取得するための措置
             elif section == 5 and step == 10:   # 大三移行時のデータを取得
                 sql = f"select {items} from eval_data where case_name='{case_name}'"\
                       f" and  (section%10)={section} and step={step} and completed=0 {order}"                        
             # SQL文を実行
+            df1 = None
             df = pandas.read_sql_query(sql, con=self.conn)
-            if df.shape[0] == 0:
-                break                # no data for this section
+            if df.shape[0] == 0:      break                # no data for this section
+            if 'split' in items : 
+                df1 = pandas.read_sql_query(sql1, con=self.conn)
+                if df1.shape[0] == 0: break
             
             # 検索データを整形してリストに追加
             print_text = ""
             for c, val in df.iloc[0].to_dict().items():
-                if c == 'section': 
+                if c == 'section':              # <section>.<step>の形式に編集する 
                     v = f"{val:2.0f}.{step}"
                     val = float(v)
+                if c == 'split':                # 'split'はSQL1で取得したデータを採用する
+                    val = df1.iloc[0]['split'] 
                 print_text += f"{val:12.2f}" if isinstance(val, float) \
                                 else f"{val:12} " if isinstance(val, int) else f"{val:>12}"
                 # 以下は、完了移行前のステップのデータを表示するための措置

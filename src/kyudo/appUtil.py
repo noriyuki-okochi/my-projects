@@ -9,6 +9,7 @@ import math
 from datetime import datetime
 import time
 from PIL import Image, ImageFont, ImageDraw
+import cv2
 #
 # local package
 from  kyudo.env import * 
@@ -163,6 +164,36 @@ class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
     Skip:bool = False
+    # キーポイントの接続ラインを定義
+    Arm_line = [Kn2idx['right_wrist'], 
+                Kn2idx['right_elbow'], 
+                Kn2idx['right_shoulder'],
+                Kn2idx['left_shoulder'], 
+                Kn2idx['left_elbow'],
+                Kn2idx['left_wrist']]       # 右手首ー＞左手首のキーポイントインデックス
+    Body_line = [Kn2idx['right_shoulder'], 
+                Kn2idx['right_hip'], 
+                Kn2idx['left_hip'], 
+                Kn2idx['left_shoulder']]    # 胴体のキーポイントインデックスright_ankle
+    LegR_line = [Kn2idx['right_hip'], 
+                Kn2idx['right_knee']] 
+#                Kn2idx['right_ankle']]      # 右脚のキーポイントインデックス
+    LegL_line = [Kn2idx['left_hip'], 
+                Kn2idx['left_knee']] 
+#                Kn2idx['left_ankle']]       # 左脚のキーポイントインデックスhhhqq
+    
+    Eye_line = [Kn2idx['right_eye'], 
+                Kn2idx['left_eye']]         # 目のキーポイントインデックス
+#
+    Rhw_line = [Kn2idx['right_hip'], 
+                Kn2idx['right_wrist']]      # 右腰ー＞右手首のキーポイントインデックス
+    ArmR_line = [Kn2idx['right_wrist'], 
+                Kn2idx['right_elbow'], 
+                Kn2idx['right_shoulder']]   # 右手首ー＞右肩のキーポイントインデックス
+    BodyR_line = [Kn2idx['right_shoulder'], 
+                Kn2idx['right_hip'], 
+                Kn2idx['right_knee'], 
+                Kn2idx['right_ankle']]      # 右胴体ー＞足首のキーポイントインデックス
     
     def __init__(self, result, frame, boxid=None):
         if boxid is None:
@@ -323,6 +354,27 @@ class MyResult(Keypoint):
             mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
 
+    # キーポイントの接続ライン（腕、胴、目）を描画する関数
+    def plot(self, annotated_frame):        
+        # キーポイントの接続ラインを描画
+        draw_kpt_line(annotated_frame, self.points, MyResult.Arm_line,  color=(0, 255, 0), weight=2, radius=3)      # 右手首ー＞左手首 
+        draw_kpt_line(annotated_frame, self.points, MyResult.Body_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
+        draw_kpt_line(annotated_frame, self.points, MyResult.Eye_line,  color=(255, 0, 0), weight=2, radius=3)      # 目
+        return annotated_frame
+
+    # キーポイントの接続ライン（腕）を描画する関数
+    def plot1(self, annotated_frame):
+        # キーポイントの接続ラインを描画
+        draw_kpt_line(annotated_frame, self.points, MyResult.Arm_line,  color=(0, 255, 0), weight=2, radius=3)      # 右手首ー＞左手首 
+        return annotated_frame
+    
+    # キーポイントの接続ライン（右腕、右胴、右足）を描画する関数
+    def plot2(self, annotated_frame):        
+        # キーポイントの接続ラインを描画
+        draw_kpt_line(annotated_frame, self.points, MyResult.ArmR_line,  color=(0, 255, 0), weight=2, radius=3)     # 右手首ー＞右肩 
+        draw_kpt_line(annotated_frame, self.points, MyResult.BodyR_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
+        return annotated_frame
+
 ##    特徴量のデータフレームクラス
 class FeaturePdf:
     # 入力データ次元数に応じた特徴量のカラム名リスト
@@ -474,23 +526,6 @@ class FeaturePdf:
             self.set_kyudo_data_list( zero_data_list )
             self.set_current_pdf(0, 0)
             self.add_previous_pdf()
-#
-# 日本語テキストの描画
-#    color = (r, g, b)
-#
-def draw_text(imag, message, point, color , font_size=20):
-    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
-    font_path = 'meiryob.ttc'
-    font = ImageFont.truetype( font_path, font_size )
-    font_color = color
-    #
-    img_pil = Image.fromarray( imag )
-    draw = ImageDraw.Draw( img_pil )
-    _, y1, _, y2 = draw.textbbox( point, message, font )
-    h = y2 - y1
-    x, y = point
-    draw.text( (x, y - h), message, font_color, font )
-    return np.array( img_pil )            
 #
 #    射法八節姿勢解析評価点数のクラス定義
 #
@@ -678,8 +713,8 @@ class MyEval:
         elif self.section > 0:
             if step != self.step: 
                 if section == 2 and step == 40 and self.step == 30:
-                    mylog.log(INFO, f"[my_evaluate]: section({section}) step({step})  score up 5 points.")
-                    #print( f"[my_evaluate]: section({section}) step({step})  score up 5 points.score={self.eval['score']}")
+                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
+                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
                     self.eval['score'] += 5     # 2節のステップ40（箆調べ）は5点加算して10点満点とする
                 if self.csvfd is not None:
                     # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
@@ -704,6 +739,47 @@ class MyEval:
         self.completed = completed
         self.step = step
     
+#
+# 日本語テキストの描画
+#    color = (r, g, b)
+#
+def draw_text(imag, message, point, color , font_size=20):
+    #font_path = 'C:/Windows/Fonts/meiryo.ttc'
+    font_path = 'meiryob.ttc'
+    font = ImageFont.truetype( font_path, font_size )
+    font_color = color
+    #
+    img_pil = Image.fromarray( imag )
+    draw = ImageDraw.Draw( img_pil )
+    _, y1, _, y2 = draw.textbbox( point, message, font )
+    h = y2 - y1
+    x, y = point
+    draw.text( (x, y - h), message, font_color, font )
+    return np.array( img_pil )            
+#
+#キーポイントをフレームに描画する関数
+'''
+    #:param annotated_frame: 描画対象のフレーム
+    #:param points: キーポイントの座標
+    #:param idxs: キーポイントのインデックスリスト
+    #:param color: キーポイントの色
+    #:param weight: 線の太さ
+    #:param radius: キーポイントの半径（Noneの場合は描画しない）
+'''
+def draw_kpt_line(annotated_frame, points, idxs,  color=(0, 255, 0), weight=2, radius=None):
+    for i, idx  in enumerate(idxs):
+        if i == 0:
+            x1, y1 = map(int, points[idx])
+            if x1 == 0 or y1 == 0: break
+        else:
+            x2, y2 = map(int, points[idx])
+            if x2 == 0 or y2 == 0: break
+            cv2.line(annotated_frame, (x1, y1), (x2, y2), color, weight)  # 緑色のライン
+            x1, y1 = x2, y2  # 次のラインの始点を更新
+        if radius is not None:
+            # キーポイントの半径が指定されている場合、キーポイントを描画
+            cv2.circle(annotated_frame, (x1, y1), radius, color, -1)
+#
 #
 # 動作解析パラメータ取得関数
 # action_param_tbls: 動作解析パラメータテーブルリスト
@@ -826,7 +902,7 @@ def import_tracking_data(db:MyDb, cmds:list, case_name:str):
     count_e = import_csv_to_db(csvfile, db, 'eval_data', case_name)
     if count_e == 0: return (count_t, count_k, 0)
 
-    print(f"[import_tracking_data]info:import count={count}")
+    #print(f"[import_tracking_data]info:import count={count}")
 
     return (count_t, count_k, count_e)
 #
@@ -838,20 +914,20 @@ def delete_frame_info(db:MyDb, case_name):
     if csvfile is not None:
         if db.delete_case(case_name) == True:
             print(f"[delete_frame_info]:info: case_name='{case_name}' deleted.")
-            rcnt = db.delete_case_records('tracking_data', case_name)
-            print(f"[delete_frame_info]:info: {rcnt} records deleted from tracking_data.")
-            rcnt = db.delete_case_records('kyudo_data', case_name)
-            print(f"[delete_frame_info]:info: {rcnt} records deleted from kyudo_data.")
+            for tbl in [ 'tracking_data', 'kyudo_data' , 'eval_data' ]:
+                rcnt = db.delete_case_records(tbl, case_name)
+                print(f"[delete_frame_info]:info: {rcnt} records deleted from {tbl}.")
         #
         print(f"> '{csvfile}' will be deleted. continue?. [y/n].")
         ans = input('>>')
         if ans == 'y': 
             try:
-                os.remove( csvfile )
-                print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
-                csvfile = csvfile.replace('track', 'kyudo')
-                os.remove( csvfile )
-                print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
+                p_base = 'track'
+                for n_base in ['track', 'kyudo', 'eval']:
+                    csvfile = csvfile.replace(p_base, n_base)
+                    os.remove( csvfile )
+                    print(f"[delete_frame_info]:info: '{csvfile}' deleted.")
+                    p_base = n_base
             except:
                 print(f"[delete_frame_info]:info: '{csvfile}' not found.")
     
@@ -882,8 +958,7 @@ def rename_frame_info(db:MyDb, from_name, to_name):
     if fps is None:
         print(f"[rename_frame_info]:error: case_name='{from_name}' not found.")
     else:
-        tables = [ 'tracking_data', 'kyudo_data' , 'eval_data', 'frame_info' ]
-        for tbl in tables:
+        for tbl in [ 'tracking_data', 'kyudo_data' , 'eval_data', 'frame_info' ]:
             rcnt = db.copy_case(tbl, from_name, to_name)
             if rcnt is None:
                 # コピー対象ケース名が存在しないとき
@@ -914,20 +989,30 @@ def print_eval_data(db:MyDb, case_names:list):
                 "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>"
             ]
     items_l = [ 
-                "section, case_name, frame_no, er, sl, rl",
-                "section, case_name, frame_no, sl, rl",
+                "section, case_name, frame_no, (-1*er), (-1*sl), (-1*rl)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl)",
                 "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
-                "section, case_name, frame_no, split, sl, rl",
-                "section, case_name, frame_no, split, sl, rl"
+                "section, case_name, frame_no, split, (-1*sl), (-1*rl)",
+                "section, case_name, frame_no, split, (-1*sl), (-1*rl)"
             ]
-    # ケース名リストが'*'の場合、全ケース名を取得してリストに格納する
+    
+    # 対象のケース名を抽出する
+    case_names_l = []
+    fdf = db.pandas_read_frame()
     if case_names[0] == '*':
-        case_names.clear()
-        fdf = db.pandas_read_frame()
+        # ケース名リストが'*'の場合、全ケース名を取得してリストを作成
         rows,_ = fdf.shape
         for i in range(rows):
             if fdf.iloc[i]['import'] == 0: continue
-            case_names.append(fdf.iloc[i]['case_name'])
+            case_names_l.append(fdf.iloc[i]['case_name'])
+    else:
+        # リストの文字列を含むケース名を取得してリストを作成
+        for name in case_names:
+            sdf = fdf[fdf['case_name'].str.contains(name)]            
+            rows,_ = sdf.shape
+            for i in range(rows):
+                if sdf.iloc[i]['import'] == 0: continue
+                case_names_l.append(sdf.iloc[i]['case_name'])
             
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
     for i, section_str in enumerate(eval_sections):
@@ -936,7 +1021,7 @@ def print_eval_data(db:MyDb, case_names:list):
         step = int(nums[1])
         if headers[i] != '':
             print(f"\n{headers[i]}")
-        for case_name in case_names:
+        for case_name in case_names_l:
             eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
