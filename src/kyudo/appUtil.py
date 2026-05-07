@@ -982,18 +982,18 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象節番号('<section>.<step>')リスト
     eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                "   <section>    <case>        <frame>    <er(°)>       <sl(°)>     <rl(°)>",
-                "   <section>    <case>        <frame>    <pull(%)>     <sl(°)>     <rl(°)>     <er(°)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>       <pull(%)>",
                 "",
-                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>",
-                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>"
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>"
             ]
     items_l = [ 
-                "section, case_name, frame_no, (-1*er), (-1*sl), (-1*rl)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
                 "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
-                "section, case_name, frame_no, split, (-1*sl), (-1*rl)",
-                "section, case_name, frame_no, split, (-1*sl), (-1*rl)"
+                "section, case_name, frame_no, (-1*sl), (-1*rl), split",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), split"
             ]
     
     # 対象のケース名を抽出する

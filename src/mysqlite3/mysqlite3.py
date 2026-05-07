@@ -496,9 +496,9 @@ class MyDb:
                 print_text += f"{val:12.2f}" if isinstance(val, float) \
                                 else f"{val:12} " if isinstance(val, int) else f"{val:>12}"
                 # 以下は、完了移行前のステップのデータを表示するための措置
-                if section == 5 and step == 10 and c == 'frame_no':
-                    # 大三移行時の角度データを表示するため、空白を追加
-                    print_text += " "*12    
+                if section == 5 and step == 0 and c == 'frame_no':
+                    # 引き分け移行時の引き・押し比率データを表示するため、空白を追加
+                    print_text += " "*40    
                     
             # テキストを出力行リストに追加  
             print_list.append(print_text)
