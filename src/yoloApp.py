@@ -871,31 +871,6 @@ def section_completed(section_no, myResult:MyResult):
     mylog.log(INFO, f">>>   completed({section_no}): completed={completed}")
     return completed
 #
-# 表示セクション名と色を返す関数 
-def edit_section_name(no, counter):
-    # セクション名を編集する
-    name = Section_names[no]    
-    if counter > 0:                     # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
-        stepKey = no*100 + counter
-        #print(f"stepKey={stepKey}")
-        if stepKey in Step_names:
-            name += f"（{Step_names[stepKey]}）"            # 大三 etc.
-            if stepKey == 511: name += f" {Push_counter:2d}"
-            elif stepKey == 512: name += f" {Pull_counter:2d}"
-        else :
-            if Debug_opt > 1 : name += f"（{counter}）"     # その他
-            else : pass   
-    # セクションの色を設定    
-    if Step_error or Section_color == RED: 
-        if Section_no > (Alart_section + 1) or Section_no == 0 or Section_no == 9:
-            # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
-            color = YELLOW
-        else:  color = RED                      # 不正な動作のセクションの色（赤色）BGR
-    else:
-        color =  YELLOW                         # セクションの色（黄色）BGR
-        if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
-
-    return name, color
 # ハイブリッドモデルの場合、動作予測結果を補正
 def correct_action_by_rules(action, section, completed):
     global Step_counter
@@ -1086,6 +1061,31 @@ def manual_analize_completed(section_no, myResult:MyResult):
 # 特徴量データフレームのインスタンス
 InputPdf:FeaturePdf = None
 #
+# 表示セクション名と色を返す関数 
+def edit_section_name(no, counter):
+    # セクション名を編集する
+    name = Section_names[no]    
+    if counter > 0:                     # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
+        stepKey = no*100 + counter
+        #print(f"stepKey={stepKey}")
+        if stepKey in Step_names:
+            name += f"（{Step_names[stepKey]}）"            # 大三 etc.
+            if stepKey == 511: name += f" {Push_counter:2d}"
+            elif stepKey == 512: name += f" {Pull_counter:2d}"
+        else :
+            if Debug_opt > 1 : name += f"（{counter}）"     # その他
+            else : pass   
+    # セクションの色を設定    
+    if Step_error or Section_color == RED: 
+        if Section_no > (Alart_section + 1) or Section_no == 0 or Section_no == 9:
+            # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
+            color = YELLOW
+        else:  color = RED                      # 不正な動作のセクションの色（赤色）BGR
+    else:
+        color =  YELLOW                         # セクションの色（黄色）BGR
+        if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
+
+    return name, color
 # キー入力の現在モード('PWR','PWT'）を編集する関数
 #
 def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, clip_video, repeat_mode ):
@@ -1102,10 +1102,10 @@ def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, c
 def edit_key_ope(out_file, raw_video, clip_video):
  
         ope_str = '(q)uit:(p)ause:(<)back:(>)forward:(k)fast:(l)slow:(s)nap'
-        if out_file != '':  ope_str += ':(w)rite-video'
+        if out_file != '':  ope_str += ':(w)rite'
         if Tracking_only:   ope_str += ':(t)racking'
         if Update_tracking: ope_str += ':(u)pdate-tracking'
-        if raw_video and (not clip_video):   ope_str += ':(r)epeat-play'
+        if raw_video and (not clip_video):   ope_str += ':(r)epeat'
         return  ope_str
 #
 #    画像のコントラストと明るさを調整する関数
@@ -1409,22 +1409,28 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
         
     # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
     cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    
     # 節(Section_no)、ステップ(Step_counter)情報の描画
     annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
+    
     # 保持時間(split)の描画
     if Split_last == 0.0:
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     else:
         cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    
     # 経過時間(lap)の描画
     cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    
     # 角度情報(XX_angle)の描画
     if Section_no == 4 or Section_no == 5 or Section_no == 6:
         cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     if Section_no == 7 or Section_no == 8:
         cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
+    
     # 評価結果の描画
     if Eval_enabled and Eval.score_on:
         cv2.putText(annotated_frame, Eval.score_text, (10, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)
@@ -2347,10 +2353,12 @@ def main():
 
         print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
         #print(f"os.sep: {os.sep}")
-        opt_vals, _ = get_opt_values(args, '-w', 'n', sep='.')  # '-w'オプションの値を取得
-        if len(opt_vals) > 1:
-            keyCtl['fps_ratio'] = float(f"{opt_vals[0]}.{opt_vals[1]}")
-            print(f"[main]:出力ファイル：FPS=Fps*{keyCtl['fps_ratio']:.3f}")
+        if not clip_video:
+            # '-w'指定時のみ、出力FPS値の検査
+            opt_vals, _ = get_opt_values(args, '-w', 'n', sep='.')  # '-w'オプションの値を取得
+            if len(opt_vals) > 1:
+                keyCtl['fps_ratio'] = float(f"{opt_vals[0]}.{opt_vals[1]}")
+                print(f"[main]:出力ファイル：FPS=Fps*{keyCtl['fps_ratio']:.3f}")
     #
     if not raw_video:
         #------------------------------------------------------------------------
@@ -2571,6 +2579,7 @@ def main():
                 else:
                     if draw_kpt_no == 1:   annotated_frame = myResult.plot1(frame)
                     elif draw_kpt_no == 2: annotated_frame = myResult.plot2(frame)
+                    elif draw_kpt_no == 3: annotated_frame = myResult.plot(frame)
                     else:
                         # YOLOv8のplot関数を使用してフレームに描画  
                         # 　kpt_line=False： キーポイントのマークのみを描画）
