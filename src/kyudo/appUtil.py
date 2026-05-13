@@ -538,6 +538,7 @@ class MyEval:
         self.eval = { # 現在セクションの評価データ
                       'completed': 0,'score': 10 , 'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
+                      'se_angle' : 0, 'eyes_ratio': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                       }              
         self.section: int = -1              # 現在のセクション（節） 番号(0-9)
@@ -563,7 +564,7 @@ class MyEval:
         #print(f"[open_csv]: csvpath={self.csvpath}")
         self.csvfd = open(self.csvpath, 'w', newline='', encoding='utf-8')
         # CSVファイルにヘッダーを書き込む
-        header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,push,pull,alart,inserted_at,time_epoch\n"
+        header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,se,eyes,push,pull,alart,label,inserted_at,time_epoch\n"
         self.csvfd.write(header)
         self.csvfd.flush()
         
@@ -578,14 +579,14 @@ class MyEval:
                             
         for i, value in enumerate(self.eval.values()):
             if i == 0: continue               # completed
-            elif i > 1 and i < 6:             # split, rl,er,sl
+            elif i > 1 and i < 8:             # split, rl,er,sl, se, eyes_ratio
                 values += f"{value:.3f},"
             elif i == 1:                      # score          
                 values += f"{score if score is not None else value},"
             else:
                 values += f"{value},"
             
-        values += f"'{timestamp}',{time_epoc}"            
+        values += f"0,'{timestamp}',{time_epoc}"            
         self.csvfd.write(f"{values}\n")
         self.csvfd.flush()
         
@@ -597,6 +598,7 @@ class MyEval:
         # 評価データの初期化
         self.eval = { 'completed': 0, 'score': 10, 'split_tm': 0, \
                       'rl_angle': 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
+                      'se_angle': 0, 'eyes_ratio': 0.0, \
                       'push_cnt': 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                     }
         # 評価データリストの初期化    
@@ -656,7 +658,8 @@ class MyEval:
     # 評価データの更新
     #
     def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
-                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, alart:int=0):
+                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0,\
+                       se_angle:float=0.0, eyes_ratio:float=0.0, alart:int=0):
         # 
         self.frame_no = frame_no
         
@@ -711,25 +714,32 @@ class MyEval:
                     self.reset()  # 9節完了で評価データを初期
                 
         elif self.section > 0:
-            if step != self.step: 
-                if section == 2 and step == 40 and self.step == 30:
-                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
-                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
-                    self.eval['score'] += 5     # 2節のステップ40（箆調べ）は5点加算して10点満点とする
-                if self.csvfd is not None:
-                    # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
-                    self.out_csv(score=0)
-            # 評価データの設定
-            self.eval['split_tm'] = split
-            if completed == 0:
+            if self.completed == 0:
+                if step != self.step: 
+                    if self.csvfd is not None:
+                        # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
+                        self.out_csv(score=0)
                 # 移行中の角度データを更新
                 self.eval['rl_angle'] = rl_angle
                 self.eval['er_angle'] = er_angle
                 self.eval['sl_angle'] = sl_angle
-            # 5節のとき、引き分けの「押し」／「引き」回数をカウント
-            if section == 5:
-                if step == 11:      self.eval['push_cnt'] += 1
-                elif step == 12:    self.eval['pull_cnt'] += 1
+                self.eval['se_angle'] = se_angle
+                self.eval['eyes_ratio'] = eyes_ratio
+                # 5節のとき、引き分けの「押し」／「引き」回数をカウント
+                if section == 5:
+                    if step == 11:      self.eval['push_cnt'] += 1
+                    elif step == 12:    self.eval['pull_cnt'] += 1
+            else:
+                if section == 2 and step == 40 and self.step == 30:
+                    # 2節のステップ40（箆調べ）は5点加算して10点満点とする
+                    self.eval['eyes_ratio'] = eyes_ratio
+                    self.eval['score'] += 5     
+                    self.out_csv(score=0)
+                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
+                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
+                
+            # 保持時間の更新
+            self.eval['split_tm'] = split
         # 
         if self.score_on: 
             # 評価点数の表示

@@ -61,6 +61,7 @@ SL_angle:float = 0.0        # 左腕の角度
 ER_angle:float = 0.0        # 右肘ー＞右手首の角度
 HR_angle:float = 0.0        # 右腰ー＞右手首の角度
 RSE_angle:float = 0.0       # 右肩ー＞右肘の角度
+EYE_ratio:float = 0.0       # 眼の間隔比率
 Pull_counter:int = 0        # 引き分け時「引き」カウンター
 Push_counter:int = 0        # 引き分け時、「押し」カウンター
 # カメラの位置を定義
@@ -225,7 +226,7 @@ def get_camera_pos(myResult):
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
-    global HR_angle, RSE_angle
+    global HR_angle, RSE_angle, EYE_ratio
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -290,6 +291,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 
         # 顔の向き（0/1/2=不定／正面／横）
         eyes_ratio = eyes_norm/box_w
+        EYE_ratio = eyes_ratio
         face_front:int = 0 if eyes_ratio > 0.5 else \
                     (1 if eyes_ratio > Face_front_threshold else 2)    
         if Section_no >= 4 and Section_no <= 8:
@@ -1397,7 +1399,8 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     if Eval_enabled:
         Eval(Frame_counter, Section_no, 1 if Completed else 0, \
             Step_counter, Split_sec, \
-            RL_angle, ER_angle, SL_angle, Alart_id)
+            RL_angle, ER_angle, SL_angle, \
+            RSE_angle, EYE_ratio, Alart_id)
     
     # セクション名を編集
     section_name, Section_color = edit_section_name(Section_no, Step_counter)   

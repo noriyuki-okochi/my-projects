@@ -4,7 +4,7 @@ create table if not exists keypoints_config( id int NOT NULL,
                                     updated_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     PRIMARY KEY(id)
                                 );
-drop table if exists frame_info;
+--drop table if exists frame_info;
 create table if not exists frame_info( case_name text NOT NULL,
                                     img_path text,
                                     fps real NOT NULL,
@@ -95,9 +95,12 @@ create table if not exists eval_data( case_name text NOT NULL,
                                     rl real DEFAULT(0.0),
                                     er real DEFAULT(0.0),
                                     sl real DEFAULT(0.0),
+                                    se real DEFAULT(0.0),
+                                    eyes real DEFAULT(0.0),
                                     push int DEFAULT(0),
                                     pull int DEFAULT(0),
                                     alart int DEFAULT(0),
+                                    label int DEFAULT(0),
                                     inserted_at TIMESTAMP DEFAULT(DATETIME('now','localtime')),
                                     time_epoch integer,
                                     PRIMARY KEY(case_name, frame_no, time_epoch)
