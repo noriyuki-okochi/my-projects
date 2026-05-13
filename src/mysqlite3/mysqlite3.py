@@ -527,5 +527,14 @@ class MyDb:
         # SQL文を実行
         df = pandas.read_sql_query(sql, con=self.conn)
         return df.iloc[0]['frame_no'] if len(df) > 0 else None
+#
+# 登録ケース名の評価データからsectionに該当するlabelを更新する
+# 
+    def update_eval_label(self, case_name, section, label_value):
+        sql = "update eval_data set "\
+            + f"label={label_value}"\
+            + f" where case_name='{case_name}' and section={section} and completed=1"
+        self.cur.execute(sql)
+        self.conn.commit()
 
 #eof

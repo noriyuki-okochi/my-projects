@@ -56,7 +56,7 @@ key_names.extend(Kyudo_data_names)
 
 opts:str = [opt for opt in args if opt.startswith('-')]
 if '-h' in opts:        #debug write
-    print("kyudoApp.py -case -L(ist)|{*|<case-name>{,<case_name>'}... -D(elete)|-R(name)|-U(pdate) <memo>|-import [<csv-file-path>]|-eval}\n"\
+    print("kyudoApp.py -case -L(ist)|{*|<case-name>{,<case_name>'}... -D(elete)|-R(name)|-U(pdate) <memo>|-E(val) <label>|-import [<csv-file-path>]|-eval}\n"\
          + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -166,6 +166,15 @@ if len(case_names) and '-U' in opts:
         db.case_name = case_names[0]
         text = f"'{memo_l[0]}'"
         db.update_frame_info('memo', text)
+    exit(0)
+
+if len(case_names) and '-E' in opts:
+    # Evalテーブルのlabelを更新
+    label_l, _ = get_opt_values(args, '-E', 'c', ',')
+    for i, label in enumerate(label_l):
+        if label.isnumeric(): 
+            section = (i + 1) if i < 8 else ((i - 8) + 10)
+            db.update_eval_label(case_names[0], section, int(label))
     exit(0)
         
 valid_case:str = []
