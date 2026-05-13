@@ -955,8 +955,9 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
         Split_sec = 0.0
     elif action == 1:
         Action_start = Lap_sec
-        if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
-            Split_start = 0                                 # スプリット開始時間をリセット
+        #if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
+        #    Split_start = 0                                 # スプリット開始時間をリセット
+        Split_start = Frame_counter                         # スプリット開始時間を記録
         if section == 9 and Step_counter == 0:              # 退場動作の場合、解析終了 
             Lap_start = 0
     #
@@ -1036,8 +1037,9 @@ def manual_analize_completed(section_no, myResult:MyResult):
         print(f"[man_analize]: section({section_no}), completed=True")
         Action_start = Lap_sec
         Completed = True 
-        if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
-            Split_start = 0                                 # スプリット開始時間をリセット
+        #if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
+        #   Split_start = 0                                 # スプリット開始時間をリセット
+        Split_start = Frame_counter                         # スプリット開始時間を記録
         if Section_no == 9 and Step_counter == 0:           # 退場動作の場合、解析終了 
             Lap_start = 0
         Step_counter = 0
