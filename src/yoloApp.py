@@ -226,7 +226,7 @@ def get_camera_pos(myResult):
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
-    global HR_angle, RSE_angle, EYE_ratio
+    global  RL_angle, SL_angle, ER_angle, HR_angle, RSE_angle, EYE_ratio
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -267,17 +267,22 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                     # 左手首移動ベクトルの長さと角度
         rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')      # 右手首から左手首のベクトルの長さと角度を計算
         hr_norm, hr_angle = keyPoints.norm('right_hip','right_wrist')       # 右腰から右手首のベクトルの長さと角度を計算
-        HR_angle = hr_angle
         sr_norm, sr_angle = keyPoints.norm('right_shoulder','right_wrist')  # 右肩から右手首ベクトルの長さと角度を計算
         sl_norm, sl_angle = keyPoints.norm('left_shoulder','left_wrist')    # 左肩から左手首ベクトルの長さと角度を計算
         _, rew_angle = keyPoints.norm('right_elbow','right_wrist')          # 右肘から右手首のベクトルの長さと角度を計算
         _, lew_angle = keyPoints.norm('left_elbow','left_wrist')            # 左肘から左手首のベクトルの長さと角度を計算
         _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
-        RSE_angle = rse_angle
         _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
+        
+        # グローバル変数にセット(評価データ参照用)
+        RL_angle = rl_angle
+        HR_angle = hr_angle
+        SL_angle = sl_angle
+        ER_angle = rew_angle
+        RSE_angle = rse_angle
         # アクション発生後の経過時間（x10秒）
         # act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
         # 体の向き（0/1=的方向／正面向き）
@@ -320,7 +325,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 #
 def section_started(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    global ER_angle, SL_angle, RL_angle
+    #global ER_angle, SL_angle, RL_angle
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -335,9 +340,9 @@ def section_started(section_no, myResult:MyResult):
     normS, _ = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
     xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
 
-    _, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
-    _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
-    _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
+    #_, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
+    #_, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
+    #_, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
     
     started = False
     # 共通の開始条件を取得
@@ -544,7 +549,8 @@ def section_started(section_no, myResult:MyResult):
 #
 def section_completed(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    global RL_angle, SL_angle, ER_angle, Pull_counter, Push_counter
+    #global RL_angle, SL_angle, ER_angle
+    global Pull_counter, Push_counter
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -565,9 +571,9 @@ def section_completed(section_no, myResult:MyResult):
 
     lenY, _ = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
 
-    _, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
-    _, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
-    _, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
+    #_, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
+    #_, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
+    #_, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
         
     completed = False
     # 共通の開始条件を取得
