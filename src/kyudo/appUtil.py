@@ -632,8 +632,9 @@ class MyEval:
                 if bret == True: 
                     deduction += score
                     mess = msg.split('.')  # メッセージを'.'でリスト分割
-                    self.deduct_msgs.append(f"{mess[0]}({self.eval[key]:.2f}{mess[1]})")
-                    mylog.log(INFO, f"[my_evaluate]:section({section}) {key}={self.eval[key]:.2f} {ope} {value} deduction={score}")   
+                    value = self.eval[key]*(-1) if mess[1] == '度' else self.eval[key]  # 値を正負反転するかどうかを判断
+                    self.deduct_msgs.append(f"{mess[0]}({value:.2f}{mess[1]})")
+                    mylog.log(INFO, f"[my_evaluate]:section({section}) {key}={value:.2f} {ope} {value} deduction={score}")   
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
@@ -668,7 +669,7 @@ class MyEval:
             self.eval['alart_cnt'] += 1
             self.alarts.append(alart)
         if section != self.section:
-            # セクションが変わった場合
+            # セクションが変わった場合（開始動作のとき）
             if (section == 0) or (section < self.section):
                 if section != 0 : 
                     # セクションが0以外で前のセクションより小さい場合、
@@ -701,8 +702,13 @@ class MyEval:
                 self.eval['push_cnt'] = 0
                 self.eval['pull_cnt'] = 0
                 
-        elif completed != self.completed:
-            # 完了状態が変わった場合
+        elif completed != self.completed:   # (0 -> 1)
+            # 完了移行時の角度データを更新
+            self.eval['rl_angle'] = rl_angle
+            self.eval['er_angle'] = er_angle
+            self.eval['sl_angle'] = sl_angle
+            self.eval['se_angle'] = se_angle
+            self.eval['eyes_ratio'] = eyes_ratio
             if self.csvfd is not None:
                 # 完了ステータスの変化でCSVファイルに評価データを書き込む
                 self.out_csv(score=0)       
@@ -996,14 +1002,14 @@ def print_eval_data(db:MyDb, case_names:list):
                 "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>       <pull(%)>",
                 "",
                 "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
-                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>"
+                "   <section>    <case>        <frame>      <sl(°)>     <er(°)>   <split(sec.)>"
             ]
     items_l = [ 
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
                 "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), split",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), split"
+                "section, case_name, frame_no, (-1*sl), (-1*er), split"
             ]
     
     # 対象のケース名を抽出する
