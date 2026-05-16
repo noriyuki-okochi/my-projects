@@ -999,7 +999,7 @@ def print_eval_data(db:MyDb, case_names:list):
     eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
                 "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>",
-                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>       <pull(%)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <pull(%)>",
                 "",
                 "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
                 "   <section>    <case>        <frame>      <sl(°)>     <er(°)>   <split(sec.)>"
@@ -1007,7 +1007,7 @@ def print_eval_data(db:MyDb, case_names:list):
     items_l = [ 
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
-                "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), split",
                 "section, case_name, frame_no, (-1*sl), (-1*er), split"
             ]
