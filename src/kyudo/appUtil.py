@@ -538,6 +538,7 @@ class MyEval:
         self.eval = { # 現在セクションの評価データ
                       'completed': 0,'score': 10 , 'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
+                      'se_angle' : 0, 'eyes_ratio': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                       }              
         self.section: int = -1              # 現在のセクション（節） 番号(0-9)
@@ -563,7 +564,7 @@ class MyEval:
         #print(f"[open_csv]: csvpath={self.csvpath}")
         self.csvfd = open(self.csvpath, 'w', newline='', encoding='utf-8')
         # CSVファイルにヘッダーを書き込む
-        header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,push,pull,alart,inserted_at,time_epoch\n"
+        header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,se,eyes,push,pull,alart,label,inserted_at,time_epoch\n"
         self.csvfd.write(header)
         self.csvfd.flush()
         
@@ -578,14 +579,14 @@ class MyEval:
                             
         for i, value in enumerate(self.eval.values()):
             if i == 0: continue               # completed
-            elif i > 1 and i < 6:             # split, rl,er,sl
+            elif i > 1 and i < 8:             # split, rl,er,sl, se, eyes_ratio
                 values += f"{value:.3f},"
             elif i == 1:                      # score          
                 values += f"{score if score is not None else value},"
             else:
                 values += f"{value},"
             
-        values += f"'{timestamp}',{time_epoc}"            
+        values += f"0,'{timestamp}',{time_epoc}"            
         self.csvfd.write(f"{values}\n")
         self.csvfd.flush()
         
@@ -597,6 +598,7 @@ class MyEval:
         # 評価データの初期化
         self.eval = { 'completed': 0, 'score': 10, 'split_tm': 0, \
                       'rl_angle': 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
+                      'se_angle': 0, 'eyes_ratio': 0.0, \
                       'push_cnt': 0, 'pull_cnt': 0, 'alart_cnt': 0 \
                     }
         # 評価データリストの初期化    
@@ -630,8 +632,9 @@ class MyEval:
                 if bret == True: 
                     deduction += score
                     mess = msg.split('.')  # メッセージを'.'でリスト分割
-                    self.deduct_msgs.append(f"{mess[0]}({self.eval[key]:.2f}{mess[1]})")
-                    mylog.log(INFO, f"[my_evaluate]:section({section}) {key}={self.eval[key]:.2f} {ope} {value} deduction={score}")   
+                    value = self.eval[key]*(-1) if mess[1] == '度' else self.eval[key]  # 値を正負反転するかどうかを判断
+                    self.deduct_msgs.append(f"{mess[0]}({value:.2f}{mess[1]})")
+                    mylog.log(INFO, f"[my_evaluate]:section({section}) {key}={value:.2f} {ope} {value} deduction={score}")   
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
@@ -656,7 +659,8 @@ class MyEval:
     # 評価データの更新
     #
     def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
-                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, alart:int=0):
+                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0,\
+                       se_angle:float=0.0, eyes_ratio:float=0.0, alart:int=0):
         # 
         self.frame_no = frame_no
         
@@ -665,7 +669,7 @@ class MyEval:
             self.eval['alart_cnt'] += 1
             self.alarts.append(alart)
         if section != self.section:
-            # セクションが変わった場合
+            # セクションが変わった場合（開始動作のとき）
             if (section == 0) or (section < self.section):
                 if section != 0 : 
                     # セクションが0以外で前のセクションより小さい場合、
@@ -698,8 +702,13 @@ class MyEval:
                 self.eval['push_cnt'] = 0
                 self.eval['pull_cnt'] = 0
                 
-        elif completed != self.completed:
-            # 完了状態が変わった場合
+        elif completed != self.completed:   # (0 -> 1)
+            # 完了移行時の角度データを更新
+            self.eval['rl_angle'] = rl_angle
+            self.eval['er_angle'] = er_angle
+            self.eval['sl_angle'] = sl_angle
+            self.eval['se_angle'] = se_angle
+            self.eval['eyes_ratio'] = eyes_ratio
             if self.csvfd is not None:
                 # 完了ステータスの変化でCSVファイルに評価データを書き込む
                 self.out_csv(score=0)       
@@ -711,25 +720,32 @@ class MyEval:
                     self.reset()  # 9節完了で評価データを初期
                 
         elif self.section > 0:
-            if step != self.step: 
-                if section == 2 and step == 40 and self.step == 30:
-                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
-                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
-                    self.eval['score'] += 5     # 2節のステップ40（箆調べ）は5点加算して10点満点とする
-                if self.csvfd is not None:
-                    # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
-                    self.out_csv(score=0)
-            # 評価データの設定
-            self.eval['split_tm'] = split
-            if completed == 0:
+            if self.completed == 0:
+                if step != self.step: 
+                    if self.csvfd is not None:
+                        # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
+                        self.out_csv(score=0)
                 # 移行中の角度データを更新
                 self.eval['rl_angle'] = rl_angle
                 self.eval['er_angle'] = er_angle
                 self.eval['sl_angle'] = sl_angle
-            # 5節のとき、引き分けの「押し」／「引き」回数をカウント
-            if section == 5:
-                if step == 11:      self.eval['push_cnt'] += 1
-                elif step == 12:    self.eval['pull_cnt'] += 1
+                self.eval['se_angle'] = se_angle
+                self.eval['eyes_ratio'] = eyes_ratio
+                # 5節のとき、引き分けの「押し」／「引き」回数をカウント
+                if section == 5:
+                    if step == 11:      self.eval['push_cnt'] += 1
+                    elif step == 12:    self.eval['pull_cnt'] += 1
+            else:
+                if section == 2 and step == 40 and self.step == 30:
+                    # 2節のステップ40（箆調べ）は5点加算して10点満点とする
+                    self.eval['eyes_ratio'] = eyes_ratio
+                    self.eval['score'] += 5     
+                    self.out_csv(score=0)
+                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
+                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
+                
+            # 保持時間の更新
+            self.eval['split_tm'] = split
         # 
         if self.score_on: 
             # 評価点数の表示
@@ -982,18 +998,18 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象節番号('<section>.<step>')リスト
     eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                "   <section>    <case>        <frame>    <er(°)>       <sl(°)>     <rl(°)>",
-                "   <section>    <case>        <frame>    <pull(%)>     <sl(°)>     <rl(°)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <pull(%)>",
                 "",
-                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>",
-                "   <section>    <case>        <frame>  <split(sec.)>   <sl(°)>    <rl(°)>"
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <er(°)>   <split(sec.)>"
             ]
     items_l = [ 
-                "section, case_name, frame_no, (-1*er), (-1*sl), (-1*rl)",
-                "section, case_name, frame_no, (-1*sl), (-1*rl)",
-                "section, case_name, frame_no, pull*100/(push+pull) as pull_ratio",
-                "section, case_name, frame_no, split, (-1*sl), (-1*rl)",
-                "section, case_name, frame_no, split, (-1*sl), (-1*rl)"
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), split",
+                "section, case_name, frame_no, (-1*sl), (-1*er), split"
             ]
     
     # 対象のケース名を抽出する

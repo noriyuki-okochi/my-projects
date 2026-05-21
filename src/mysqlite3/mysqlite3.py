@@ -496,9 +496,9 @@ class MyDb:
                 print_text += f"{val:12.2f}" if isinstance(val, float) \
                                 else f"{val:12} " if isinstance(val, int) else f"{val:>12}"
                 # 以下は、完了移行前のステップのデータを表示するための措置
-                if section == 5 and step == 10 and c == 'frame_no':
-                    # 大三移行時の角度データを表示するため、空白を追加
-                    print_text += " "*12    
+                #if section == 5 and step == 0 and c == 'frame_no':
+                #    # 引き分け移行時の引き・押し比率データを表示するため、空白を追加
+                #    print_text += " "*40    
                     
             # テキストを出力行リストに追加  
             print_list.append(print_text)
@@ -527,5 +527,14 @@ class MyDb:
         # SQL文を実行
         df = pandas.read_sql_query(sql, con=self.conn)
         return df.iloc[0]['frame_no'] if len(df) > 0 else None
+#
+# 登録ケース名の評価データからsectionに該当するlabelを更新する
+# 
+    def update_eval_label(self, case_name, section, label_value):
+        sql = "update eval_data set "\
+            + f"label={label_value}"\
+            + f" where case_name='{case_name}' and section={section} and completed=1"
+        self.cur.execute(sql)
+        self.conn.commit()
 
 #eof
