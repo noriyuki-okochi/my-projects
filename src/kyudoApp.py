@@ -421,7 +421,12 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
     else:
         # 予測実行(predict)
         y_pred = predict_Kyudo( model, x, s_frames )
-
+        '''        
+        y = df_y.to_numpy(dtype=np.int64).reshape(-1)   # (input_frames,)
+        correct = ((y == y_pred) & (y != 0)).sum()
+        print(f"[kyudoApp] y={y.shape}, y_pred={y_pred.shape}, correct={correct}")
+        print(f"[kyudoApp] accuracy={ correct / len(y):.4f}")
+        '''
         # 入力、ラベル、予測結果データフレームの作成、保存、プロット準備
         #  （dtype='Int64'の指定でconcat後もintの型が保持された）
         df_yp = pd.DataFrame(y_pred, columns=['predicted'], dtype='Int64')
@@ -430,7 +435,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         df_p = df_p.astype({'section':'Int64', 'completed':'Int64', 'label':'Int64'})
         out_csv = f"predict_{case_names[0]}.csv"
         df2csv(df_p, title=None, file=out_csv)
-        print(f"[kyudoApp]info:predict data saved as '{out_csv}'")
+        print(f"[kyudoApp] predict data saved as '{out_csv}'")
         mlast[0] = x.shape[0]
         last = mlast[0]
         m_flg = True   # 入力データと予測結果グラフを表示
