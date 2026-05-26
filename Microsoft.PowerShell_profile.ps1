@@ -58,7 +58,7 @@ $cases_list = "iijima_1.1","iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
 $cases_list = "iijima_1.3", "anbe_1.3", "iwata_1.3", "nemoto_1.3"
 $cases_list = "iijima_1.0", "anbe_1.0", "iwata_1.0", "nemoto_1.0"
 $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
-$cases_list = "memoto_2.1", "sato_2.1", "yoshimoto_2m.0"
+$cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
 $env:CASE_LIST=$cases_list
@@ -515,7 +515,7 @@ function kyudo {
         write-output ">kyudo  -update  <登録ケース名> {-memo '<メモ>'}|{-label '<ラベル>'} ：登録ケース名のメモまたは、評価データのラベルを更新する"
         write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'...            ：評価データを表示する"
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train   <登録ケース名> [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
+        write-output '>kyudo  -train   <登録ケース名>|list [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
         write-output '>kyudo  -predict <登録ケース名> [-model <モデルファイル>]      	                            ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
@@ -589,22 +589,22 @@ function kyudo {
             }
             else {
                 # 複数ケース学習（環境変数CASE_LIST指定）
-                if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    $cases_list = $env:CASE_LIST.Split(' ')
-                    $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
-                    write-output $str
-                    $i = 1
-                    foreach ( $case_name in $cases_list ) {
+                $cases_list = $env:CASE_LIST.Split(' ')
+                $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
+                write-output $str
+                $i = 1
+                foreach ( $case_name in $cases_list ) {
+                    if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
                         python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
-                        #Write-Output $LASTEXITCODE
-                        if ( $LASTEXITCODE -ne 0 ) {
-                            break
-                        }
-                        $i++    
                     }
-                }
-                else {
-                    write-output 'モデルファイル名を指定してください' 
+                    else {
+                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                    }
+                    #Write-Output $LASTEXITCODE
+                    if ( $LASTEXITCODE -ne 0 ) {
+                        break
+                    }
+                    $i++    
                 }
             }
         }
