@@ -625,7 +625,7 @@ function kyudo {
         if ($idx -ge 0 -and $len -gt $idx) {
             $modelpt = $args[$idx+1]
         }
-        python ./src/kyudoApp.py -d -case $predict -hparam "$hparam" -predict $modelx $modelpt -f0 $input_frames -m    
+        python ./src/kyudoApp.py -d -case $predict -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
     }
     else{
         write-output '不正なパラメータが指定されました' 
