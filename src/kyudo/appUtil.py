@@ -999,18 +999,23 @@ def print_eval_data(db:MyDb, case_names:list):
     eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
                 "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>",
-                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <pull(%)>",
+                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
                 "",
                 "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
-                "   <section>    <case>        <frame>      <sl(°)>     <er(°)>   <split(sec.)>"
+                "   <section>    <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     items_l = [ 
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), split",
-                "section, case_name, frame_no, (-1*sl), (-1*er), split"
+                "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
             ]
+    legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
+        + " sl:left Shoulder->Left wrist, rl:Right wrist->Left wrist\n"\
+        + " se:right Shoulder->right Elbow, er:right Elbow->Right wrist\n"\
+        + " split:完了状態の保持時間\n"\
+        + " pull_ratio:大三からの引き分け’押／引'の'引'検知率"
     
     # 対象のケース名を抽出する
     case_names_l = []
@@ -1041,4 +1046,5 @@ def print_eval_data(db:MyDb, case_names:list):
             eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
+    print(f"\n[legend]\n {legend}")
 #eof
