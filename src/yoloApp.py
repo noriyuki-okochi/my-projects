@@ -1002,7 +1002,7 @@ def manual_analize_start(section_no, myResult:MyResult):
         Split_sec = 0.0
         Completed = False                                   # セクションが開始されたら完了フラグをリセット    
         Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
-        if Section_no == 4: Pull_counter,Push_counter = 0,0 # 「引き分け」引き・押しのカウンターリセット
+        if Section_no < 5: Pull_counter,Push_counter = 0,0  # 「引き分け」引き・押しのカウンターリセット
         if Section_no != 9: 
             Section_no = Section_no + 1                     # セクション番号をインクリメント
             Step_counter = 0                                # セクション内の動作カウンター
