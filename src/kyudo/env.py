@@ -132,6 +132,26 @@ Features_lists = {
     81: Features_list_81,
     90: Features_list_90
     }
+#
+# EvalAppで使用する特徴量リスト
+Eval_Features_list_90 = ['rl/180.0 as rl_deg',\
+                'er/180.0 as er_deg',\
+                'sl/180.0 as sl_deg',\
+                'se/180.0 as se_deg',\
+                'eyes as eyes_ratio',\
+                'pull/(pull+push) as pull_rate',\
+                'split','alart',\
+                'completed','section'
+                ]
+#
+Eval_Features_lists = {
+    90: Eval_Features_list_90                   # 評価用特徴量リスト
+}
+Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']
+
+Eval_feature_key = 90                           # 使用する特徴量のキー番号
+Eval_output_dim = 10                            # 出力クラス数（10段階の完成度評価）
+Eval_model_pt = './eval_model.pt'
 
 # 学習済モデルファイルのデフォルト定義
 Kyudo_model_pt = './kyudo80_modelse_8-96-3.pt'

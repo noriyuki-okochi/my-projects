@@ -31,6 +31,7 @@ DF2CSV_enabled = True
 
 # モデル保存用のファイル名
 MODEL_NAME = 'kyudo_model'
+EVAL_MODEL_NAME = 'eval_model'
 
 # GPUチェック
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -47,7 +48,7 @@ def log_write(fmtmsg, print_enabled=True):
 # case_name: ケース名
 # title: CSVファイルのタイトル（ヘッダー）
 # file: 出力ファイル名（Noneの場合はデフォルト名）
-def df2csv(df, case_name='none', title=None, file=None):
+def df2csv(df, case_name='none', title=None, file=None, mode='a'):
     # CSV出力ファイルの作成
     if file is not None: out_csv = file
     else: out_csv = f"./log/kyudo_debug_{case_name}.csv"
@@ -59,7 +60,7 @@ def df2csv(df, case_name='none', title=None, file=None):
         f.close()
     # CSVファイルのデータ出力  
     if file is not None:
-        df.to_csv(out_csv, mode='w', float_format='%.4f', na_rep='NaN', sep='\t')
+        df.to_csv(out_csv, mode=mode, float_format='%.4f', na_rep='NaN', sep='\t')
     elif DF2CSV_enabled:    
         df.to_csv(out_csv, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #
@@ -187,14 +188,14 @@ class EarlyStopping:
 #
 # GRUモデルの学習用TensorDatasetを編集する関数
 #
-def edit_TesorDataset( np_x, np_yact, s_frames ):
+def kyudo_tesorDataset( np_x, np_yact, s_frames ):
     input_frames, input_size = np_x.shape
     # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
     x_zeros = np.zeros( (s_frames, input_size) )
     y_zeros = np.zeros( (s_frames, 1) )
     x = np.vstack( [x_zeros, np_x] )
     y_act = np.vstack( [y_zeros, np_yact] )
-    log_write(f"[train_Kyudo]:x={x.shape}, y_act={y_act.shape}")   
+    log_write(f"[kyudo_tesorDataset]:x={x.shape}, y_act={y_act.shape}")   
     #
     x_data = np.zeros( (input_frames, s_frames, input_size) )
     y_data = np.zeros( (input_frames, 1) )  
@@ -204,9 +205,35 @@ def edit_TesorDataset( np_x, np_yact, s_frames ):
     #
     x_data = torch.tensor(x_data, dtype=torch.float32).to(device )
     y_data = torch.tensor(y_data, dtype=torch.int64).to(device )
-    log_write(f"[train_Kyudo]:x_data={x_data.shape}")
-    log_write(f"[train_Kyudo]:y_data={y_data.shape}")
+    log_write(f"[kyudo_tesorDataset]:x_data={x_data.shape}")
+    log_write(f"[kyudo_tesorDataset]:y_data={y_data.shape}")
     
+    return TensorDataset(x_data, y_data)
+#
+# EVALモデルの学習用TensorDatasetを編集する関数
+def eval_tesorDataset( np_x, np_yact, s_frames ):
+    input_frames, input_size = np_x.shape
+    x_data = np.zeros( (1, s_frames, input_size) )  # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
+    y_data = np.zeros( (1, 1) )  
+    c_section = np_x[0, -1]  # section
+    i_frame = 0
+    for i in range(input_frames):
+        if np_x[i, -1] != c_section:
+            print(f"[eval_tesorDataset]:section = {c_section}, frames={i_frame}")
+            c_section = np_x[i, -1]
+            i_frame = 0
+            # 
+            x_data = np.vstack( [x_data, np.zeros( (1, s_frames, input_size) )] )
+            y_data = np.vstack( [y_data, np.zeros( (1, 1) )] )
+        x_data[-1,i_frame] = np_x[i]
+        #x_data[-1,i_frame] = np_x[i].reshape(-1, input_size)
+        y_data[-1] = np_yact[i]
+        i_frame += 1
+    #x_data = x_data.reshape(-1, s_frames * input_size)
+    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_size]
+    #y_data = torch.tensor(y_data, dtype=torch.int64).to(device )
+    y_data = torch.randint(low=0, high=10,  size=y_data.shape, dtype=torch.int64).to(device )  # ランダムなラベルを生成する
+    print(f"[eval_tesorDataset]:x_data={x_data.shape}, y_data={y_data.shape}")
     return TensorDataset(x_data, y_data)
 #
 def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
@@ -261,28 +288,38 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
 # n_epoch: エポック数
 # pth: 学習結果のモデルを保存するファイルパス（Noneの場合はデフォルト名）
 def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, r_factor=1.0, pth=None):
-
+    # モデルのクラス名からモデルのベース名を決定する
+    class_name:str = model.get_class_name()
+    if 'GRU' in class_name: model_name = f'{MODEL_NAME}{class_name[-1]}'
+    else: model_name = f'{EVAL_MODEL_NAME}'
+    
     # 学習用TensorDatasetを編集する
     np_x, np_yact = np_train
     _, input_size = np_x.shape
     log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")
 
-    dataset = edit_TesorDataset( np_x, np_yact, s_frames )
+    if 'GRU' in class_name:
+        # np_x: (input_frames, s_frames, input_dim), np_yact: (input_frames, 1)
+        dataset = kyudo_tesorDataset( np_x, np_yact, s_frames )
+    else:
+        # np_x: (i_sections, s_frames, input_dim), np_yact: (i_sections, 1)
+        dataset = eval_tesorDataset( np_x, np_yact, s_frames )  
     loader = DataLoader(dataset, batch_size, shuffle=False)
 
     # 検証TensorDatasetを編集する
     valid_loader = None
     if np_valid is not None:
         np_valid_x, np_valid_yact = np_valid
-        valid_dataset = edit_TesorDataset( np_valid_x, np_valid_yact, s_frames )
+        if 'GRU' in class_name:    
+            valid_dataset = kyudo_tesorDataset( np_valid_x, np_valid_yact, s_frames )
+        else:
+            valid_dataset = eval_tesorDataset( np_valid_x, np_valid_yact, s_frames )
         valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False)
 
     # 学習結果のモデル保存用ファイル名の決定
     if pth is not None:
         model_pth = pth
     else:
-        class_name:str = model.get_class_name()
-        model_name = f'{MODEL_NAME}{class_name[-1]}'
         model_name +=  'e' if model.embed else 'n'
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
@@ -396,6 +433,3 @@ def predict_Kyudo( model, np_x, s_frames, log_print=True):
     y_data = y_data.reshape(-1)  
     ulog.debug(f"[predict_Kyudo]:y_pred={y_data.shape}")   
     return y_data 
-  
-  
-
