@@ -536,5 +536,24 @@ class MyDb:
             + f" where case_name='{case_name}' and section={section} and completed=1"
         self.cur.execute(sql)
         self.conn.commit()
+#
+#   read eval_data of each case_name(return pandas-DataFrame)
+#       
+    def pandas_read_eval(self, cols=None, cases=None, index='frame_no'):
+        if cases is None:
+            cond_case = f"case_name='{self.case_name}'"
+        else:
+            cond_case = "case_name in (" + ','.join([f"'{c}'" for c in cases]) + ")"
+            
+        #print(f"pandas_read_eval: {cases}")
+        if cols is None: 
+            sql = f"select * from eval_data where {cond_case} order by case_name,frame_no asc"
+        else: 
+            sql = 'select frame_no,' +  ','.join(cols)                                    
+            sql += f" from eval_data where {cond_case} order by case_name,frame_no asc"
+        
+        #print(f"pandas_read_eval: sql={sql}")
+        return pandas.read_sql_query(sql, con=self.conn, index_col=index) if index is not None \
+            else pandas.read_sql_query(sql, con=self.conn)
 
 #eof
