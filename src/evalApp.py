@@ -81,7 +81,7 @@ def main():
             + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
             + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
             + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-            + "        [{-train|-predict} [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
+            + "        [{-train|-predict} [eta=<rate>] [-model '<model-path>']\n"\
             + "        [-valid <case_name>|none]\n"\
             + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
             + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
@@ -147,13 +147,12 @@ def main():
         print("[evalApp]:error:'-case <name>' must be specified.")
         exit(1)
 
-
     if len(case_names) and '-E' in opts:
         # Evalテーブルのlabelを更新
         label_l, _ = get_opt_values(args, '-E', 'c', ',')
         for i, label in enumerate(label_l):
             if label.isnumeric(): 
-                section = (i + 1) if i < 8 else ((i - 8) + 10)
+                section = (i + 1) if i < 8 else ((i - 7) + 10)
                 db.update_eval_label(case_names[0], section, int(label))
         exit(0)
             
@@ -285,7 +284,7 @@ def main():
             exit(1)
         # モデル情報の表示
         log_write(f"[evalApp]:model\n {model}")
-        log_write(f"[evalApp]:input_size={input_dim}, output_size={num_classes}")
+        log_write(f"[evalApp]:input_dim={input_dim}, output_size={num_classes}")
         numel_params = [p.numel() for p in model.parameters() if p.requires_grad]
         log_write(f"[evalApp]: numel parameters={sum(numel_params)}, {numel_params}")   
         
@@ -329,8 +328,11 @@ def main():
                 case_names.append(name)
         else:
             # 予測実行(predict)
-            y_pred = predict_Kyudo( model, x, s_frames )
-
+            y_pred = predict_Eval( model, x, s_frames ) # x=numpy(input_frames, input_dim)
+            print(f"[predict_Eval]:y_pred={y_pred}")   
+            exit(0)
+            '''
+            
             # 入力、ラベル、予測結果データフレームの作成、保存、プロット準備
             #  （dtype='Int64'の指定でconcat後もintの型が保持された）
             df_yp = pd.DataFrame(y_pred, columns=['predicted'], dtype='Int64')
@@ -343,6 +345,7 @@ def main():
             mlast[0] = x.shape[0]
             last = mlast[0]
             m_flg = True   # 入力データと予測結果グラフを表示
+            '''
     #
     # CSVデータのプロットコマンド(-loss|-predicted)オプションの解析
     #
@@ -556,7 +559,7 @@ def main():
                 # 予測結果データフレームの読み込み
                 features = Features_lists[input_key]
                 cols = get_feature_colnames( features )
-                dfk = df_p  
+                #dfk = df_p  
                 dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
                 mdfk = dfk
                 # 実測データの読み込み
@@ -830,7 +833,7 @@ def main():
     if prompt and (plot_loss or predict):
         while True:
             value = ''
-            if predict: csvfile = out_csv
+            #if predict: csvfile = out_csv
             promptStr = csvfile[-18:-4] if plot_loss else csvfile[8:-4]
             print(f">Please input new-file-name( {csvfile} ).!: [/:cancle]")
             value = input(f"{promptStr} -> :")

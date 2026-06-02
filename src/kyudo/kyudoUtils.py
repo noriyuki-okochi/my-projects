@@ -73,7 +73,7 @@ def get_hyper_parameters(cmds, def_parameters):
     i = cmds.index('-hparam')
     if len(cmds) > (i + 1):
         params = cmds[i+1][1:-1].split(',')   # (1,2,3,4,5)の形式で指定
-        print(f"[get_hyper_parameters]:params={params}")
+        #print(f"[get_hyper_parameters]:params={params}")
         if len(params) > 0:
           values = [None] * len(def_parameters)
           for i, p in enumerate(params):
@@ -212,31 +212,39 @@ def kyudo_tesorDataset( np_x, np_yact, s_frames ):
 #
 # EVALモデルの学習用TensorDatasetを編集する関数
 def eval_tesorDataset( np_x, np_yact, s_frames ):
-    input_frames, input_size = np_x.shape
-    x_data = np.zeros( (1, s_frames, input_size) )  # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
+    input_frames, input_dim = np_x.shape
+    x_data = np.zeros( (1, s_frames, input_dim) )  # 先頭s_framesサイズのデータを1サンプル（ゼロ値データ）として扱う
     y_data = np.zeros( (1, 1) )  
     c_section = np_x[0, -1]  # section
     i_frame = 0
     for i in range(input_frames):
+        # セクション（節）毎に、s_framesサイズのデータを格納する
         if np_x[i, -1] != c_section:
-            print(f"[eval_tesorDataset]:section = {c_section}, frames={i_frame}")
+            # セクションが変わったら、次のサンプルのデータを格納するためにx_dataとy_dataを拡張する
+            #print(f"[eval_tesorDataset]:section = {c_section}, frames={i_frame}")
             c_section = np_x[i, -1]
             i_frame = 0
             # 
-            x_data = np.vstack( [x_data, np.zeros( (1, s_frames, input_size) )] )
+            x_data = np.vstack( [x_data, np.zeros( (1, s_frames, input_dim) )] )
             y_data = np.vstack( [y_data, np.zeros( (1, 1) )] )
+            
+        # サンプル末尾にセクション毎のフレームデータを格納する
         x_data[-1,i_frame] = np_x[i]
-        #x_data[-1,i_frame] = np_x[i].reshape(-1, input_size)
         y_data[-1] = np_yact[i]
         i_frame += 1
-    #x_data = x_data.reshape(-1, s_frames * input_size)
-    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_size]
-    #y_data = torch.tensor(y_data, dtype=torch.int64).to(device )
-    y_data = torch.randint(low=0, high=10,  size=y_data.shape, dtype=torch.int64).to(device )  # ランダムなラベルを生成する
+    #print(f"[eval_tesorDataset]: y_data={y_data}")
+    #    
+    # データをTensorに変換してTensorDatasetを作成する
+    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_dim]
+    y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[i_frame, s_frames, input_dim]
+    #y_data = torch.randint(low=0, high=10,  size=y_data.shape, dtype=torch.int64).to(device )  # ランダムなラベルを生成する
     print(f"[eval_tesorDataset]:x_data={x_data.shape}, y_data={y_data.shape}")
     return TensorDataset(x_data, y_data)
 #
 def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
+    # モデルのクラス名からモデルのベース名を決定する
+    class_name:str = model.get_class_name()
+
     for epoch in range(n_epoch):
         model.train()
         loss_train = 0
@@ -261,27 +269,48 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
             # 20エポックごとに学習過程を表示
             log_write(f'epoch:{epoch:3d}, loss_train={loss_train:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
         
+        if scheduler is not None:
+            # 学習率の更新
+            scheduler.step(loss_train)      
+
         if valid_loader is not None:
             model.eval()
-            loss_valid = 0
-            with torch.no_grad():
-                for x, t in valid_loader:
-                    y = model(x)
-                    loss = criterion(y, t.squeeze())
-                    loss_valid += loss.item()
-            loss_valid /= len(valid_loader)
-            #log_write(f'epoch:{epoch:3d}, loss_valid={loss_valid:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
-            if earlystop is not None:
-                earlystop(epoch, loss_valid, model)        # EarlyStoppingの呼び出し
-                if earlystop.early_stop:
-                    log_write(f"Early stopping at epoch {epoch:3d}")
-                    break
-        if scheduler is not None:
-            scheduler.step(loss_train)      # 学習率の更新
-        
-# GRUモデルの学習を実行する関数
-# model: GRUモデル
-# s_frames: 1セットのフレーム数 
+            if 'GRU' in class_name: 
+                # EaryStoppingのための検証ループ
+                loss_valid = 0
+                with torch.no_grad():
+                    for x, t in valid_loader:
+                        y = model(x)
+                        loss = criterion(y, t.squeeze())
+                        loss_valid += loss.item()
+                        #print(f"[train_loop]:y={y}, t={t}")
+                        #score = torch.argmax( y, dim=1).item()
+                loss_valid /= len(valid_loader)
+                #log_write(f'epoch:{epoch:3d}, loss_valid={loss_valid:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
+                if earlystop is not None:
+                    # EarlyStoppingの呼び出し
+                    earlystop(epoch, loss_valid, model)        
+                    if earlystop.early_stop:
+                        log_write(f"Early stopping at epoch {epoch:3d}")
+                        break
+            else:
+                # EvalNN:正解率測定のための検証ループ
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for x, t in valid_loader:
+                        y = model(x)
+                        predicted = torch.argmax(y, dim=1)
+                        total += t.shape[0]
+                        correct += int((predicted == t.squeeze()).sum().item())
+                    accuracy = (correct / total) if total > 0 else 0
+                    if epoch % 20 == 0 or epoch == (n_epoch - 1):
+                        # 20エポックごとに学習過程を表示
+                        print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")
+
+# モデルの学習を実行する関数
+# model: GRU/EvalNNモデル
+# s_frames: 1サンプルのフレーム数 
 # np_train: 学習入力データ (input_frames, input_size)
 # np_valid: 検証データ (input_frames,)
 # batch_size: バッチサイズ
@@ -297,7 +326,6 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     np_x, np_yact = np_train
     _, input_size = np_x.shape
     log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")
-
     if 'GRU' in class_name:
         # np_x: (input_frames, s_frames, input_dim), np_yact: (input_frames, 1)
         dataset = kyudo_tesorDataset( np_x, np_yact, s_frames )
@@ -315,6 +343,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
         else:
             valid_dataset = eval_tesorDataset( np_valid_x, np_valid_yact, s_frames )
         valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False)
+        print(f"[train_Kyudo]:valid_loader={len(valid_loader)} batches, batch_size={batch_size}")
 
     # 学習結果のモデル保存用ファイル名の決定
     if pth is not None:
@@ -366,7 +395,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
 #  
 # GRUモデルを使って予測を実行する関数
 # np_x: 入力データ (input_frames, input_size)
-# s_frames: 1セットのフレーム数
+# s_frames: 1サンプルのフレーム数
 # 戻り値: 予測データ (input_frames,)
 #
 def predict_Kyudo( model, np_x, s_frames, log_print=True):
@@ -433,3 +462,54 @@ def predict_Kyudo( model, np_x, s_frames, log_print=True):
     y_data = y_data.reshape(-1)  
     ulog.debug(f"[predict_Kyudo]:y_pred={y_data.shape}")   
     return y_data 
+
+# EvalNNモデルを使って予測を実行する関数
+# np_x: 入力データ (input_frames, input_size)
+# s_frames: 1サンプルのフレーム数
+# 戻り値: 予測データ (input_frames,)
+#
+def predict_Eval( model, np_x, s_frames, log_print=True):
+    # 予測データ
+    input_frames, input_dim = np_x.shape
+    print(f"[predict_Eval]:np_x={np_x.shape}") 
+    
+    # np_x(input_frames, input_dim) -> x_data(n_samples, s_frames, input_dim)に編集する
+    np_data = np.zeros( (1, s_frames, input_dim) )  # 先頭s_framesサイズのデータを1サンプル（ゼロ値データ）として扱う
+    c_section = np_x[0, -1]  # section
+    i_frame = 0
+    for i in range(input_frames):
+        # セクション（節）毎に、s_framesサイズのデータを格納する
+        if np_x[i, -1] != c_section:
+            # セクションが変わったら、次のサンプルのデータを格納するためにx_dataとy_dataを拡張する
+            #print(f"[predict_Eval]:section = {c_section}, frames={i_frame}")
+            c_section = np_x[i, -1]
+            i_frame = 0
+            # 
+            np_data = np.vstack( [np_data, np.zeros( (1, s_frames, input_dim) )] )
+            
+        # サンプル末尾にセクション毎のフレームデータを格納する
+        np_data[-1,i_frame] = np_x[i]
+        i_frame += 1
+        
+    n_samples = np_data.shape[0]
+    x_data = torch.tensor(np_data, dtype=torch.float32).to(device )
+    print(f"[predict_Eval]:np_data={np_data.shape}, x_data={x_data.shape}")
+    ulog.debug(f"[predict_Eval]:x_data={x_data.shape}")
+        
+    y_data = np.zeros( (n_samples, 1) ,dtype=np.int64)
+    model.eval()
+    for t in range(n_samples):
+        x = x_data[t].reshape(1, s_frames, input_dim)
+        ulog.debug(f"[predict_Eval]:t={t}:{x}")
+        with torch.no_grad():
+            y_pred = model(x)
+            score = torch.argmax( y_pred, dim=1).item()
+        #
+        log_write(f"[predict_Eval]:({t:2d}) section={x[0,0,-1]}, score={score}", log_print)    
+        ulog.debug(f"[predict_Eval]:score={score}")
+        y_data[t] = score
+        
+    #        
+    y_data = y_data.reshape(-1)  
+    ulog.debug(f"[predict_Eval]:y_pred={y_data.shape}")   
+    return y_data
