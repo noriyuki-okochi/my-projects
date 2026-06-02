@@ -384,9 +384,8 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     # 学習過程の損失値をCSVファイルに出力するための後処理
     model.close_csv()    
       
-    if np_valid is None:
-        #  学習結果のモデルを保存する
-        torch.save(model.state_dict(), model_pth)
+    #  学習結果のモデルを保存する
+    torch.save(model.state_dict(), model_pth)
     #
     ulog.debug(model.state_dict())
     log_write(f"[train_Kyudo]:model saved as {model_pth}")
