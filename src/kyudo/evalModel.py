@@ -8,7 +8,7 @@ from datetime import datetime
 # NNモデルの定義
 #
 class EvalNN(nn.Module):
-  def __init__(self, input_dim=10, s_frames=50,  output_size=10,
+  def __init__(self, input_dim=10, s_frames=50,  output_size=11,
                      section_vocab_size=10, section_embed_dim=8, 
                      completed_vocab_size=3,
                      completed_embed_dim=4):

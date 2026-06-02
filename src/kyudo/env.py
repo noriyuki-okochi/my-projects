@@ -150,7 +150,7 @@ Eval_Features_lists = {
 Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']
 
 Eval_feature_key = 90                           # 使用する特徴量のキー番号
-Eval_output_dim = 10                            # 出力クラス数（10段階の完成度評価）
+Eval_output_dim = 11                            # 出力クラス数（0-10段階の完成度評価）
 Eval_model_pt = './eval_model.pt'
 
 # 学習済モデルファイルのデフォルト定義
