@@ -149,11 +149,20 @@ def main():
 
     if len(case_names) and '-E' in opts:
         # Evalテーブルのlabelを更新
-        label_l, _ = get_opt_values(args, '-E', 'c', ',')
-        for i, label in enumerate(label_l):
-            if label.isnumeric(): 
-                section = (i + 1) if i < 8 else ((i - 7) + 10)
-                db.update_eval_label(case_names[0], section, int(label))
+        label_l, _ = get_opt_values(args, '-E', 'c', '=')
+        if len(label_l) == 2 and label_l[0].isnumeric() and label_l[1].isnumeric():
+            # '<section>=<score>'の指定がある場合
+            section = int(label_l[0])
+            score = int(label_l[1])
+            db.update_eval_label(case_names[0], section, score)
+            exit(1)
+        else:
+            label_l, _ = get_opt_values(args, '-E', 'c', ',')
+            # '<label1>,<label2>,...'の指定がある場合
+            for i, label in enumerate(label_l):
+                if label.isnumeric(): 
+                    section = (i + 1) if i < 8 else ((i - 7) + 10)
+                    db.update_eval_label(case_names[0], section, int(label))
         exit(0)
             
     valid_case:str = []
