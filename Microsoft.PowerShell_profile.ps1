@@ -498,7 +498,6 @@ function kyudo {
         [string]$to='',
         [string]$update='',
         [string]$memo='',
-        [string]$label='',
         [string]$import,
         [string]$case,
         [string]$train,
@@ -531,8 +530,8 @@ function kyudo {
         write-output '>kyudo  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
-        write-output ">kyudo  -update  <登録ケース名> {-memo '<メモ>'}|{-label '<ラベル>'} ：登録ケース名のメモまたは、評価データのラベルを更新する"
-        write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'...            ：評価データを表示する"
+        write-output ">kyudo  -update  <登録ケース名> -memo '<メモ>'            ：登録ケース名のメモを更新する"
+        write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'... ：評価データを表示する"
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
         write-output '>kyudo  -train   <登録ケース名>|list [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
         write-output '>kyudo  -predict <登録ケース名> [-model <モデルファイル>]      	                            ：解析結果データで予測する'
@@ -569,11 +568,7 @@ function kyudo {
         python ./src/kyudoApp.py -d -case $rename,$to -R
     }
     elseif ($update -ne '') {
-        if ($label -ne '') {
-            # 登録ケースのラベル更新
-            python ./src/kyudoApp.py -d -case $update -E $label
-        }
-        elseif ($memo -ne '') {
+        if ($memo -ne '') {
             # 登録ケースのメモ更新
             python ./src/kyudoApp.py -d -case $update -U $memo
         }
@@ -655,23 +650,15 @@ function eval {
     param(
         [switch]$help,
         [switch]$h,
-        [string]$list='',
-        [string]$delete,
-        [string]$rename='',
-        [string]$to='',
         [string]$update='',
-        [string]$memo='',
-        [string]$label='',
-        [string]$import,
+        [string]$score='',
         [string]$case,
         [string]$train,
         [string]$valid='none',
-        [switch]$section,
         [string]$predict,
         [int]$input_frames = 0,
-        [string]$input_key = '',
         [float]$eta = 0.001,
-        [string]$eval=''
+        [string]$print=''
     )
     # ハイパーパラメータ取得
     $val_list = $env:HYPER_PARAM.Split(' ')
@@ -681,73 +668,31 @@ function eval {
         $i++    
     }
     $hparam = $hp_vals -join ','
-    # 入力データキー設定
-    if ( $input_key -eq '' ) {
-        $input_key = $env:INPUT_KEY
-    }
     # モデルタイプ取得
     $modelx = "-model"
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>eval  -list	case|case_name|key|pt                     ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
-        write-output '>eval  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
-        write-output '>eval  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
-        write-output '>eval  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
-        write-output ">eval  -update  <登録ケース名> {-memo '<メモ>'}|{-label '<ラベル>'} ：登録ケース名のメモまたは、評価データのラベルを更新する"
-        write-output ">eval  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'...            ：評価データを表示する"
-        write-output '>eval  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
+        write-output ">eval  -update  <登録ケース名> -score '<スコア>'                  ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
+        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...          ：評価データを表示する"
+        write-output '>eval  -case    <登録ケース名> [-input_frames <表示フレーム数>]   ：評価データをグラフ表示する'
         write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
-        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]      	                            ：解析結果データで予測する'
-        write-output '>eval  -h		：コマンドの詳細パラメータを表示する'
+        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]          ：解析結果データで予測する'
+        write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
         # 詳細ヘルプ表示
         python ./src/evalApp.py -h
     } 
-    elseif ($list -ne '') {
-        if ( $list -eq 'key' ) {
-            # 入力データキー一覧表示
-            python ./src/evalApp.py  -d -inputkey
-        }
-        elseif ( $list -eq 'case' ) {
-            # 登録済ケース名一覧表示（詳細）
-            python ./src/evalApp.py  -d -case -L
-        }
-        elseif ( $list -eq 'case_name' ) {
-            # 登録済ケース名一覧表示
-            python ./src/evalApp.py  -d -case -l
-        }
-        elseif ( $list -eq 'pt' ) {
-            # 作成済モデルファイル一覧表示
-            get-childitem ./eval*.pt
-        }
-    } 
-    elseif ($delete -ne '') {
-        # 登録ケース名、データファイル削除
-        python ./src/evalApp.py -d -case $delete -D
-    }
-    elseif ($rename -ne '' -and $to -ne '') {
-        # 登録ケース名リネーム
-        python ./src/evalApp.py -d -case $rename,$to -R
-    }
     elseif ($update -ne '') {
-        if ($label -ne '') {
+        if ($score -ne '') {
             # 登録ケースのラベル更新
-            python ./src/evalApp.py -d -case $update -E $label
-        }
-        elseif ($memo -ne '') {
-            # 登録ケースのメモ更新
-            python ./src/evalApp.py -d -case $update -U $memo
+            python ./src/evalApp.py -d -case $update -E $score
         }
     }
-    elseif ($import -ne '') {
-        # 解析結果データファイルのデータをデータベースに登録
-        python ./src/evalApp.py -d inputkey=$input_key -case $import -import -m -f0 0
-    }
-    elseif ($eval -ne '') {
+    elseif ($print -ne '') {
         # 評価データ表示
-        python ./src/evalApp.py -d  -case $eval -eval | Tee-Object $logfile
+        python ./src/evalApp.py -d  -case $print -eval | Tee-Object $logfile
     }    
     elseif ($case -ne '') {
         # 解析結果データをグラフ表示
@@ -760,45 +705,34 @@ function eval {
         $len = $args.Length
         # 検証ケース名が指定さた場合は、-valid オプションで指定する
         $valid_case = $valid
-        if (-not $section ) {
-            if ($train -ne 'list') {
-                # 単一ケース学習（登録ケース名指定）
-                if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
-                }
-                else {
-                    python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
-                }
+        if ($train -ne 'list') {
+            # 単一ケース学習（登録ケース名指定）
+            if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
+                python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
             }
             else {
-                # 複数ケース学習（環境変数CASE_LIST指定）
-                $cases_list = $env:CASE_LIST.Split(' ')
-                $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
-                write-output $str
-                $i = 1
-                foreach ( $case_name in $cases_list ) {
-                    if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                        python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
-                    }
-                    else {
-                        python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
-                    }
-                    #Write-Output $LASTEXITCODE
-                    if ( $LASTEXITCODE -ne 0 ) {
-                        break
-                    }
-                    $i++    
-                }
+                python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
             }
         }
-        elseif ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
-            # セクション毎（0 -> 9）学習
-            for( $i=0; $i -lt 10; $i++) {
-                python ./src/evalApp.py -d -case $train  classes=3 eta=$eta -hparam "($hparam)" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
-            } 
-        }
-        else{
-            write-output 'モデルファイル名を指定してください' 
+        else {
+            # 複数ケース学習（環境変数CASE_LIST指定）
+            $cases_list = $env:CASE_LIST.Split(' ')
+            $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
+            write-output $str
+            $i = 1
+            foreach ( $case_name in $cases_list ) {
+                if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
+                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                }
+                else {
+                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                }
+                #Write-Output $LASTEXITCODE
+                if ( $LASTEXITCODE -ne 0 ) {
+                    break
+                }
+                $i++    
+            }
         }
     }
     elseif ($predict -ne '') {
