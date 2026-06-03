@@ -133,7 +133,7 @@ Features_lists = {
     90: Features_list_90
     }
 #
-# EvalAppで使用する特徴量リスト
+# EvalNNで使用する特徴量リスト
 Eval_Features_list_90 = ['rl/180.0 as rl_deg',\
                 'er/180.0 as er_deg',\
                 'sl/180.0 as sl_deg',\
