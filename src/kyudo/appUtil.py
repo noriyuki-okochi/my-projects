@@ -586,7 +586,7 @@ class MyEval:
             else:
                 values += f"{value},"
             
-        values += f"0,'{timestamp}',{time_epoc}"            
+        values += f"{self.eval['score']},'{timestamp}',{time_epoc}"            
         self.csvfd.write(f"{values}\n")
         self.csvfd.flush()
         
@@ -616,8 +616,8 @@ class MyEval:
 
         if self.eval['alart_cnt'] > 0:
             # 警告の有無をチェックして減点する
-            deduction += 10
-            mylog.log(INFO, f"[my_evaluate]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction=10")            
+            deduction += Eval_alart_deduction
+            mylog.log(INFO, f"[my_evaluate]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
         #
         # セクションごとの減点条件をチェックして減点数を計算する
         for key_nm, data in Diduct_params.items():  # key_nm: 's<section_no>_<key of check data>'
@@ -680,8 +680,7 @@ class MyEval:
                     self.cycle += 1
                 # 評価データの初期化
                 self.reset()
-                if section == 2: self.eval['score'] = 5       # 2節は5点、以外は10点満点
-                    
+                if section == 2: self.eval['score'] = (Eval_perfect_score - 2)   # 2節は3点、以外は満点(Eval_perfect_score)
             elif self.section > 0:
                 # 評価点数の減算
                 deduction = self.check_deduction(self.section)  # 減点数の計算                
@@ -697,7 +696,7 @@ class MyEval:
                 # 現在の評価データを保存
                 self.evals[self.section - 1] = self.eval.copy()
                 # 次のセクションの評価データを初期化
-                self.eval['score'] = 5 if section == 2 else 10       # 2節は5点、以外は10点満点
+                self.eval['score'] = (Eval_perfect_score-2) if section == 2 else Eval_perfect_score       # 2節は3点、以外は点満点(Eval_perfect_score)
                 self.eval['alart_cnt'] = 0      # 警告カウントはセクションごとにリセット   
                 self.eval['push_cnt'] = 0
                 self.eval['pull_cnt'] = 0
@@ -737,12 +736,12 @@ class MyEval:
                     elif step == 12:    self.eval['pull_cnt'] += 1
             else:
                 if section == 2 and step == 40 and self.step == 30:
-                    # 2節のステップ40（箆調べ）は5点加算して10点満点とする
+                    # 2節のステップ40（箆調べ）は2点加算して満点(Eval_perfect_score)とする
                     self.eval['eyes_ratio'] = eyes_ratio
-                    self.eval['score'] += 5     
+                    self.eval['score'] += 2     
                     self.out_csv(score=0)
-                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 5 points.")
-                    print( f"[my_evaluate]: section({section})  step({step}) score up 5 points.score={self.eval['score']}")
+                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 2 points.")
+                    print( f"[my_evaluate]: section({section})  step({step}) score up 2 points.score={self.eval['score']}")
                 
             # 保持時間の更新
             self.eval['split_tm'] = split
