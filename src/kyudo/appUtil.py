@@ -535,12 +535,15 @@ class MyEval:
     :param boxid: 解析対象バウンダリーボックスのID:int 
     """
     def __init__(self):
-        self.eval = { # 現在セクションの評価データ
-                      'completed': 0,'score': 10 , 'split_tm': 0.0, \
+        self.eval_init = { # 評価データ初期値
+                      'completed': 0,'score': Eval_perfect_score ,\
+                      'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
                       'se_angle' : 0, 'eyes_ratio': 0.0, \
-                      'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0 \
+                      'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0, \
+                      'pull_rate': 0.0 \
                       }              
+        self.eval = self.eval_init.copy()  # 現在セクションの評価データ
         self.section: int = -1              # 現在のセクション（節） 番号(0-9)
         self.completed: int = 0             # 現在の完了状態(0/1)
         self.step: int = -1                 # ステップ番号
@@ -578,10 +581,11 @@ class MyEval:
         values = f"{self.case_name},{self.lv_no},{self.frame_no},{self.section+10*self.cycle},{self.completed},{self.step},"
                             
         for i, value in enumerate(self.eval.values()):
-            if i == 0: continue               # completed
+            if i == 0 or i == 11: continue    # completed,pull_rate
             elif i > 1 and i < 8:             # split, rl,er,sl, se, eyes_ratio
                 values += f"{value:.3f},"
-            elif i == 1:                      # score          
+            elif i == 1:                      # score 
+                # 引数scoreが指定されている場合はscoreを、そうでない場合（節移行時の呼び出し）は評価データの値を出力する         
                 values += f"{score if score is not None else value},"
             else:
                 values += f"{value},"
@@ -596,11 +600,7 @@ class MyEval:
         self.completed = 0              # 現在の完了状態(0/1)
         self.step = -1                  # ステップ番号
         # 評価データの初期化
-        self.eval = { 'completed': 0, 'score': 10, 'split_tm': 0, \
-                      'rl_angle': 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
-                      'se_angle': 0, 'eyes_ratio': 0.0, \
-                      'push_cnt': 0, 'pull_cnt': 0, 'alart_cnt': 0 \
-                    }
+        self.eval = self.eval_init.copy() 
         # 評価データリストの初期化    
         self.evals.clear()                                        
         for i in range(9): 
@@ -617,24 +617,31 @@ class MyEval:
         if self.eval['alart_cnt'] > 0:
             # 警告の有無をチェックして減点する
             deduction += Eval_alart_deduction
-            mylog.log(INFO, f"[my_evaluate]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
+            mylog.log(INFO, f"[check_deduction]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
         #
         # セクションごとの減点条件をチェックして減点数を計算する
+        
+        bRet = False
+        c_key, c_msg, c_ope, c_value = '', '', '', 0
         for key_nm, data in Diduct_params.items():  # key_nm: 's<section_no>_<key of check data>'
             sect_no = int(key_nm[1])                # セクション番号を取得（例: 's8_rl_angle' -> 8）
             key = key_nm[3:]                        # 評価データのキーを取得（例: 's8_rl_angle' -> 'rl_angle'）
             if sect_no == section:
                 # セクションに対応する減点条件をチェックして減点する
                 (ope, value, score), msg = data
-                if ope == '<'   : bret = True if self.eval[key] < value else False
-                elif ope == '>' : bret = True if self.eval[key] > value else False
+                mylog.log(INFO, f"[check_deduction]: section({section})  {key} {ope} {value}")
+                if ope == '<'   : bRet = True if self.eval[key] < value else False
+                elif ope == '>' : bRet = True if self.eval[key] > value else False
                 else: continue
-                if bret == True: 
-                    deduction += score
-                    mess = msg.split('.')  # メッセージを'.'でリスト分割
-                    value = self.eval[key]*(-1) if mess[1] == '度' else self.eval[key]  # 値を正負反転するかどうかを判断
-                    self.deduct_msgs.append(f"{mess[0]}({value:.2f}{mess[1]})")
-                    mylog.log(INFO, f"[my_evaluate]:section({section}) {key}={value:.2f} {ope} {value} deduction={score}")   
+                if bRet == True: 
+                    # 最後に減点条件を満たしたデータを採用して、減点、メッセージを作成する
+                    deduction = score
+                    c_key, c_msg, c_ope, c_value = key, msg, ope, value
+        if bRet == True: 
+            mess = c_msg.split('.')  # メッセージを'.'でリスト分割
+            value = self.eval[c_key]*(-1) if mess[1] == '度' else self.eval[c_key]  # 値を正負反転するかどうかを判断
+            self.deduct_msgs.append(f"{mess[0]}({value:.2f}{mess[1]})")
+            mylog.log(INFO, f"[check_deduction]:section({section}) {c_key}={value:.2f} {c_ope} {c_value} deduction={deduction}")   
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
@@ -684,12 +691,13 @@ class MyEval:
             elif self.section > 0:
                 # 評価点数の減算
                 deduction = self.check_deduction(self.section)  # 減点数の計算                
-                self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0                                            # その他の減点
+                self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0 
+                
                 print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction})") 
-                mylog.log(INFO, f"[my_evaluate]:section={self.section}  score={self.eval['score']}  alart={self.eval['alart_cnt']}"\
-                                f"  split={self.eval['split_tm']:.2f}"\
-                                f"  rl={self.eval['rl_angle']:.2f}  er={self.eval['er_angle']:.2f}  sl={self.eval['sl_angle']:.2f}"\
-                                f"  push={self.eval['push_cnt']}    pull={self.eval['pull_cnt']}")
+                mylog.log(INFO, f"[my_evaluate]:section={self.section} score={self.eval['score']} alart={self.eval['alart_cnt']}"\
+                                f" split={self.eval['split_tm']:.2f}"\
+                                f" rl={self.eval['rl_angle']:.2f} er={self.eval['er_angle']:.2f} sl={self.eval['sl_angle']:.2f}"\
+                                f" push={self.eval['push_cnt']} pull={self.eval['pull_cnt']} pull_rate={self.eval['pull_rate']:.2f}")
                 if self.csvfd is not None:
                     self.out_csv()  # CSVファイルに評価データを書き込む
                               
@@ -734,9 +742,11 @@ class MyEval:
                 if section == 5:
                     if step == 11:      self.eval['push_cnt'] += 1
                     elif step == 12:    self.eval['pull_cnt'] += 1
+                    if (self.eval['push_cnt'] + self.eval['pull_cnt']) > 0:
+                        self.eval['pull_rate'] = self.eval['pull_cnt']/(self.eval['push_cnt'] + self.eval['pull_cnt'])
             else:
                 if section == 2 and step == 40 and self.step == 30:
-                    # 2節のステップ40（箆調べ）は2点加算して満点(Eval_perfect_score)とする
+                    # 2節のステップ40（箆調べ）は2点加算
                     self.eval['eyes_ratio'] = eyes_ratio
                     self.eval['score'] += 2     
                     self.out_csv(score=0)
@@ -995,16 +1005,22 @@ def rename_frame_info(db:MyDb, from_name, to_name):
 def print_eval_data(db:MyDb, case_names:list):
     # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
     # 解析対象節番号('<section>.<step>')リスト
-    eval_sections = [ '4.0', '5.10','5.0', '6.0', '8.0' ]  
+    eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>",
-                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
+                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
+                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
                 "",
-                "   <section>    <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
-                "   <section>    <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
+                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
+                "   <section>     <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     items_l = [ 
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er)",
+                "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
+                "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
+                "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), split",
