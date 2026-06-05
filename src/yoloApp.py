@@ -1322,7 +1322,7 @@ def clip_process( frame , rotate = False):
 #
 def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
     global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
-    global Split_start, Split_sec, Split_last, Lap_start, Lap_sec
+    global Split_start, Split_sec, Split_last, Lap_start, Lap_sec,Pull_counter, Push_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
     
     result = myResult.result
@@ -1353,6 +1353,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
             Step_error = False
             Alart_id = 0
+            p_section = Section_no
             if nn_gru:
                 # GRUモデルによる姿勢解析
                 # カレントのデータフレームを作成、保存
@@ -1384,6 +1385,9 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                     # 動作の完了を判定
                     Section_no, Completed = manual_analize_completed(Section_no, myResult)
             #
+            if Section_no != p_section and Section_no == 5: 
+                Pull_counter,Push_counter = 0,0     # 「引き分け」引き・押しのカウンターリセット
+                
             Db.section = Section_no                 # トラッキングデータのセクション番号を設定 
             Db.step_counter = Step_counter          # トラッキングデータのセクション内の動作カウンターを設定             
             Db.completed = 1 if Completed else 0
@@ -1403,10 +1407,14 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     #
     # 評価用のデータ保存、採点
     if Eval_enabled:
-        Eval(Frame_counter, Section_no, 1 if Completed else 0, \
+        bSectionChanged = Eval(Frame_counter, Section_no, 1 if Completed else 0, \
             Step_counter, Split_sec, \
             RL_angle, ER_angle, SL_angle, \
             RSE_angle, EYE_ratio, Alart_id)
+        
+        if bSectionChanged: 
+            Eval.debug_to_csv()
+            Eval.free_eval_pdf()
     
     # セクション名を編集
     section_name, Section_color = edit_section_name(Section_no, Step_counter)   
