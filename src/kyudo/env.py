@@ -153,6 +153,7 @@ Eval_perfect_score = 5                          # 評価の満点スコア
 Eval_alart_deduction = 3                        # アラートがある場合の減点数
 
 Eval_feature_key = 90                           # 使用する特徴量のキー番号
+Eval_sframes = 50                               # 評価用の入力シーケンスのフレーム数
 Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
 Eval_model_pt = './eval_model.pt'
 
