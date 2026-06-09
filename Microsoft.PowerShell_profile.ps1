@@ -61,6 +61,7 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1"
 $env:CASE_LIST=$cases_list
 #
 function help {
@@ -234,7 +235,6 @@ function yoloAp {
         [int]$kpt=0,
         [switch]$clip,
         [switch]$rotate,
-        [switch]$eval,
         [string]$case,
         [string]$multi='',
         [string]$one='',
@@ -280,13 +280,19 @@ function yoloAp {
         write-output 'GRUモデルファイル名を指定してください' 
         return
     }
+    $evalon = ''
+    $eval_model = ''
+    $idx = $args.IndexOf("-eval")
+    if ( $idx -ge 0 ) {
+        $evalon = '-eval'
+        if ( $args.Length -gt ($idx + 1) ) {
+            $eval_model = $args[$idx + 1]
+            $evalon = '-eval'
+        }
+    }
     $maskon = ''
     if ( $mask ) {
         $maskon = '-z'
-    }
-    $evalon = ''
-    if ( $eval ) {
-        $evalon = '-eval'
     }
     #
     if ($help) {
@@ -329,7 +335,7 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon -- 
+        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon $eval_model --
     }
     elseif ($raw) {         
         # 動画生再生
@@ -388,7 +394,7 @@ function yoloAp {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py -d1 -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon --
+        python ./src/yoloApp.py -d1 -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model --
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -403,11 +409,11 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model --
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon --
+            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model --
         }
     }
     else{

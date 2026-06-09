@@ -530,10 +530,15 @@ class FeaturePdf:
 #    射法八節姿勢解析評価点数のクラス定義
 #
 class MyEval:
-    """
-    :param result: 解析データ:Tensor
-    :param boxid: 解析対象バウンダリーボックスのID:int 
-    """
+    # 入力データ次元数に応じた特徴量のカラム名リスト
+    # ・env.py定義の読み込みリストの別名と一致させる
+    Eval_Features_list = [  'rl_deg', 'er_deg', 'sl_deg', 'se_deg',\
+                            'eyes_ratio', 'pull_rate',\
+                            'split','alart',\
+                            'completed','section'
+                        ]
+    debug_file = f"./log/eval_debug.csv"
+    #
     def __init__(self):
         self.eval_init = { # 評価データ初期値
                       'completed': 0,'score': Eval_perfect_score ,\
@@ -552,13 +557,51 @@ class MyEval:
         self.deduct_msgs: list = []         # 減点リスト
         self.score_on: bool = False         # 総合評価点数表示のON/OFF
         self.score_text: str = ""           # 総合評価点数表示用のテキスト
+        self.scores: list = [0]*8           # 予測スコアリスト(8節分)
         self.csvpath: str = None            # 評価結果保存用のCSVファイルパス
         self.csvfd = None                   # 評価結果保存用のCSVファイルオブジェクト
         self.case_name: str = None          # 評価ケース名
         self.frame_no: int = -1             # フレーム番号
         self.lv_no: int = 0                 # レベル番号
         self.cycle: int = 0                 # セクションのサイクル
-            
+        #
+        self.predict:bool = True           # 予測モードのON/OFF
+        self.evalPdf:pd.DataFrame = None    # 特徴量のデータフレームクラスのインスタンス
+        self.eval_list = [None]*len(MyEval.Eval_Features_list)   # 特徴量データリスト
+        
+    def set_eval_list(self):
+        for i, key in enumerate(MyEval.Eval_Features_list):
+            if '_deg' in key:  # 角度の特徴量は0.01度単位で整数化して保存する
+                key_name = key.replace('_deg', '_angle')                    # 角度の特徴量名をevalのキー名に変換
+                self.eval_list[i] = round(self.eval[key_name]/180.0, 3)     # 角度を180度で正規化して保存する
+            elif key == 'pull_rate':    
+                total_cnt = self.eval['push_cnt'] + self.eval['pull_cnt']                           
+                self.eval_list[i] = round(self.eval['pull_cnt'] / total_cnt, 3) if total_cnt > 0 else 0.0    # 率
+            elif key == 'split':   
+                self.eval_list[i] = round(self.eval['split_tm'], 3)       # 時間
+            elif key == 'alart':   
+                self.eval_list[i] = self.eval['alart_cnt']      # カウント
+            elif key != 'section':
+                self.eval_list[i] = self.eval[key]
+        self.eval_list[-1] = self.section
+        
+    def add_eval_pdf(self):
+        narray = np.array(self.eval_list).reshape(1, -1)
+        pdf = pd.DataFrame(narray, columns=MyEval.Eval_Features_list)
+        if self.evalPdf is None:
+            self.evalPdf = pdf
+        else:
+            self.evalPdf = pd.concat([self.evalPdf, pdf])  # 過去データに結合
+
+    def get_eval_pdf(self):
+        return self.evalPdf
+ 
+    def free_eval_pdf(self):
+        self.evalPdf = None
+        
+    def debug_to_csv(self):
+        self.evalPdf.to_csv(MyEval.debug_file, mode='w', float_format='%.4f', na_rep='NaN', sep='\t')
+#
     # CSVファイルを開いてヘッダーを書き込む
     def open_csv(self,case_name: str, lv_no: int, path: str):
         self.case_name = case_name
@@ -640,6 +683,7 @@ class MyEval:
         if bRet == True: 
             mess = c_msg.split('.')  # メッセージを'.'でリスト分割
             value = self.eval[c_key]*(-1) if mess[1] == '度' else self.eval[c_key]  # 値を正負反転するかどうかを判断
+            value = self.eval[c_key]*100 if mess[1] == '%' else self.eval[c_key]    # %は100を掛けて表示
             self.deduct_msgs.append(f"{mess[0]}({value:.2f}{mess[1]})")
             mylog.log(INFO, f"[check_deduction]:section({section}) {c_key}={value:.2f} {c_ope} {c_value} deduction={deduction}")   
         #
@@ -669,6 +713,7 @@ class MyEval:
                        rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0,\
                        se_angle:float=0.0, eyes_ratio:float=0.0, alart:int=0):
         # 
+        bool_section_change = False  # セクションが変わったかどうか
         self.frame_no = frame_no
         
         if alart != 0:
@@ -689,6 +734,7 @@ class MyEval:
                 self.reset()
                 if section == 2: self.eval['score'] = (Eval_perfect_score - 2)   # 2節は3点、以外は満点(Eval_perfect_score)
             elif self.section > 0:
+                bool_section_change = True
                 # 評価点数の減算
                 deduction = self.check_deduction(self.section)  # 減点数の計算                
                 self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0 
@@ -700,7 +746,12 @@ class MyEval:
                                 f" push={self.eval['push_cnt']} pull={self.eval['pull_cnt']} pull_rate={self.eval['pull_rate']:.2f}")
                 if self.csvfd is not None:
                     self.out_csv()  # CSVファイルに評価データを書き込む
-                              
+                
+                if self.predict:
+                    self.set_eval_list()  # 評価データの特徴量リストを更新する
+                    self.add_eval_pdf()   # 評価データの特徴量データフレームに追加する
+                    #self.debug_to_csv()
+#                              
                 # 現在の評価データを保存
                 self.evals[self.section - 1] = self.eval.copy()
                 # 次のセクションの評価データを初期化
@@ -716,9 +767,15 @@ class MyEval:
             self.eval['sl_angle'] = sl_angle
             self.eval['se_angle'] = se_angle
             self.eval['eyes_ratio'] = eyes_ratio
+            
             if self.csvfd is not None:
                 # 完了ステータスの変化でCSVファイルに評価データを書き込む
                 self.out_csv(score=0)       
+            
+            if self.predict:
+                self.set_eval_list()  # 評価データの特徴量リストを更新する
+                self.add_eval_pdf()   # 評価データの特徴量データフレームに追加する
+                
             if completed == 1:
                 self.eval['completed'] = 1
                 if section == 9:
@@ -732,6 +789,11 @@ class MyEval:
                     if self.csvfd is not None:
                         # ステップの変化でCSVファイルに評価データ(score=0)を書き込む
                         self.out_csv(score=0)
+                    
+                    if self.predict:
+                        self.set_eval_list()  # 評価データの特徴量リストを更新する
+                        self.add_eval_pdf()   # 評価データの特徴量データフレームに追加する
+                        
                 # 移行中の角度データを更新
                 self.eval['rl_angle'] = rl_angle
                 self.eval['er_angle'] = er_angle
@@ -749,9 +811,15 @@ class MyEval:
                     # 2節のステップ40（箆調べ）は2点加算
                     self.eval['eyes_ratio'] = eyes_ratio
                     self.eval['score'] += 2     
-                    self.out_csv(score=0)
                     mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 2 points.")
                     print( f"[my_evaluate]: section({section})  step({step}) score up 2 points.score={self.eval['score']}")
+
+                    if self.csvfd is not None:
+                        self.out_csv(score=0)
+                    
+                    if self.predict:
+                        self.set_eval_list()  # 評価データの特徴量リストを更新する
+                        self.add_eval_pdf()   # 評価データの特徴量データフレームに追加する
                 
             # 保持時間の更新
             self.eval['split_tm'] = split
@@ -763,6 +831,8 @@ class MyEval:
         self.section = section
         self.completed = completed
         self.step = step
+        
+        return  bool_section_change
     
 #
 # 日本語テキストの描画

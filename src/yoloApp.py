@@ -17,6 +17,7 @@ from kyudo.env import *
 from kyudo.param import * 
 from kyudo.appUtil import * 
 from kyudo.kyudoModel import * 
+from kyudo.evalModel import *
 from kyudo.kyudoUtils import *
 from mysqlite3.mysqlite3 import MyDb
 
@@ -103,7 +104,7 @@ def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval] [-w [<fps>]] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
         + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [--] [-at <frame_no>]")
@@ -1320,7 +1321,7 @@ def clip_process( frame , rotate = False):
 #
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None):
+def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None, evalModel=None):
     global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
     global Split_start, Split_sec, Split_last, Lap_start, Lap_sec,Pull_counter, Push_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
@@ -1412,8 +1413,17 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             RL_angle, ER_angle, SL_angle, \
             RSE_angle, EYE_ratio, Alart_id)
         
-        if bSectionChanged: 
+        if bSectionChanged and evalModel is not None: 
             Eval.debug_to_csv()
+            # 予測実行(predict)
+            df_x = Eval.get_eval_pdf()                  # 評価用の特徴量データフレームを取得
+            df_x = df_x.astype({'section': 'Int64'})    # 整数型に変換する   
+            # numpy配列に変換
+            x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
+            pred_score  = predict_Eval( evalModel, x, Eval_sframes ) # x=numpy(input_frames, input_dim)
+            sect_no = int(df_x.iloc[-1]['section'])          # 最新のセクション番号を取得
+            Eval.scores[sect_no - 1] = pred_score
+            #print(f"[predict_Eval]: section({sect_no}) predicted_score={pred_score}")   
             Eval.free_eval_pdf()
     
     # セクション名を編集
@@ -1932,9 +1942,17 @@ def main():
     #
     if '-r' in opts:
         raw_video = True        # 生画像を表示するオプション
-        
+    
+    eval_model_path = None      # 評価モデル(EvalNN)ファイルのパス   
     if '-eval' in opts:
         Eval_enabled = True
+        # 評価モデル(EvalNN)ファイルの指定をチェックする
+        opt_vals, _ = get_opt_values(args, '-eval')
+        if len(opt_vals) > 0: 
+            eval_model_path = opt_vals[0]
+            if os.path.isfile(eval_model_path) is False:
+                print(f"[yoloApp]error:model-file({eval_model_path}) not found.")
+                return
 
     if '-clip' in opts:
         clip_video = True
@@ -2381,7 +2399,7 @@ def main():
     #
     if not raw_video:
         #------------------------------------------------------------------------
-        # NNモデルのインスタンス生成
+        # GRUモデルのインスタンス生成
         #------------------------------------------------------------------------
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLO{V8_model} Pose Detectionを開始します")
@@ -2402,12 +2420,12 @@ def main():
             # KyudoGRUモデルの読み込み（事前学習済みモデル）
             parts =model_pth.split('_') 
             if 'modelse' in parts:
-                model_gru = KyudoGRUs( input_size = input_dim, output_size = output_dim,
+                gruModel = KyudoGRUs( input_size = input_dim, output_size = output_dim,
                                 face_embed_dim = Face_dim if face_embed else None,
                                 section_embed_dim = section_dim,
                                 completed_embed_dim = completed_dim )
             elif 'modelme' in parts:
-                model_gru = KyudoGRUm( input_size = input_dim, output_size = output_dim,
+                gruModel = KyudoGRUm( input_size = input_dim, output_size = output_dim,
                                 hidden_size=32,
                                 face_embed_dim = Face_dim if face_embed else None,
                                 section_embed_dim = section_dim,
@@ -2415,13 +2433,32 @@ def main():
             else:
                 print(f"非対応のモデルです。")
                 return   
-            model_gru.to( get_device() )
-            model_gru.load_state_dict( torch.load(model_pth, map_location = get_device()) )
+            gruModel.to( get_device() )
+            gruModel.load_state_dict( torch.load(model_pth, map_location = get_device()) )
 
-            print(f"model_gru={model_gru}")
-            mylog.log(INFO,f"model_gru={model_gru}")            
+            print(f"gruModel={gruModel}")
+            mylog.log(INFO,f"gruModel={gruModel}")            
             print(f"[main]:model loaded from {model_pth}")
             mylog.log(INFO,f"model loaded from {model_pth}")
+            
+        #------------------------------------------------------------------------
+        # EvalNNモデルのインスタンス生成
+        #------------------------------------------------------------------------
+        evalModel = None
+        if eval_model_path is not None:
+            completed_dim = 0 
+            evalModel = EvalNN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
+                            s_frames = Eval_sframes,
+                            output_size = Eval_output_dim,
+                            section_embed_dim = section_dim,
+                            completed_embed_dim = completed_dim )
+            evalModel.to( get_device() )
+            evalModel.load_state_dict( torch.load(eval_model_path, map_location = get_device()) )
+
+            print(f"evalModel={evalModel}")
+            mylog.log(INFO,f"evalModel={evalModel}")            
+            print(f"[main]:model loaded from {eval_model_path}")
+            mylog.log(INFO,f"model loaded from {eval_model_path}")            
     #    
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
@@ -2586,7 +2623,8 @@ def main():
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
                         annotated_frame = plot( myResult, frame, output_dim, \
-                                                nn_gru, model_gru if nn_gru else None)
+                                                nn_gru, gruModel if nn_gru else None,\
+                                                evalModel)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
