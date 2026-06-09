@@ -274,6 +274,7 @@ def main():
         
         # 学習パラメータ
         s_frames, batch_size, n_epoch, r_factor, section_dim, completed_dim = hyper_parameters
+        completed_dim = 0
         log_write(f"[evalApp]:num_classes:{num_classes}")
         log_write(f"[evalApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
         log_write(f"[evalApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
@@ -281,12 +282,11 @@ def main():
         # GRUモデルのインスタンスを生成する
         #
         if model_opt == '-model':
-            log_write(f"[evalApp]:hidden_size={HiddenS_size}")
             model = EvalNN( input_dim = input_dim, 
                             s_frames = s_frames,
                             output_size = num_classes,
                             section_embed_dim = section_dim,
-                            completed_embed_dim = 0 )
+                            completed_embed_dim = completed_dim )
             model.to( get_device() )
         else:
             print(f"[evalApp]error:'Illegal model option:{model_opt}")
