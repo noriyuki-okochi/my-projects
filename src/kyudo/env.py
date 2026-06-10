@@ -147,6 +147,7 @@ Eval_Features_list_90 = ['rl/180.0 as rl_deg',\
 Eval_Features_lists = {
     90: Eval_Features_list_90                   # 評価用特徴量リスト
 }
+# プロット用の特徴量キー番号リスト
 Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']
 
 Eval_perfect_score = 5                          # 評価の満点スコア
