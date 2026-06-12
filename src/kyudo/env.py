@@ -157,9 +157,13 @@ Eval_alart_deduction = 3                        # アラートがある場合の
 Eval_feature_key = 90                           # 使用する特徴量のキー番号
 Eval_sframes = 40                               # 評価用の入力シーケンスのフレーム数
 Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
+
+# モデル保存用のファイルベース名
+EVAL_MODEL_NAME = 'eval_model'
 Eval_model_pt = './eval_model.pt'
 
 # 学習済モデルファイルのデフォルト定義
+MODEL_NAME = 'kyudo_model'
 Kyudo_model_pt = './kyudo80_modelse_8-96-3.pt'
 # 環境変数 'MODEL_PT' が設定されていれば、それを使用する
 model_pt = os.getenv('MODEL_PT')

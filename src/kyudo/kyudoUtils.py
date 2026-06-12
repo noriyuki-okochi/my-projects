@@ -29,10 +29,6 @@ ulog.setLevel(DEBUG)    # ログレベルの設定
 ulog.setLevel(INFO)     # ログレベルの設定
 DF2CSV_enabled = True
 
-# モデル保存用のファイル名
-MODEL_NAME = 'kyudo_model'
-EVAL_MODEL_NAME = 'eval_model'
-
 # GPUチェック
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #
