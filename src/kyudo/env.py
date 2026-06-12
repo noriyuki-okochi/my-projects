@@ -134,13 +134,14 @@ Features_lists = {
     }
 #
 # EvalNNで使用する特徴量リスト
-Eval_Features_list_90 = ['rl/180.0 as rl_deg',\
-                'er/180.0 as er_deg',\
-                'sl/180.0 as sl_deg',\
-                'se/180.0 as se_deg',\
-                'eyes as eyes_ratio',\
-                'pull/(pull+push) as pull_rate',\
-                'split','alart',\
+Eval_Features_list_90 = ['rl/180.0 as rl_deg',
+                'er/180.0 as er_deg',
+                'sl/180.0 as sl_deg',
+                'se/180.0 as se_deg',
+                'eyes as eyes_ratio',
+                'pull/(pull+push) as pull_rate',
+                #'split/60.0 as split_m','alart',\
+                'split/60.0 as split_m',
                 'completed','section'
                 ]
 #
@@ -154,7 +155,7 @@ Eval_perfect_score = 5                          # 評価の満点スコア
 Eval_alart_deduction = 3                        # アラートがある場合の減点数
 
 Eval_feature_key = 90                           # 使用する特徴量のキー番号
-Eval_sframes = 50                               # 評価用の入力シーケンスのフレーム数
+Eval_sframes = 40                               # 評価用の入力シーケンスのフレーム数
 Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
 Eval_model_pt = './eval_model.pt'
 
