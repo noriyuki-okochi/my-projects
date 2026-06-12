@@ -3,7 +3,7 @@ $env:DB_PATH = './yolo-kyudo_local.db'
 #$env:DB_PATH = './yolo-kyudo.db'
 #
 # 動画ファイル検索位置設定
-$env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
+$env:ROLL_PATH='H:/share/Pictures/Camera Roll/'
 # ホームディレクトリ設定
 $HOME_DIR = 'f:/share/YOLO'
 #
@@ -22,6 +22,7 @@ $inputkey = $env:INPUT_KEY
 # モデルオプション設定
 # マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
 $env:MODEL_TYPE="-models"
+$env:EVAL_MODEL_TYPE="-modeln"
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
 $env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
@@ -88,7 +89,8 @@ function home {
 function model {
     param(
         [switch]$help,
-        [string]$head='',
+        [string]$gru='',
+        [string]$eval='',
         [string]$case='',
         [string]$pt='',
         [string]$hp='',
@@ -99,7 +101,8 @@ function model {
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output ">model -head s|m                  ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
+        write-output ">model -gru s|m                   ：GRUモデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
+        write-output ">model -eval n|c                  ：評価モデルタイプ('n':全結合|'c':畳み込み)を設定する"
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
@@ -111,21 +114,39 @@ function model {
         write-output ">actv26env	                  ：V26仮想環境をアクティベートする"
     }
     else {
-        if ( $head -ne '' ) {
-            if ( $head -eq 's' ) {
+        if ( $gru -ne '' ) {
+            if ( $gru -eq 's' ) {
                 $env:MODEL_TYPE="-models"
                 $modelx = $env:MODEL_TYPE
                 $str = '・モデルタイプがシングルヘッド(' + $modelx + ')に設定されました。'
                 write-output $str
             }
-            elseif ( $head -eq 'm' ) {
+            elseif ( $gru -eq 'm' ) {
                 $env:MODEL_TYPE="-modelm"
                 $modelx = $env:MODEL_TYPE
                 $str = '・モデルタイプがマルチヘッド(' + $modelx + ')に設定されました。'
                 write-output $str
             }
             else {
-                $str = '不正なモデルタイプが指定されました。：' + $head
+                $str = '不正なモデルタイプが指定されました。：' + $gru
+                write-output $str
+            }
+        }
+        elseif ( $eval -ne '' ) {
+            if ( $eval -eq 'n' ) {
+                $env:EVAL_MODEL_TYPE="-modeln"
+                $modelx = $env:EVAL_MODEL_TYPE
+                $str = '・評価モデルタイプが全結合(' + $modelx + ')に設定されました。'
+                write-output $str
+            }
+            elseif ( $eval -eq 'c' ) {
+                $env:EVAL_MODEL_TYPE="-modelc"
+                $modelx = $env:EVAL_MODEL_TYPE
+                $str = '・評価モデルタイプが畳み込み(' + $modelx + ')に設定されました。'
+                write-output $str
+            }
+            else {
+                $str = '不正な評価モデルタイプが指定されました。：' + $eval
                 write-output $str
             }
         }
@@ -197,7 +218,9 @@ function model {
         }
         else{
             write-output '>>' 
-            $str = '・モデルオプション    ：  ' + $env:MODEL_TYPE
+            $str = '・GRUモデルオプション ：  ' + $env:MODEL_TYPE
+            Write-Output $str
+            $str = '・評価モデルタイプ    ：  ' + $env:EVAL_MODEL_TYPE
             Write-Output $str
             $str = '・学習済モデル        ： ' + $env:MODEL_PT 
             write-output $str
@@ -675,7 +698,7 @@ function eval {
     }
     $hparam = $hp_vals -join ','
     # モデルタイプ取得
-    $modelx = "-model"
+    $modelx = $env:EVAL_MODEL_TYPE
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
