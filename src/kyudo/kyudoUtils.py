@@ -349,7 +349,10 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     if pth is not None:
         model_pth = pth
     else:
-        model_name +=  'e' if model.embed else 'n'
+        if 'GRU' in class_name:
+            model_name +=  'e' if model.embed else 'n'
+        else:
+            model_name +=  'c' if 'EvalCNN' in class_name else 'n'
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
     log_write(f"[train_Kyudo]:model will be saved as {model_pth}")

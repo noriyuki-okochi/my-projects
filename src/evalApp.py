@@ -81,7 +81,7 @@ def main():
             + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
             + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
             + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-            + "        [{-train|-predict} [eta=<rate>] [-model '<model-path>']\n"\
+            + "        [ {-train|-predict} [eta=<rate>] [{-modeln|-modelc} ['<model-path>']] ]\n"\
             + "        [-valid <case_name>|none]\n"\
             + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
             + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
@@ -194,10 +194,11 @@ def main():
 
     #
     model_pth = None
-    model_opt = '-model'
-    model_opts = [opt for opt in cmds if opt.startswith(model_opt)]
-    if len(model_opts) > 0:
-        i = cmds.index(model_opts[0])
+    model_opt = None
+    if   '-modeln' in cmds: model_opt = '-modeln'
+    elif '-modelc' in cmds: model_opt = '-modelc'
+    if model_opt is not None:
+        i = cmds.index(model_opt)
         if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' :
             model_pth = cmds[i +1]
 
@@ -248,6 +249,9 @@ def main():
         # 教師ラベルデータの読み込み
         df_y = db.pandas_read_eval( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
         df_x, df_y = correct_singular_values(df_x, df_y)   # 特異値の補正
+        if model_opt == '-modelc':
+            # CNNモデルを使用する場合、'section'を1.0～0.0に正規化する（暫定措置）
+            df_x['section'] = df_x['section'] / 8.0
         if verbose:
             # debug write 
             df2csv(df_x, case_names[0], title=f'df_x ', file=f'./log/eval_debug_{case_names[0]}.csv')
@@ -279,14 +283,18 @@ def main():
         log_write(f"[evalApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
         log_write(f"[evalApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
         #
-        # GRUモデルのインスタンスを生成する
+        # Evalモデルのインスタンスを生成する
         #
-        if model_opt == '-model':
+        if model_opt == '-modeln':
             model = EvalNN( input_dim = input_dim, 
                             s_frames = s_frames,
                             output_size = num_classes,
-                            section_embed_dim = section_dim,
-                            completed_embed_dim = completed_dim )
+                            section_embed_dim = section_dim)
+            model.to( get_device() )
+        elif model_opt == '-modelc':
+            model = EvalCNN( input_dim = input_dim, 
+                            s_frames = s_frames,
+                            output_size = num_classes)
             model.to( get_device() )
         else:
             print(f"[evalApp]error:'Illegal model option:{model_opt}")
