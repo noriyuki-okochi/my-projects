@@ -8,10 +8,11 @@ from datetime import datetime
 # NNモデルの定義
 #
 class EvalNN(nn.Module):
-  def __init__(self, input_dim=10, s_frames=50,  output_size=11,
-                     section_vocab_size=10, section_embed_dim=8, 
-                     completed_vocab_size=3,
-                     completed_embed_dim=4):
+  def __init__(self, input_dim=10, s_frames=40,  output_size=11,
+                     section_vocab_size=10, section_embed_dim=8 
+                     #completed_vocab_size=3,
+                     #completed_embed_dim=4
+                     ):
 
     super(EvalNN, self).__init__() 
 
@@ -96,6 +97,80 @@ class EvalNN(nn.Module):
       if self.csvfile is not None:
           self.csvfile.close()
           self.csvfile = None
-          print(f"[KyudoGRU]:close_csv:{self.csvpath}")
+          print(f"[EvalNN]:close_csv:{self.csvpath}")
+#
+#
+# NNモデルの定義
+#
+class EvalCNN(nn.Module):
+  def __init__(self, input_dim=10, s_frames=40,  output_size=11):
+
+    super(EvalCNN, self).__init__() 
+
+    self.csvfile = None
+    self.csvpath = None 
+
+    # GPUチェック
+    self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
+    # NN入力サイズ：EVAL解析ベクトル + section埋め込み + completed埋め込み
+    #self.input_size = (input_dim - 2) + section_embed_dim + completed_embed_dim
+    self.input_dim = input_dim
+    self.s_frames = s_frames
+    self.output_size = output_size
+    self.in_ch = 1
+    self.out_ch = 8
+    
+    self.cnn1 = nn.Conv2d(self.in_ch, self.out_ch, kernel_size=3, padding=1)
+    self.act1 = nn.ReLU()
+    self.flat = nn.Flatten()
+    self.fc1 = nn.Linear(self.out_ch * self.s_frames * self.input_dim, 128)
+    self.fc2 = nn.Linear(128, output_size)
+  
+  def get_class_name(self):
+    return self.__class__.__name__
+
+  def forward(self, x):
+    _, s_frames, input_dim = x.size()
+
+    out = torch.tanh(self.cnn1(x.unsqueeze(1)))     # (batch_size, in_ch, s_frames, input_dim)
+    # バッチサイズを維持して、特徴量をフラット化
+    #x = x.reshape(-1, s_frames*input_dim ) 
+    x = self.flat(out)                              # (batch_size, out_ch * s_frames * input_dim)         
+    
+    out = torch.tanh(self.fc1(x))
+    out = self.fc2(out)
+    return out
+#
+# CSVファイルのオープン、書き込み、クローズ
+# CSVファイルは、モデルの学習や評価の過程で、損失値や精度などの指標を記録するために使用されます。
+# CSVファイルのオープンは、指定されたパスとファイル名で新しいCSVファイルを作成し、カラム名をヘッダーとして書き込みます。
+# 書き込みは、指定された値をCSVファイルに行として追加します。クローズは、CSVファイルを閉じてリソースを解放します。
+  def open_csv(self, headers='', path="./", fname='model', mode='w'):
+      # CSV出力ファイルの作成
+      timestamp = datetime.now().strftime('%Y%m%d')
+      self.csvpath = path[:path.rfind('/')+1] + f"{fname}_{timestamp}.csv"
+      self.csvfile = open( self.csvpath, mode)
+      # カラム名を出力
+      line = ''
+      for name in headers:
+          if len(line) > 0: line += f"\t{name}"
+          else: line += name
+      self.csvfile.write(line + "\n")
+      self.csvfile.flush()
+      
+  def write_csv(self, values):
+      if self.csvfile is None: return
+      line = ''
+      for v in values:
+          if len(line) > 0: line += f"\t{v:.4f}"
+          else: line += f"{v}"
+      self.csvfile.write(line + "\n")
+
+  def close_csv(self):
+      if self.csvfile is not None:
+          self.csvfile.close()
+          self.csvfile = None
+          print(f"[EvalCNN]:close_csv:{self.csvpath}")
 #
 #eof 

@@ -2450,8 +2450,7 @@ def main():
             evalModel = EvalNN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
                             s_frames = Eval_sframes,
                             output_size = Eval_output_dim,
-                            section_embed_dim = section_dim,
-                            completed_embed_dim = completed_dim )
+                            section_embed_dim = section_dim)
             evalModel.to( get_device() )
             evalModel.load_state_dict( torch.load(eval_model_path, map_location = get_device()) )
 
