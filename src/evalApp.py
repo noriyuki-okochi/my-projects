@@ -747,7 +747,7 @@ def main():
                 # < tag1:face>
                 fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                             name = "split",
-                                            y = mdfk["split"], 
+                                            y = mdfk["split_m"], 
                                             mode = "lines"),
                                     row = irow, 
                                     col = 1,   

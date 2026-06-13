@@ -134,13 +134,12 @@ Features_lists = {
     }
 #
 # EvalNNで使用する特徴量リスト
-Eval_Features_list_90 = ['rl/180.0 as rl_deg',
-                'er/180.0 as er_deg',
-                'sl/180.0 as sl_deg',
-                'se/180.0 as se_deg',
+Eval_Features_list_90 = ['(rl+180)/360.0 as rl_deg',
+                '(er+180)/360.0 as er_deg',
+                '(sl+180)/360.0 as sl_deg',
+                '(se+180)/360.0 as se_deg',
                 'eyes as eyes_ratio',
                 'pull/(pull+push) as pull_rate',
-                #'split/60.0 as split_m','alart',\
                 'split/60.0 as split_m',
                 'completed','section'
                 ]
