@@ -62,7 +62,7 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
-$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1,sato_2.1_1,nemoto_2.1_1"
 $env:CASE_LIST=$cases_list
 #
 function help {
@@ -682,6 +682,7 @@ function eval {
         [string]$update='',
         [string]$score='',
         [string]$case,
+        [switch]$img,
         [string]$train,
         [string]$valid='none',
         [string]$predict,
@@ -702,11 +703,11 @@ function eval {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output ">eval  -update  <登録ケース名> -score '<スコア>'                  ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
-        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...          ：評価データを表示する"
-        write-output '>eval  -case    <登録ケース名> [-input_frames <表示フレーム数>]   ：評価データをグラフ表示する'
+        write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
+        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
+        write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
         write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
-        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]          ：解析結果データで予測する'
+        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]              ：解析結果データで予測する'
         write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -724,9 +725,15 @@ function eval {
         python ./src/evalApp.py -d  -case $print -eval | Tee-Object $logfile
     }    
     elseif ($case -ne '') {
-        # 解析結果データをグラフ表示
-        python ./src/evalApp.py -d  -case $case -f0 $input_frames  -m
-        #python ./src/evalApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m 
+        if ($img) {
+             # 解析結果画像を表示
+            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"
+        }
+        else {
+            # 解析結果データをグラフ表示
+            python ./src/evalApp.py -d  -case $case -f0 $input_frames  -m
+            #python ./src/evalApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m
+        } 
     }
     elseif ($train -ne '') {
         # 学習実行
