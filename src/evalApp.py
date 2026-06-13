@@ -8,6 +8,7 @@ import os
 # local
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 #import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
 from datetime import datetime
@@ -64,12 +65,13 @@ def main():
         cmdline += f" {arg}"
     #    
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    log_write(f'<< evalApp start at {timestamp} >>')
-    log_write(f"[evalApp]info:{cmdline}")
+    log_write( f'<< evalApp start at {timestamp} >>')
+    log_write( f"[evalApp]:{cmdline}")
+    mylog.info(f"[evalApp]:{cmdline}")
     #print(db)
     # コマンドライン引数を辞書に変換
     args_dict = {arg: idx for idx, arg in enumerate(args)}
-    ulog.info(f"[evalApp]info:args={args_dict}")
+    log_write( f"[evalApp]info:args={args_dict}")
 
     key_names:str = []
     key_names.extend(Eval_data_names)
@@ -77,7 +79,7 @@ def main():
 
     opts:str = [opt for opt in args if opt.startswith('-')]
     if '-h' in opts:        #debug write
-        print("evalApp.py -case {*|<case-name>{,<case_name>'}... |-E(val) <label>|-eval}\n"\
+        print("evalApp.py -case {*|<case-name>{,<case_name>'}... |-E(val) <label>|-eval|-img}\n"\
             + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
             + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
             + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
@@ -93,6 +95,7 @@ def main():
     #
     if '-d' in opts:        #debug write
         verbose = True   
+        mylog.setLevel(INFO)  
 
     prompt_val:int = 0
     nvals = [opt[1:] for opt in opts if opt.startswith('-n')]
@@ -208,7 +211,7 @@ def main():
     hyper_parameters = Hyper_parameters   
     if '-hparam' in cmds:
         hyper_parameters = get_hyper_parameters( cmds, hyper_parameters )
-        log_write(f"[evalApp]:hyper_parameters={hyper_parameters}")
+        log_write( f"[evalApp]:hyper_parameters={hyper_parameters}")
 
     df_k = None     # 予測結果データフレーム
     num_classes:int = Eval_output_dim
@@ -243,7 +246,7 @@ def main():
         # 学習用データの読み込み
         features = Eval_Features_lists[Eval_feature_key]
         input_dim = len(features)
-        log_write(f"[evalApp]:features:{features}")
+        log_write( f"[evalApp]:features:{features}")
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
         df_x = db.pandas_read_eval( features, case_names )     # 学習用特徴量(input_frames, input_dim)                       
         # 教師ラベルデータの読み込み
@@ -279,9 +282,9 @@ def main():
         # 学習パラメータ
         s_frames, batch_size, n_epoch, r_factor, section_dim, completed_dim = hyper_parameters
         completed_dim = 0
-        log_write(f"[evalApp]:num_classes:{num_classes}")
-        log_write(f"[evalApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
-        log_write(f"[evalApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
+        log_write( f"[evalApp]:num_classes:{num_classes}")
+        log_write( f"[evalApp]:s_frames={s_frames}, s_time={(s_frames/FPS):.2f}[s]")    
+        log_write( f"[evalApp]:section_embed_dim={section_dim}, completed_embed_dim={completed_dim}")
         #
         # Evalモデルのインスタンスを生成する
         #
@@ -300,10 +303,10 @@ def main():
             print(f"[evalApp]error:'Illegal model option:{model_opt}")
             exit(1)
         # モデル情報の表示
-        log_write(f"[evalApp]:model\n {model}")
-        log_write(f"[evalApp]:input_dim={input_dim}, output_size={num_classes}")
+        log_write( f"[evalApp]:model\n {model}")
+        log_write( f"[evalApp]:input_dim={input_dim}, output_size={num_classes}")
         numel_params = [p.numel() for p in model.parameters() if p.requires_grad]
-        log_write(f"[evalApp]: numel parameters={sum(numel_params)}, {numel_params}")   
+        log_write( f"[evalApp]: numel parameters={sum(numel_params)}, {numel_params}")   
         
         # 学習済モデルの読み込み
         if model_pth is not None:
@@ -324,9 +327,9 @@ def main():
         
         # 学習、または予測の実行
         if not predict:      
-            log_write(f"[evalApp]:batch_size={batch_size}, n_epoch={n_epoch}")
-            log_write(f"[evalApp]:Learning_rate={learning_rate:.5f}, r_factor={r_factor:.2f}")
-            log_write(f"[evalApp]:L2_lambda={L2_lambda:.5f}")
+            log_write( f"[evalApp]:batch_size={batch_size}, n_epoch={n_epoch}")
+            log_write( f"[evalApp]:Learning_rate={learning_rate:.5f}, r_factor={r_factor:.2f}")
+            log_write( f"[evalApp]:L2_lambda={L2_lambda:.5f}")
             # 学習実行(train)
             train_Kyudo( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, pth = model_pth )
             
@@ -363,6 +366,42 @@ def main():
             last = mlast[0]
             m_flg = True   # 入力データと予測結果グラフを表示
             '''
+    if '-img' in opts:
+        # 指定ケースの評価用データをグレースケール画像で表示するコマンドオプションの解析
+        if len(case_names) > 0 :
+            # 学習用データの読み込み
+            features = Eval_Features_lists[Eval_feature_key]
+            input_dim = len(features)
+            # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
+            df_x = db.pandas_read_eval( features, case_names )              # 学習用特徴量(input_frames, input_dim)                       
+            # 教師ラベルデータの読み込み
+            df_y = db.pandas_read_eval( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
+            df_x, df_y = correct_singular_values(df_x, df_y)                # 特異値の補正
+            df_x['section'] = df_x['section'] / 8.0
+            np_x = df_x.to_numpy(dtype=np.float32)                          # (input_frames, input_dim)
+            np_y = df_y.to_numpy(dtype=np.int64)                            # (input_frames, 1)
+            print(f"[evalApp]info:np_x.shape={np_x.shape}")
+
+            # section毎にフレーム数をs_framesに合わせて切り出す
+            s_frames, _, _, _, _, _ = hyper_parameters                      # 1サンプルのフレーム数         np_x, _ = eval_data_squeeze(np_x, np_y, s_frames)     
+            np_ch, _ = eval_data_unSqueeze(np_x, np_y, s_frames)            # (input_samples, s_frames, input_dim)
+            print(f"[evalApp]info:np_ch.shape={np_ch.shape}")
+            inum, s_frames, input_dim = np_ch.shape
+            print(f"[evalApp]info:inum={inum}, s_frames={s_frames}, input_dim={input_dim}")
+            sections = []
+            gray_img = np_ch[0,:, :]                                        # (s_frames, input_dim)
+            sections.append(np_ch[0, 0, -1])
+            
+            for i in range(1, inum):
+                gray_img = np.concatenate( (gray_img, np_ch[i,:, :]), axis=1 )         # (i*s_frames, input_dim)
+                sections.append(np_ch[i, 0, -1])
+            print(f"[evalApp]info:gray_img.shape={gray_img.shape}")
+            fig = px.imshow(gray_img, color_continuous_scale='gray', title=f"Eval-data({sections}) Image plot")
+            fig.update_xaxes(range=(1, inum*input_dim), dtick=input_dim)
+            fig.show()
+        else:
+            print("[evalApp]error:'-img' requires '-case <name>'.")
+        exit(0)
     #
     # CSVデータのプロットコマンド(-loss|-predicted)オプションの解析
     #
@@ -440,12 +479,12 @@ def main():
     if '-range' in args:
         i = args.index('-range')
         if len(args) > (i + 1):
-            range = args[i+1].split(',')
+            ranges = args[i+1].split(',')
             try:
-                if range[0] != '': 
-                    range_min = float(range[0])
-                if len(range) > 1 and range[1] != '': 
-                    range_max = float(range[1])
+                if ranges[0] != '': 
+                    range_min = float(ranges[0])
+                if len(ranges) > 1 and ranges[1] != '': 
+                    range_max = float(ranges[1])
             except ValueError:
                 pass
     print(f"[evalApp]info:range_min={range_min},range_max={range_max}.")
@@ -469,6 +508,7 @@ def main():
     if case_compare and len(second_names) > 0:
         print("[evalApp]info:'-second' was ignored.")
         second_names.clear()
+    #
     #
     #  <<< プロットのサブプロット領域の定義、作成 >>>
     #
