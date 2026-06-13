@@ -206,8 +206,10 @@ def kyudo_tesorDataset( np_x, np_yact, s_frames ):
     
     return TensorDataset(x_data, y_data)
 #
-# EVALモデルの学習用TensorDatasetを編集する関数
-def eval_tesorDataset( np_x, np_yact, s_frames ):
+# 評価データ(input_frames,input_dim)をsectionごとに(samples,s_frames,input_dim)にunsqueezeする関数
+# 評価データは、sectionごとにs_framesサイズのデータを1サンプルとして扱う
+#
+def eval_data_unSqueeze( np_x, np_yact, s_frames ):
     input_frames, input_dim = np_x.shape
     x_data = np.zeros( (1, s_frames, input_dim) )  # 先頭s_framesサイズのデータを1サンプル（ゼロ値データ）として扱う
     y_data = np.zeros( (1, 1) )  
@@ -228,15 +230,38 @@ def eval_tesorDataset( np_x, np_yact, s_frames ):
         x_data[-1,i_frame] = np_x[i]
         y_data[-1] = np_yact[i]
         i_frame += 1
-    #print(f"[eval_tesorDataset]: y_data={y_data}")
+        if i_frame >= s_frames:
+            print(f"[eval_data_unSqueeze]:Warning: section {c_section} has more than {s_frames} frames. Extra frames will be ignored.")
+            break
+
+    log_write(f"[eval_data_unSqueeze]:x_data={x_data.shape}, y_data={y_data.shape}")
+    return x_data, y_data
+#
+# EVALモデルの学習用TensorDatasetを編集する関数
+# np_x: 評価データ (input_frames, input_dim)
+# np_yact: 評価の正解ラベル (input_frames, 1)
+# s_frames: 1サンプルのフレーム数
+def eval_tesorDataset( np_x, np_yact, s_frames ):
+    x_data, y_data = eval_data_unSqueeze( np_x, np_yact, s_frames )
     #    
     # データをTensorに変換してTensorDatasetを作成する
     x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_dim]
     y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[i_frame, s_frames, input_dim]
-    #y_data = torch.randint(low=0, high=10,  size=y_data.shape, dtype=torch.int64).to(device )  # ランダムなラベルを生成する
+
     print(f"[eval_tesorDataset]:x_data={x_data.shape}, y_data={y_data.shape}")
     return TensorDataset(x_data, y_data)
 #
+# 学習ループ関数
+# model: GRU/EvalNNモデル
+# loader: 学習用DataLoader
+# criterion: 損失関数
+# optimizer: 最適化手法
+# n_epoch: エポック数
+# l2_lambda: L2正則化の強さ
+# scheduler: 学習率スケジューラー   
+# valid_loader: 検証用DataLoader
+# earlystop: EarlyStoppingのインスタンス
+# 学習ループは、指定されたエポック数だけ、学習用データローダーからデータを取得してモデルを訓練します。
 def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
     # モデルのクラス名からモデルのベース名を決定する
     class_name:str = model.get_class_name()
