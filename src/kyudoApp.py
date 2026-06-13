@@ -516,12 +516,12 @@ range_max:float = None
 if '-range' in args:
     i = args.index('-range')
     if len(args) > (i + 1):
-        range = args[i+1].split(',')
+        ranges = args[i+1].split(',')
         try:
-            if range[0] != '': 
-                range_min = float(range[0])
-            if len(range) > 1 and range[1] != '': 
-                range_max = float(range[1])
+            if ranges[0] != '': 
+                range_min = float(ranges[0])
+            if len(ranges) > 1 and ranges[1] != '': 
+                range_max = float(ranges[1])
         except ValueError:
             pass
 print(f"[kyudoApp]info:range_min={range_min},range_max={range_max}.")
