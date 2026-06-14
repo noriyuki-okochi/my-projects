@@ -1858,7 +1858,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 def main(): 
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
-    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled
+    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled, Eval_sframes
     global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Hybrid_model
     global StartAction_param, CompleteAction_param
     global Rect_area
@@ -2450,7 +2450,10 @@ def main():
         #------------------------------------------------------------------------
         evalModel = None
         if eval_model_pth is not None:
+            # 学習済みモデルファイル名からパラメータを取得（eval_model_pthの例：eval_modeln_9-48-6.pth）
             parts = eval_model_pth.split('_') 
+            params = parts[-1].split('-')
+            Eval_sframes = int(params[1]) if len(params) > 1 and params[1].isnumeric() else Eval_sframes
             completed_dim = 0 
             if 'modeln' in parts:
                 
