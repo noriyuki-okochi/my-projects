@@ -2458,19 +2458,23 @@ def main():
                                 s_frames = Eval_sframes,
                                 output_size = Eval_output_dim,
                                 section_embed_dim = section_dim)
-                evalModel.to( get_device() )
-                evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
+                #evalModel.to( get_device() )
+                #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
             elif 'modelc' in parts:
                 evalModel = EvalCNN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
                                 s_frames = Eval_sframes,
                                 output_size = Eval_output_dim)
-                evalModel.to( get_device() )
-                evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
+                #evalModel.to( get_device() )
+                #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
             else :
                 print(f"非対応のモデルです。")
                 return           
+            #
+            evalModel.to( get_device() )
             print(f"evalModel={evalModel}")
             mylog.log(INFO,f"evalModel={evalModel}")            
+
+            evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
             print(f"[main]:model loaded from {eval_model_pth}")
             mylog.log(INFO,f"model loaded from {eval_model_pth}") 
     #    
