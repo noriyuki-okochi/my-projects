@@ -154,15 +154,18 @@ Eval_perfect_score = 5                          # 評価の満点スコア
 Eval_alart_deduction = 3                        # アラートがある場合の減点数
 
 Eval_feature_key = 90                           # 使用する特徴量のキー番号
-Eval_sframes = 48                               # 評価用の入力シーケンスのフレーム数
 Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
 
+Sequence_frames:int = 96                        # GRU用入力シーケンスのフレーム数
+Eval_sframes = 48                               # 評価用の入力シーケンスのフレーム数
 hyper_params = os.getenv('HYPER_PARAM')
 if hyper_params != None:
     print(f"Environment variable 'HYPER_PARAM': {hyper_params}")
     params = hyper_params.split(' ')
     if len(params) > 0:
-        Eval_sframes = int(params[0])
+        Sequence_frames = int(params[0])
+        Eval_sframes = Sequence_frames
+        
 # モデル保存用のファイルベース名
 EVAL_MODEL_NAME = 'eval_model'
 Eval_model_pt = './eval_model.pt'
@@ -200,7 +203,6 @@ l2_lambda = os.getenv('L2_LAMBDA')
 if l2_lambda != None:
     L2_lambda = float(l2_lambda)
     
-Sequence_frames:int = 96    # 入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
 R_factor:float = 1.0   # 学習率減衰の係数
