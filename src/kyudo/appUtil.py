@@ -1079,14 +1079,14 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象節番号('<section>.<step>')リスト
     eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
+                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
                 "",
-                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
-                "   <section>     <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     items_l = [ 
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
