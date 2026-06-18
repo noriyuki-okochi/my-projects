@@ -1102,7 +1102,8 @@ def print_eval_data(db:MyDb, case_names:list):
         + " sl:left Shoulder->Left wrist, rl:Right wrist->Left wrist\n"\
         + " se:right Shoulder->right Elbow, er:right Elbow->Right wrist\n"\
         + " split:完了状態の保持時間\n"\
-        + " pull_ratio:大三からの引き分け’押／引'の'引'検知率"
+        + " pull:大三からの引き分け’押／引'の'引'検知率（率が大きいほど、弓手の押しが弱い）\n"\
+        + " eyes:眉間長さの尺度（section=2.0で正面向きの目安：ほぼ0.06以下で顔向け良）"
     
     # 対象のケース名を抽出する
     case_names_l = []
