@@ -2454,6 +2454,7 @@ def main():
             parts = eval_model_pth.split('_') 
             params = parts[-1].split('-')
             Eval_sframes = int(params[1]) if len(params) > 1 and params[1].isnumeric() else Eval_sframes
+            print(f"[main]:Eval_sframes={Eval_sframes}")
             completed_dim = 0 
             if 'modeln' in parts:
                 
