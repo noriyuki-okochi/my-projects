@@ -20,9 +20,8 @@ $logfile = './log/console.log'
 $env:INPUT_KEY="80"
 $inputkey = $env:INPUT_KEY
 # モデルオプション設定
-# マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
-$env:MODEL_TYPE="-models"
-$env:EVAL_MODEL_TYPE="-modeln"
+$env:MODEL_TYPE="-models"               # シングルヘッドをデフォルト
+$env:EVAL_MODEL_TYPE="-modelc"          # 畳み込みモデルをデフォルト
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
 $env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
@@ -62,7 +61,7 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
-$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1,sato_2.1_1,nemoto_2.1_1"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,iwata_2.0_2,okochi_2.0_1,okochi_2.0_2,okochi_2.0_3,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,kanoda_2.0_2,y.shihan_2.0_1,yoshida_2.0_1,sueyoshi_2.3_1,oshima_2.0_1,n.iijima_2.0_1"
 $env:CASE_LIST=$cases_list
 #
 function help {
@@ -218,7 +217,7 @@ function model {
         }
         else{
             write-output '>>' 
-            $str = '・GRUモデルオプション ：  ' + $env:MODEL_TYPE
+            $str = '・GRUモデルタイプ     ：  ' + $env:MODEL_TYPE
             Write-Output $str
             $str = '・評価モデルタイプ    ：  ' + $env:EVAL_MODEL_TYPE
             Write-Output $str
@@ -679,6 +678,7 @@ function eval {
     param(
         [switch]$help,
         [switch]$h,
+        [string]$list='',
         [string]$update='',
         [string]$score='',
         [string]$case,
@@ -703,6 +703,7 @@ function eval {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
+        write-output '>eval  -list	pt                                                    ：作成済モデルファイルの一覧を表示する'
         write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
         write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
         write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
@@ -713,6 +714,12 @@ function eval {
     elseif ($h) {
         # 詳細ヘルプ表示
         python ./src/evalApp.py -h
+    } 
+    elseif ($list -ne '') {
+        if ( $list -eq 'pt' ) {
+            # 作成済モデルファイル一覧表示
+            get-childitem ./eval*.pt
+        }
     } 
     elseif ($update -ne '') {
         if ($score -ne '') {
