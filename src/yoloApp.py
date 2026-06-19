@@ -1418,7 +1418,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             # 予測実行(predict)
             df_x = Eval.get_eval_pdf()                  # 評価用の特徴量データフレームを取得
             df_x = df_x.astype({'section': 'Int64'})    # 整数型に変換する   
-            if evalModel.get_class_name() == 'EvalCNN':
+            if evalModel.get_class_name() == 'EvalCN':
                 df_x['section'] = df_x['section']/8.0   # セクション番号を正規化する（0-1）
             # numpy配列に変換
             x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
@@ -2465,7 +2465,7 @@ def main():
                 #evalModel.to( get_device() )
                 #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
             elif 'modelc' in parts:
-                evalModel = EvalCNN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
+                evalModel = EvalCN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
                                 s_frames = Eval_sframes,
                                 output_size = Eval_output_dim)
                 #evalModel.to( get_device() )

@@ -373,7 +373,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
         if 'GRU' in class_name:
             model_name +=  'e' if model.embed else 'n'
         else:
-            model_name +=  'c' if 'EvalCNN' in class_name else 'n'
+            model_name +=  'c' if 'EvalCN' in class_name else 'n'
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
     log_write(f"[train_Kyudo]:model will be saved as {model_pth}")
@@ -492,6 +492,7 @@ def predict_Kyudo( model, np_x, s_frames, log_print=True):
 # 戻り値: 予測データ (input_frames,)
 #
 def predict_Eval( model, np_x, s_frames, log_print=True):
+    class_name:str = model.get_class_name()
     # 予測データ
     input_frames, input_dim = np_x.shape
     print(f"[predict_Eval]:np_x={np_x.shape}") 
@@ -528,7 +529,10 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
             y_pred = model(x)
             score = torch.argmax( y_pred, dim=1).item()
         #
-        log_write(f"[predict_Eval]:({t:2d}) section={x[0,0,-1]}, score={score}", log_print)    
+        if class_name == 'EvalCN':
+            log_write(f"[predict_Eval]:({t:2d}) section={int(x[0,0,-1]*8+0.1)}, score={score}", log_print)
+        else:
+            log_write(f"[predict_Eval]:({t:2d}) section={int(x[0,0,-1])}, score={score}", log_print)    
         ulog.debug(f"[predict_Eval]:score={score}")
         y_data[t] = score
         

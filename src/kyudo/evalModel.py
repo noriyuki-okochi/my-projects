@@ -112,10 +112,10 @@ class EvalNN(EvalModule):
 #
 # CNNモデルの定義
 #
-class EvalCNN(EvalModule):
+class EvalCN(EvalModule):
   def __init__(self, input_dim=9, s_frames=48,  output_size=11):
 
-    super(EvalCNN, self).__init__(
+    super(EvalCN, self).__init__(
         input_dim=input_dim, s_frames=s_frames, output_size=output_size
     )
     self.in_ch = 1
