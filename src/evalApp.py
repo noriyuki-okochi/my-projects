@@ -46,7 +46,7 @@ def correct_singular_values(df_x:pd.DataFrame, df_y:pd.DataFrame) :
 #
 #
 def main():
-    global Eval_feature_key, Eval_output_dim, Eval_model_pt
+    global  Eval_output_dim, Eval_model_pt
     verbose:bool = False         # debug write
     m_flg:bool = False           # not display section/conf
     slider:bool = False          # display slider
@@ -86,7 +86,7 @@ def main():
             + "        [ {-train|-predict} [eta=<rate>] [{-modeln|-modelc} ['<model-path>']] ]\n"\
             + "        [-valid <case_name>|none]\n"\
             + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
-            + "        [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
+            + "        [-inputkey][-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
         print(" --- Notation---")
         print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
         exit(0)
@@ -97,6 +97,15 @@ def main():
         verbose = True   
         mylog.setLevel(INFO)  
 
+    if '-inputkey' in cmds:
+        # 入力データキー一覧を表示して終了
+        print(f"[evalApp]info:Input-Features-lists: default input_key={Eval_feature_key}   ")
+        for key, features in Eval_Features_lists.items():
+            print(f"  Input_key={key}:")
+            for feat in features:
+                print(f"    {feat}")
+        exit(0)
+        
     prompt_val:int = 0
     nvals = [opt[1:] for opt in opts if opt.startswith('-n')]
     if len(nvals) > 0:        #no prompt
@@ -218,7 +227,6 @@ def main():
             
     # inputkey=<num>の解析(使用する特徴量の抽出パターンの指定)
     input_key:int = Eval_feature_key
-    input_key_opt = False
 
     # eta=<rate>の解析(学習率の指定)
     learning_rate = Learning_rate
@@ -244,7 +252,7 @@ def main():
         
         #  
         # 学習用データの読み込み
-        features = Eval_Features_lists[Eval_feature_key]
+        features = Eval_Features_lists[input_key]
         input_dim = len(features)
         log_write( f"[evalApp]:features:{features}")
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
@@ -295,7 +303,7 @@ def main():
                             section_embed_dim = section_dim)
             model.to( get_device() )
         elif model_opt == '-modelc':
-            model = EvalCNN( input_dim = input_dim, 
+            model = EvalCN( input_dim = input_dim, 
                             s_frames = s_frames,
                             output_size = num_classes)
             model.to( get_device() )
@@ -370,7 +378,7 @@ def main():
         # 指定ケースの評価用データをグレースケール画像で表示するコマンドオプションの解析
         if len(case_names) > 0 :
             # 学習用データの読み込み
-            features = Eval_Features_lists[Eval_feature_key]
+            features = Eval_Features_lists[input_key]
             input_dim = len(features)
             # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
             df_x = db.pandas_read_eval( features, case_names )              # 学習用特徴量(input_frames, input_dim)                       
@@ -614,7 +622,7 @@ def main():
                 print(f"[evalApp]info:df{df.shape}")
             elif predict:
                 # 予測結果データフレームの読み込み
-                features = Features_lists[input_key]
+                features = Features_lists[Current_feature_key]
                 cols = get_feature_colnames( features )
                 #dfk = df_p  
                 dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
@@ -627,7 +635,7 @@ def main():
                     mdf = mdf.head(pf_vals[1])
                     print(f"[evalApp]info:mdf{mdf.shape}")
             else:
-                features = Eval_Features_lists[Eval_feature_key]
+                features = Eval_Features_lists[input_key]
                 dfk = db.pandas_read_eval(features, case_names, index=None)
                 df = db.pandas_read_eval( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
                 dfk, df = correct_singular_values(dfk, df)   # 特異値の補正
