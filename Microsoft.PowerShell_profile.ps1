@@ -19,6 +19,8 @@ $logfile = './log/console.log'
 # データ入力キー設定
 $env:INPUT_KEY="80"
 $inputkey = $env:INPUT_KEY
+$env:EVAL_INPUT_KEY="170"
+$evalkey = $env:EVAL_INPUT_KEY
 # モデルオプション設定
 $env:MODEL_TYPE="-models"               # シングルヘッドをデフォルト
 $env:EVAL_MODEL_TYPE="-modelc"          # 畳み込みモデルをデフォルト
@@ -96,13 +98,15 @@ function model {
         [string]$roll='',
         [float]$l2=0.0,
         [int]$key=0,
+        [int]$evalkey=0,
         [float]$alpha=1.0
     )
     if ($help) {
         write-output '・コマンド -オプション'
         write-output ">model -gru s|m                   ：GRUモデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
-        write-output ">model -eval n|c                  ：評価モデルタイプ('n':全結合|'c':畳み込み)を設定する"
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
+        write-output ">model -eval n|c                  ：評価モデルタイプ('n':全結合|'c':畳み込み)を設定する"
+        write-output ">model -evalkey <input_key>       ：評価データ入力キーを設定する"
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
@@ -159,6 +163,12 @@ function model {
             $env:INPUT_KEY="$key"
             $inputkey = $env:INPUT_KEY
             $str = '・入力データキーが ' + $inputkey + ' に設定されました。'
+            write-output $str
+        }
+        elseif ( $evalkey -gt 0 ) {
+            $env:EVAL_INPUT_KEY="$evalkey"
+            $evalkey = $env:EVAL_INPUT_KEY
+            $str = '・評価データキーが ' + $evalkey + ' に設定されました。'
             write-output $str
         }
         elseif ( $pt -ne '' ) {
@@ -226,6 +236,8 @@ function model {
             $str = '・ハイパーパラメータ  ： ' + $env:HYPER_PARAM
             write-output $str
             $str = '・入力データキー      ： ' + $env:INPUT_KEY
+            write-output $str
+            $str = '・評価入力データキー  ： ' + $env:EVAL_INPUT_KEY
             write-output $str
             $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
             write-output $str
@@ -703,7 +715,7 @@ function eval {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>eval  -list	pt                                                    ：作成済モデルファイルの一覧を表示する'
+        write-output '>eval  -list    key|pt                                                ：入力データキー,または作成済モデルファイルの一覧を表示する'
         write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
         write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
         write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
@@ -719,6 +731,10 @@ function eval {
         if ( $list -eq 'pt' ) {
             # 作成済モデルファイル一覧表示
             get-childitem ./eval*.pt
+        }
+        elseif ( $list -eq 'key' ) {
+            # 入力データキー一覧表示
+            python ./src/evalApp.py -d -inputkey
         }
     } 
     elseif ($update -ne '') {
