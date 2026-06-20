@@ -25,8 +25,8 @@ filehandler = logging.FileHandler('./log/kyudoApp.log', mode=LOG_FILE_MODE)  # �
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
 ulog.addHandler(filehandler)  # ログハンドラを追加
-ulog.setLevel(DEBUG)    # ログレベルの設定
 ulog.setLevel(INFO)     # ログレベルの設定
+#ulog.setLevel(DEBUG)    # ログレベルの設定
 DF2CSV_enabled = True
 
 # GPUチェック
@@ -228,7 +228,7 @@ def eval_data_unSqueeze( np_x, np_yact, s_frames ):
             
         # サンプル末尾にセクション毎のフレームデータを格納する
         x_data[-1,i_frame] = np_x[i]
-        y_data[-1] = np_yact[i]
+        y_data[-1] = np_yact[i] if np_yact is not None else 0
         i_frame += 1
         if i_frame >= s_frames:
             print(f"[eval_data_unSqueeze]:Warning: section {c_section} has more than {s_frames} frames. Extra frames will be ignored.")
@@ -270,6 +270,9 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
         model.train()
         loss_train = 0
         for x, t in loader:
+            _,_,input_size = x.shape
+            if class_name == 'EvalCN' and input_size >= 17:
+                x = x[:,:,:-1]        # sectionカラム(-1)は削除
             # 順伝搬、損失計算、逆伝搬、パラメータ更新
             y = model(x)
             loss = criterion(y, t.squeeze())
@@ -374,6 +377,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
             model_name +=  'e' if model.embed else 'n'
         else:
             model_name +=  'c' if 'EvalCN' in class_name else 'n'
+            input_size = (input_size - 1) if input_size >= 17 else input_size
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
     log_write(f"[train_Kyudo]:model will be saved as {model_pth}")
@@ -492,31 +496,17 @@ def predict_Kyudo( model, np_x, s_frames, log_print=True):
 # 戻り値: 予測データ (input_frames,)
 #
 def predict_Eval( model, np_x, s_frames, log_print=True):
-    class_name:str = model.get_class_name()
     # 予測データ
-    input_frames, input_dim = np_x.shape
+    _, input_dim = np_x.shape
     print(f"[predict_Eval]:np_x={np_x.shape}") 
     
-    # np_x(input_frames, input_dim) -> x_data(n_samples, s_frames, input_dim)に編集する
-    np_data = np.zeros( (1, s_frames, input_dim) )  # 先頭s_framesサイズのデータを1サンプル（ゼロ値データ）として扱う
-    c_section = np_x[0, -1]  # section
-    i_frame = 0
-    for i in range(input_frames):
-        # セクション（節）毎に、s_framesサイズのデータを格納する
-        if np_x[i, -1] != c_section:
-            # セクションが変わったら、次のサンプルのデータを格納するためにx_dataとy_dataを拡張する
-            #print(f"[predict_Eval]:section = {c_section}, frames={i_frame}")
-            c_section = np_x[i, -1]
-            i_frame = 0
-            # 
-            np_data = np.vstack( [np_data, np.zeros( (1, s_frames, input_dim) )] )
-            
-        # サンプル末尾にセクション毎のフレームデータを格納する
-        np_data[-1,i_frame] = np_x[i]
-        i_frame += 1
-        
+    np_data, _ = eval_data_unSqueeze( np_x, None, s_frames )        
     n_samples = np_data.shape[0]
     x_data = torch.tensor(np_data, dtype=torch.float32).to(device )
+    if input_dim >= 17:
+        # 特徴量のデータサイズが17以上の場合、sectionのone-hot encodingを使用
+        x_data = x_data[:,:,:-1]    # sectionの列(-1)は削除する
+        input_dim -= 1
     print(f"[predict_Eval]:np_data={np_data.shape}, x_data={x_data.shape}")
     ulog.debug(f"[predict_Eval]:x_data={x_data.shape}")
         
@@ -529,14 +519,11 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
             y_pred = model(x)
             score = torch.argmax( y_pred, dim=1).item()
         #
-        if class_name == 'EvalCN':
-            log_write(f"[predict_Eval]:({t:2d}) section={int(x[0,0,-1]*8+0.1)}, score={score}", log_print)
-        else:
-            log_write(f"[predict_Eval]:({t:2d}) section={int(x[0,0,-1])}, score={score}", log_print)    
-        ulog.debug(f"[predict_Eval]:score={score}")
+        log_write(f"[predict_Eval]:({t:2d}) section={int(np_data[t,0,-1])}, score={score}", log_print)    
         y_data[t] = score
         
     #        
     y_data = y_data.reshape(-1)  
     ulog.debug(f"[predict_Eval]:y_pred={y_data.shape}")   
     return y_data
+# eof

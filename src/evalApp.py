@@ -71,7 +71,7 @@ def main():
     #print(db)
     # コマンドライン引数を辞書に変換
     args_dict = {arg: idx for idx, arg in enumerate(args)}
-    log_write( f"[evalApp]info:args={args_dict}")
+    #log_write( f"[evalApp]info:args={args_dict}")
 
     key_names:str = []
     key_names.extend(Eval_data_names)
@@ -254,15 +254,15 @@ def main():
         # 学習用データの読み込み
         features = Eval_Features_lists[input_key]
         input_dim = len(features)
+        if input_key >= 170:
+            # 特徴量の抽出パターンが170以上の場合、sectionのone-hot encodingを使用
+            input_dim -= 1   # sectionの列(-1)は削除する
         log_write( f"[evalApp]:features:{features}")
         # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
         df_x = db.pandas_read_eval( features, case_names )     # 学習用特徴量(input_frames, input_dim)                       
         # 教師ラベルデータの読み込み
         df_y = db.pandas_read_eval( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
         df_x, df_y = correct_singular_values(df_x, df_y)   # 特異値の補正
-        if model_opt == '-modelc':
-            # CNNモデルを使用する場合、'section'を1.0～0.0に正規化する（暫定措置）
-            df_x['section'] = df_x['section'] / 8.0
         if verbose:
             # debug write 
             df2csv(df_x, case_names[0], title=f'df_x ', file=f'./log/eval_debug_{case_names[0]}.csv')
