@@ -494,7 +494,7 @@ class MyDb:
                 if c == 'split':                # 'split'はSQL1で取得したデータを採用する
                     val = df1.iloc[0]['split'] 
                 print_text += f"{val:12.2f}" if isinstance(val, float) \
-                                else f"{val:12} " if isinstance(val, int) else f"{val:>13}"
+                                else f"{val:12} " if isinstance(val, int) else f"{val:>16}"
                 # 以下は、完了移行前のステップのデータを表示するための措置
                 #if section == 5 and step == 0 and c == 'frame_no':
                 #    # 引き分け移行時の引き・押し比率データを表示するため、空白を追加

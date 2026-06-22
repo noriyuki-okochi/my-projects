@@ -530,14 +530,17 @@ class FeaturePdf:
 #    射法八節姿勢解析評価点数のクラス定義
 #
 class MyEval:
+    Header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,se,eyes,push,pull,alart,"\
+             "label,inserted_at,time_epoch\n"
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
-    Eval_Features_list = [  'rl_deg', 'er_deg', 'sl_deg', 'se_deg',\
-                            'eyes_ratio', 'pull_rate',\
-                            'split','alart',\
-                            'completed','section'
-                        ]
-    debug_file = f"./log/eval_debug.csv"
+    Features_list = [  'rl_deg', 'er_deg', 'sl_deg', 'se_deg',\
+                        'eyes_ratio', 'pull_rate',\
+                        'split_m',\
+                        'completed','section'
+                    ]
+    One_shot_list = [ 'sec_0', 'sec_1', 'sec_2', 'sec_3', 'sec_4', 'sec_5', 'sec_6', 'sec_7' ]
+    debug_file = f"./log/myeval_debug"
     #
     def __init__(self):
         self.eval_init = { # 評価データ初期値
@@ -567,42 +570,63 @@ class MyEval:
         #
         self.predict:bool = True           # 予測モードのON/OFF
         self.evalPdf:pd.DataFrame = None    # 特徴量のデータフレームクラスのインスタンス
-        self.eval_list = [None]*len(MyEval.Eval_Features_list)   # 特徴量データリスト
+        self.eval_list = [None]*len(MyEval.Features_list)   # 特徴量データリスト
         
     def set_eval_list(self):
-        for i, key in enumerate(MyEval.Eval_Features_list):
+        for i, key in enumerate(MyEval.Features_list):
             if '_deg' in key:  # 角度の特徴量は0.01度単位で整数化して保存する
-                key_name = key.replace('_deg', '_angle')                    # 角度の特徴量名をevalのキー名に変換
-                self.eval_list[i] = round(self.eval[key_name]/180.0, 3)     # 角度を180度で正規化して保存する
+                key_name = key.replace('_deg', '_angle')                        # 角度の特徴量名をevalのキー名に変換
+                self.eval_list[i] = round((self.eval[key_name]+180)/360.0, 3)   # 角度を360度で正規化して保存する
             elif key == 'pull_rate':    
                 total_cnt = self.eval['push_cnt'] + self.eval['pull_cnt']                           
                 self.eval_list[i] = round(self.eval['pull_cnt'] / total_cnt, 3) if total_cnt > 0 else 0.0    # 率
-            elif key == 'split':   
-                self.eval_list[i] = round(self.eval['split_tm'], 3)       # 時間
+            elif key == 'split_m':   
+                self.eval_list[i] = round(self.eval['split_tm'] / 60.0, 3)       # 時間
             elif key == 'alart':   
-                self.eval_list[i] = self.eval['alart_cnt']      # カウント
+                self.eval_list[i] = self.eval['alart_cnt']                      # カウント
             elif key != 'section':
                 self.eval_list[i] = self.eval[key]
-        self.eval_list[-1] = self.section
+        self.eval_list[-1] = self.section                                       # sectionは常に最後
         
     def add_eval_pdf(self):
         narray = np.array(self.eval_list).reshape(1, -1)
-        pdf = pd.DataFrame(narray, columns=MyEval.Eval_Features_list)
+        pdf = pd.DataFrame(narray, columns=MyEval.Features_list)
         if self.evalPdf is None:
             self.evalPdf = pdf
         else:
-            self.evalPdf = pd.concat([self.evalPdf, pdf])  # 過去データに結合
+            self.evalPdf = pd.concat([self.evalPdf, pdf])       # 過去データに結合
+        self.eval_list = [None]*len(MyEval.Features_list)   # 特徴量データリスト初期化
 
-    def get_eval_pdf(self):
+    def get_eval_pdf(self, input_dim):
+        if input_dim >= 16:
+            eval_pdf = self.evalPdf.loc[:,MyEval.Features_list[0]:MyEval.Features_list[-3]]
+            sect_pdf = self.evalPdf.loc[:,MyEval.Features_list[-2]:MyEval.Features_list[-1]]            
+            
+            # sectionのone-hot encodingを作成
+            ones_np = np.zeros( (len(sect_pdf), len(MyEval.One_shot_list)), dtype=int )
+            ones_pdf = pd.DataFrame(ones_np, columns=MyEval.One_shot_list)
+            for i in range(len(sect_pdf)):
+                isec = int(sect_pdf.iloc[i, 1])
+                if isec > 0 and isec < 9:
+                    ones_pdf.iloc[i, isec - 1] = 1
+            
+            # indexを再構成して列方向に結合する
+            eval_pdf = eval_pdf.reset_index(drop=True)
+            sect_pdf = sect_pdf.reset_index(drop=True)
+            self.evalPdf = pd.concat( (eval_pdf, ones_pdf, sect_pdf), axis=1 )
+        #           
         return self.evalPdf
- 
+    #
+    # 特徴量のデータフレームクラスの削除
     def free_eval_pdf(self):
         self.evalPdf = None
         
-    def debug_to_csv(self):
-        self.evalPdf.to_csv(MyEval.debug_file, mode='w', float_format='%.4f', na_rep='NaN', sep='\t')
+    # 特徴量のデータのCSVファイル出力
+    def df_to_csv(self, case_name='real'):
+        file_path = f"{MyEval.debug_file}_{case_name}.csv"
+        self.evalPdf.to_csv(file_path, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #
-    # CSVファイルを開いてヘッダーを書き込む
+    # 評価データ保存CSVファイルを開いてヘッダーを書き込む
     def open_csv(self,case_name: str, lv_no: int, path: str):
         self.case_name = case_name
         self.lv_no = lv_no
@@ -610,8 +634,7 @@ class MyEval:
         #print(f"[open_csv]: csvpath={self.csvpath}")
         self.csvfd = open(self.csvpath, 'w', newline='', encoding='utf-8')
         # CSVファイルにヘッダーを書き込む
-        header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,se,eyes,push,pull,alart,label,inserted_at,time_epoch\n"
-        self.csvfd.write(header)
+        self.csvfd.write(MyEval.Header)
         self.csvfd.flush()
         
     # CSVファイルに評価データを書き込む
@@ -650,7 +673,8 @@ class MyEval:
             self.evals.append(self.eval.copy()) 
         # 警告リストの初期化
         self.alarts.clear()  
-        #self.deduct_msgs.clear()                                      
+        self.free_eval_pdf()
+       #self.deduct_msgs.clear()                                      
         print(f"[my_evaluate]: reset.")
         
     # 評価点数の減算条件をチェックして減点数を計算する    
@@ -732,7 +756,6 @@ class MyEval:
                     self.cycle += 1
                 # 評価データの初期化
                 self.reset()
-                if section == 2: self.eval['score'] = (Eval_perfect_score - 2)   # 2節は3点、以外は満点(Eval_perfect_score)
             elif self.section > 0:
                 bool_section_change = True
                 # 評価点数の減算
@@ -755,10 +778,7 @@ class MyEval:
                 # 現在の評価データを保存
                 self.evals[self.section - 1] = self.eval.copy()
                 # 次のセクションの評価データを初期化
-                self.eval['score'] = (Eval_perfect_score-2) if section == 2 else Eval_perfect_score       # 2節は3点、以外は点満点(Eval_perfect_score)
-                self.eval['alart_cnt'] = 0      # 警告カウントはセクションごとにリセット   
-                self.eval['push_cnt'] = 0
-                self.eval['pull_cnt'] = 0
+                self.eval = self.eval_init.copy() 
                 
         elif completed != self.completed:   # (0 -> 1)
             # 完了移行時の角度データを更新
@@ -767,6 +787,8 @@ class MyEval:
             self.eval['sl_angle'] = sl_angle
             self.eval['se_angle'] = se_angle
             self.eval['eyes_ratio'] = eyes_ratio
+            if self.section == 2:       # 2節は箆調べでプラス2点
+                self.eval['score'] -= 2 
             
             if self.csvfd is not None:
                 # 完了ステータスの変化でCSVファイルに評価データを書き込む
@@ -1077,14 +1099,14 @@ def print_eval_data(db:MyDb, case_names:list):
     # 解析対象節番号('<section>.<step>')リスト
     eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0', '8.0' ]  
     headers = [
-                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
-                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
+                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
                 "",
-                "   <section>     <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
-                "   <section>     <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     items_l = [ 
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
@@ -1100,7 +1122,8 @@ def print_eval_data(db:MyDb, case_names:list):
         + " sl:left Shoulder->Left wrist, rl:Right wrist->Left wrist\n"\
         + " se:right Shoulder->right Elbow, er:right Elbow->Right wrist\n"\
         + " split:完了状態の保持時間\n"\
-        + " pull_ratio:大三からの引き分け’押／引'の'引'検知率"
+        + " pull:大三からの引き分け’押／引'の'引'検知率（率が大きいほど、弓手の押しが弱い）\n"\
+        + " eyes:眉間長さの尺度（section=2.0で正面向きの目安：ほぼ0.06以下で顔向け良）"
     
     # 対象のケース名を抽出する
     case_names_l = []

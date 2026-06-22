@@ -134,18 +134,37 @@ Features_lists = {
     }
 #
 # EvalNNで使用する特徴量リスト
-Eval_Features_list_90 = ['rl/180.0 as rl_deg',\
-                'er/180.0 as er_deg',\
-                'sl/180.0 as sl_deg',\
-                'se/180.0 as se_deg',\
-                'eyes as eyes_ratio',\
-                'pull/(pull+push) as pull_rate',\
-                'split','alart',\
+Eval_Features_list_90 = ['(rl+180)/360.0 as rl_deg',
+                '(er+180)/360.0 as er_deg',
+                '(sl+180)/360.0 as sl_deg',
+                '(se+180)/360.0 as se_deg',
+                'eyes as eyes_ratio',
+                'IIF((pull+push)=0,0.0,cast(pull as reat)/cast((pull+push) as real)) as pull_rate',
+                'split/60.0 as split_m',
                 'completed','section'
+                ]
+Eval_Features_list_170 = ['(rl+180)/360.0 as rl_deg',
+                '(er+180)/360.0 as er_deg',
+                '(sl+180)/360.0 as sl_deg',
+                '(se+180)/360.0 as se_deg',
+                'eyes as eyes_ratio',
+                'IIF((pull+push)=0,0.0,cast(pull as reat)/cast((pull+push) as real)) as pull_rate',
+                'split/60.0 as split_m',
+                'IIF(section=1,1,0) as sec_0',
+                'IIF(section=2,1,0) as sec_1',
+                'IIF(section=3,1,0) as sec_2',
+                'IIF(section=4,1,0) as sec_3',
+                'IIF(section=5,1,0) as sec_4',
+                'IIF(section=6,1,0) as sec_5',
+                'IIF(section=7,1,0) as sec_6',
+                'IIF(section=8,1,0) as sec_7',
+                'completed',
+                'section'
                 ]
 #
 Eval_Features_lists = {
-    90: Eval_Features_list_90                   # 評価用特徴量リスト
+    90: Eval_Features_list_90,                   # 評価用特徴量リスト
+    170: Eval_Features_list_170
 }
 # プロット用の特徴量キー番号リスト
 Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']
@@ -154,12 +173,21 @@ Eval_perfect_score = 5                          # 評価の満点スコア
 Eval_alart_deduction = 3                        # アラートがある場合の減点数
 
 Eval_feature_key = 90                           # 使用する特徴量のキー番号
-Eval_sframes = 50                               # 評価用の入力シーケンスのフレーム数
+# 環境変数 'EVAL_INPUT_KEY' が設定されていれば、それを使用する
+Eval_input_key = os.getenv('EVAL_INPUT_KEY')
+if Eval_input_key != None:
+    Eval_feature_key = int(Eval_input_key)
+Eval_sframes = 48                               # 評価用の入力シーケンスのフレーム数（ハイパーパラメータのシーケンスフレーム数と同じ値を使用）
 Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
-Eval_model_pt = './eval_model.pt'
+
+# モデル保存用のファイルベース名
+EVAL_MODEL_NAME = 'eval_model'
+MODEL_NAME = 'kyudo_model'
 
 # 学習済モデルファイルのデフォルト定義
 Kyudo_model_pt = './kyudo80_modelse_8-96-3.pt'
+Eval_model_pt = './eval_model.pt'
+
 # 環境変数 'MODEL_PT' が設定されていれば、それを使用する
 model_pt = os.getenv('MODEL_PT')
 if model_pt != None:
@@ -190,7 +218,7 @@ l2_lambda = os.getenv('L2_LAMBDA')
 if l2_lambda != None:
     L2_lambda = float(l2_lambda)
     
-Sequence_frames:int = 96    # 入力シーケンスのフレーム数
+Sequence_frames:int = 96                        # GRU用入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
 R_factor:float = 1.0   # 学習率減衰の係数

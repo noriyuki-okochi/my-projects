@@ -60,7 +60,7 @@ if '-h' in opts:        #debug write
          + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
          + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
          + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-         + "        [{-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] {-models|-modelm} ['<model-path>']]\n"\
+         + "        [ {-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] [{-models|-modelm} ['<model-path>']] ]\n"\
          + "        [-valid <case_name>|none]\n"\
          + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
          + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
@@ -214,8 +214,8 @@ if '-import' in cmds and len(case_names) > 0 :
 #
 model_pth = None
 model_opt = None
-if '-models' in cmds: model_opt = '-models'
-if '-modelm' in cmds: model_opt = '-modelm'
+if   '-models' in cmds: model_opt = '-models'
+elif '-modelm' in cmds: model_opt = '-modelm'
 if model_opt is not None:
     i = cmds.index( model_opt )
     if len(cmds) > (i + 1) and cmds[i + 1][0] != '-' : 
@@ -516,12 +516,12 @@ range_max:float = None
 if '-range' in args:
     i = args.index('-range')
     if len(args) > (i + 1):
-        range = args[i+1].split(',')
+        ranges = args[i+1].split(',')
         try:
-            if range[0] != '': 
-                range_min = float(range[0])
-            if len(range) > 1 and range[1] != '': 
-                range_max = float(range[1])
+            if ranges[0] != '': 
+                range_min = float(ranges[0])
+            if len(ranges) > 1 and ranges[1] != '': 
+                range_max = float(ranges[1])
         except ValueError:
             pass
 print(f"[kyudoApp]info:range_min={range_min},range_max={range_max}.")

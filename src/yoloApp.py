@@ -1321,7 +1321,7 @@ def clip_process( frame , rotate = False):
 #
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None, evalModel=None):
+def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None, evalModel=None, evalInput_dim=None):
     global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
     global Split_start, Split_sec, Split_last, Lap_start, Lap_sec,Pull_counter, Push_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
@@ -1414,9 +1414,9 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             RSE_angle, EYE_ratio, Alart_id)
         
         if bSectionChanged and evalModel is not None: 
-            Eval.debug_to_csv()
             # 予測実行(predict)
-            df_x = Eval.get_eval_pdf()                  # 評価用の特徴量データフレームを取得
+            df_x = Eval.get_eval_pdf(evalInput_dim)     # 評価用の特徴量データフレームを取得
+            Eval.df_to_csv()
             df_x = df_x.astype({'section': 'Int64'})    # 整数型に変換する   
             # numpy配列に変換
             x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
@@ -1856,7 +1856,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 def main(): 
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
-    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled
+    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled, Eval_sframes
     global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Hybrid_model
     global StartAction_param, CompleteAction_param
     global Rect_area
@@ -1943,15 +1943,15 @@ def main():
     if '-r' in opts:
         raw_video = True        # 生画像を表示するオプション
     
-    eval_model_path = None      # 評価モデル(EvalNN)ファイルのパス   
+    eval_model_pth = None      # 評価モデル(EvalNN)ファイルのパス   
     if '-eval' in opts:
         Eval_enabled = True
         # 評価モデル(EvalNN)ファイルの指定をチェックする
         opt_vals, _ = get_opt_values(args, '-eval')
         if len(opt_vals) > 0: 
-            eval_model_path = opt_vals[0]
-            if os.path.isfile(eval_model_path) is False:
-                print(f"[yoloApp]error:model-file({eval_model_path}) not found.")
+            eval_model_pth = opt_vals[0]
+            if os.path.isfile(eval_model_pth) is False:
+                print(f"[yoloApp]error:model-file({eval_model_pth}) not found.")
                 return
 
     if '-clip' in opts:
@@ -2399,7 +2399,7 @@ def main():
     #
     if not raw_video:
         #------------------------------------------------------------------------
-        # GRUモデルのインスタンス生成
+        # YOLO-poseモデルのインスタンス生成
         #------------------------------------------------------------------------
         mylog.log(INFO,f"YOLO{V8_model} Pose Detectionを開始します")
         print(f"YOLO{V8_model} Pose Detectionを開始します")
@@ -2412,13 +2412,15 @@ def main():
         print(f"学習済モデルファイル：yolo{V8_model}-pose.pt")
         model = YOLO(f"yolo{V8_model}-pose.pt")  # 軽量モデル。他にも'yolov8s-pose.pt'などあり
         model.info()  # モデル情報を表示
-        
+        #------------------------------------------------------------------------
+        # GRUモデルのインスタンス生成
+        #------------------------------------------------------------------------        
         if nn_gru:
             print("GRUによる姿勢解析を有効化します")
             mylog.log(INFO, "GRUによる姿勢解析を有効化します")
             print(f"input_dim={input_dim}")            
             # KyudoGRUモデルの読み込み（事前学習済みモデル）
-            parts =model_pth.split('_') 
+            parts = model_pth.split('_') 
             if 'modelse' in parts:
                 gruModel = KyudoGRUs( input_size = input_dim, output_size = output_dim,
                                 face_embed_dim = Face_dim if face_embed else None,
@@ -2445,20 +2447,41 @@ def main():
         # EvalNNモデルのインスタンス生成
         #------------------------------------------------------------------------
         evalModel = None
-        if eval_model_path is not None:
+        eval_input_dim = None
+        if eval_model_pth is not None:
+            # 学習済みモデルファイル名からパラメータを取得（eval_model_pthの例：eval_modeln_9-48-6.pth）
+            parts = eval_model_pth.split('_') 
+            params = parts[-1].split('-')
+            eval_input_dim = int(params[0]) if len(params) > 0 and params[0].isnumeric() else len(Eval_Features_lists[Eval_feature_key])
+            eval_output_dim = int(params[2]) if len(params) > 2 and params[2].isnumeric() else Eval_output_dim
+            Eval_sframes = int(params[1]) if len(params) > 1 and params[1].isnumeric() else Eval_sframes
+            print(f"[main]:input_dim={eval_input_dim}, s_frames={Eval_sframes}, output_dim={eval_output_dim}")
             completed_dim = 0 
-            evalModel = EvalNN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
-                            s_frames = Eval_sframes,
-                            output_size = Eval_output_dim,
-                            section_embed_dim = section_dim,
-                            completed_embed_dim = completed_dim )
+            if 'modeln' in parts:
+                
+                evalModel = EvalNN( input_dim = eval_input_dim, 
+                                s_frames = Eval_sframes,
+                                output_size = eval_output_dim,
+                                section_embed_dim = section_dim)
+                #evalModel.to( get_device() )
+                #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
+            elif 'modelc' in parts:
+                evalModel = EvalCN( input_dim = eval_input_dim, 
+                                s_frames = Eval_sframes,
+                                output_size = eval_output_dim)
+                #evalModel.to( get_device() )
+                #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
+            else :
+                print(f"非対応のモデルです。")
+                return           
+            #
             evalModel.to( get_device() )
-            evalModel.load_state_dict( torch.load(eval_model_path, map_location = get_device()) )
-
             print(f"evalModel={evalModel}")
             mylog.log(INFO,f"evalModel={evalModel}")            
-            print(f"[main]:model loaded from {eval_model_path}")
-            mylog.log(INFO,f"model loaded from {eval_model_path}")            
+
+            evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
+            print(f"[main]:model loaded from {eval_model_pth}")
+            mylog.log(INFO,f"model loaded from {eval_model_pth}") 
     #    
     sample_seconds = 1.0 / Fps * Sample_frames  # サンプリング秒数
     
@@ -2624,7 +2647,7 @@ def main():
                     if prePointsBuffer.len() > 1:
                         annotated_frame = plot( myResult, frame, output_dim, \
                                                 nn_gru, gruModel if nn_gru else None,\
-                                                evalModel)
+                                                evalModel, eval_input_dim)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")

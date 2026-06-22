@@ -20,18 +20,14 @@ CSV_FILE_MODE = 'a'
 LOSS_FILE_MODE = 'w'
 
 ulog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('./log/kyudoApp.log', mode=LOG_FILE_MODE)  # ログファイルの設定
+filehandler = logging.FileHandler('./log/kyudoUtils.log', mode=LOG_FILE_MODE)  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
 ulog.addHandler(filehandler)  # ログハンドラを追加
-ulog.setLevel(DEBUG)    # ログレベルの設定
 ulog.setLevel(INFO)     # ログレベルの設定
+#ulog.setLevel(DEBUG)    # ログレベルの設定
 DF2CSV_enabled = True
-
-# モデル保存用のファイル名
-MODEL_NAME = 'kyudo_model'
-EVAL_MODEL_NAME = 'eval_model'
 
 # GPUチェック
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -210,8 +206,10 @@ def kyudo_tesorDataset( np_x, np_yact, s_frames ):
     
     return TensorDataset(x_data, y_data)
 #
-# EVALモデルの学習用TensorDatasetを編集する関数
-def eval_tesorDataset( np_x, np_yact, s_frames ):
+# 評価データ(input_frames,input_dim)をsectionごとに(samples,s_frames,input_dim)にunsqueezeする関数
+# 評価データは、sectionごとにs_framesサイズのデータを1サンプルとして扱う
+#
+def eval_data_unSqueeze( np_x, np_yact, s_frames ):
     input_frames, input_dim = np_x.shape
     x_data = np.zeros( (1, s_frames, input_dim) )  # 先頭s_framesサイズのデータを1サンプル（ゼロ値データ）として扱う
     y_data = np.zeros( (1, 1) )  
@@ -230,17 +228,40 @@ def eval_tesorDataset( np_x, np_yact, s_frames ):
             
         # サンプル末尾にセクション毎のフレームデータを格納する
         x_data[-1,i_frame] = np_x[i]
-        y_data[-1] = np_yact[i]
+        y_data[-1] = np_yact[i] if np_yact is not None else 0
         i_frame += 1
-    #print(f"[eval_tesorDataset]: y_data={y_data}")
+        if i_frame >= s_frames:
+            print(f"[eval_data_unSqueeze]:Warning: section {c_section} has more than {s_frames} frames. Extra frames will be ignored.")
+            break
+
+    log_write(f"[eval_data_unSqueeze]:x_data={x_data.shape}, y_data={y_data.shape}", False)
+    return x_data, y_data
+#
+# EVALモデルの学習用TensorDatasetを編集する関数
+# np_x: 評価データ (input_frames, input_dim)
+# np_yact: 評価の正解ラベル (input_frames, 1)
+# s_frames: 1サンプルのフレーム数
+def eval_tesorDataset( np_x, np_yact, s_frames ):
+    x_data, y_data = eval_data_unSqueeze( np_x, np_yact, s_frames )
     #    
     # データをTensorに変換してTensorDatasetを作成する
     x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_dim]
     y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[i_frame, s_frames, input_dim]
-    #y_data = torch.randint(low=0, high=10,  size=y_data.shape, dtype=torch.int64).to(device )  # ランダムなラベルを生成する
+
     print(f"[eval_tesorDataset]:x_data={x_data.shape}, y_data={y_data.shape}")
     return TensorDataset(x_data, y_data)
 #
+# 学習ループ関数
+# model: GRU/EvalNNモデル
+# loader: 学習用DataLoader
+# criterion: 損失関数
+# optimizer: 最適化手法
+# n_epoch: エポック数
+# l2_lambda: L2正則化の強さ
+# scheduler: 学習率スケジューラー   
+# valid_loader: 検証用DataLoader
+# earlystop: EarlyStoppingのインスタンス
+# 学習ループは、指定されたエポック数だけ、学習用データローダーからデータを取得してモデルを訓練します。
 def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
     # モデルのクラス名からモデルのベース名を決定する
     class_name:str = model.get_class_name()
@@ -249,6 +270,9 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
         model.train()
         loss_train = 0
         for x, t in loader:
+            _,_,input_size = x.shape
+            if class_name == 'EvalCN' and input_size >= 17:
+                x = x[:,:,:-1]        # sectionカラム(-1)は削除
             # 順伝搬、損失計算、逆伝搬、パラメータ更新
             y = model(x)
             loss = criterion(y, t.squeeze())
@@ -349,7 +373,11 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     if pth is not None:
         model_pth = pth
     else:
-        model_name +=  'e' if model.embed else 'n'
+        if 'GRU' in class_name:
+            model_name +=  'e' if model.embed else 'n'
+        else:
+            model_name +=  'c' if 'EvalCN' in class_name else 'n'
+            input_size = (input_size - 1) if input_size >= 17 else input_size
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
     log_write(f"[train_Kyudo]:model will be saved as {model_pth}")
@@ -469,30 +497,17 @@ def predict_Kyudo( model, np_x, s_frames, log_print=True):
 #
 def predict_Eval( model, np_x, s_frames, log_print=True):
     # 予測データ
-    input_frames, input_dim = np_x.shape
-    print(f"[predict_Eval]:np_x={np_x.shape}") 
+    _, input_dim = np_x.shape
+    #print(f"[predict_Eval]:np_x={np_x.shape}") 
     
-    # np_x(input_frames, input_dim) -> x_data(n_samples, s_frames, input_dim)に編集する
-    np_data = np.zeros( (1, s_frames, input_dim) )  # 先頭s_framesサイズのデータを1サンプル（ゼロ値データ）として扱う
-    c_section = np_x[0, -1]  # section
-    i_frame = 0
-    for i in range(input_frames):
-        # セクション（節）毎に、s_framesサイズのデータを格納する
-        if np_x[i, -1] != c_section:
-            # セクションが変わったら、次のサンプルのデータを格納するためにx_dataとy_dataを拡張する
-            #print(f"[predict_Eval]:section = {c_section}, frames={i_frame}")
-            c_section = np_x[i, -1]
-            i_frame = 0
-            # 
-            np_data = np.vstack( [np_data, np.zeros( (1, s_frames, input_dim) )] )
-            
-        # サンプル末尾にセクション毎のフレームデータを格納する
-        np_data[-1,i_frame] = np_x[i]
-        i_frame += 1
-        
+    np_data, _ = eval_data_unSqueeze( np_x, None, s_frames )        
     n_samples = np_data.shape[0]
     x_data = torch.tensor(np_data, dtype=torch.float32).to(device )
-    print(f"[predict_Eval]:np_data={np_data.shape}, x_data={x_data.shape}")
+    if input_dim >= 17:
+        # 特徴量のデータサイズが17以上の場合、sectionのone-hot encodingを使用
+        x_data = x_data[:,:,:-1]    # sectionの列(-1)は削除する
+        input_dim -= 1
+    #print(f"[predict_Eval]:np_data={np_data.shape}, x_data={x_data.shape}")
     ulog.debug(f"[predict_Eval]:x_data={x_data.shape}")
         
     y_data = np.zeros( (n_samples, 1) ,dtype=np.int64)
@@ -504,11 +519,11 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
             y_pred = model(x)
             score = torch.argmax( y_pred, dim=1).item()
         #
-        log_write(f"[predict_Eval]:({t:2d}) section={x[0,0,-1]}, score={score}", log_print)    
-        ulog.debug(f"[predict_Eval]:score={score}")
+        log_write(f"[predict_Eval]:({t:2d}) section={int(np_data[t,0,-1])}, score={score}", log_print)    
         y_data[t] = score
         
     #        
     y_data = y_data.reshape(-1)  
     ulog.debug(f"[predict_Eval]:y_pred={y_data.shape}")   
     return y_data
+# eof

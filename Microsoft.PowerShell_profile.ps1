@@ -3,7 +3,7 @@ $env:DB_PATH = './yolo-kyudo_local.db'
 #$env:DB_PATH = './yolo-kyudo.db'
 #
 # 動画ファイル検索位置設定
-$env:ROLL_PATH='C:/Users/USER/Pictures/Camera Roll/'
+$env:ROLL_PATH='H:/share/Pictures/Camera Roll/'
 # ホームディレクトリ設定
 $HOME_DIR = 'f:/share/YOLO'
 #
@@ -19,9 +19,11 @@ $logfile = './log/console.log'
 # データ入力キー設定
 $env:INPUT_KEY="80"
 $inputkey = $env:INPUT_KEY
+$env:EVAL_INPUT_KEY="170"
+$evalkey = $env:EVAL_INPUT_KEY
 # モデルオプション設定
-# マルチヘッドモデル設定に変更（注：シングルヘッドをデフォルト、"-multi"オプションで指定時は関数kyudo内でハイパーパラメータを設定）
-$env:MODEL_TYPE="-models"
+$env:MODEL_TYPE="-models"               # シングルヘッドをデフォルト
+$env:EVAL_MODEL_TYPE="-modelc"          # 畳み込みモデルをデフォルト
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
 $env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
@@ -61,7 +63,7 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
-$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,iwata_2.0_2,okochi_2.0_1,okochi_2.0_2,okochi_2.0_3,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,kanoda_2.0_2,y.shihan_2.0_1,yoshida_2.0_1,sueyoshi_2.3_1,oshima_2.0_1,n.iijima_2.0_1"
 $env:CASE_LIST=$cases_list
 #
 function help {
@@ -88,19 +90,23 @@ function home {
 function model {
     param(
         [switch]$help,
-        [string]$head='',
+        [string]$gru='',
+        [string]$eval='',
         [string]$case='',
         [string]$pt='',
         [string]$hp='',
         [string]$roll='',
         [float]$l2=0.0,
         [int]$key=0,
+        [int]$evalkey=0,
         [float]$alpha=1.0
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output ">model -head s|m                  ：モデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
+        write-output ">model -gru s|m                   ：GRUモデルタイプ('s':シングルヘッド|'m':マルチヘッド)を設定する"
         write-output ">model -key <input_key>           ：データ入力キーを設定する"
+        write-output ">model -eval n|c                  ：評価モデルタイプ('n':全結合|'c':畳み込み)を設定する"
+        write-output ">model -evalkey <input_key>       ：評価データ入力キーを設定する"
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
@@ -111,21 +117,39 @@ function model {
         write-output ">actv26env	                  ：V26仮想環境をアクティベートする"
     }
     else {
-        if ( $head -ne '' ) {
-            if ( $head -eq 's' ) {
+        if ( $gru -ne '' ) {
+            if ( $gru -eq 's' ) {
                 $env:MODEL_TYPE="-models"
                 $modelx = $env:MODEL_TYPE
                 $str = '・モデルタイプがシングルヘッド(' + $modelx + ')に設定されました。'
                 write-output $str
             }
-            elseif ( $head -eq 'm' ) {
+            elseif ( $gru -eq 'm' ) {
                 $env:MODEL_TYPE="-modelm"
                 $modelx = $env:MODEL_TYPE
                 $str = '・モデルタイプがマルチヘッド(' + $modelx + ')に設定されました。'
                 write-output $str
             }
             else {
-                $str = '不正なモデルタイプが指定されました。：' + $head
+                $str = '不正なモデルタイプが指定されました。：' + $gru
+                write-output $str
+            }
+        }
+        elseif ( $eval -ne '' ) {
+            if ( $eval -eq 'n' ) {
+                $env:EVAL_MODEL_TYPE="-modeln"
+                $modelx = $env:EVAL_MODEL_TYPE
+                $str = '・評価モデルタイプが全結合(' + $modelx + ')に設定されました。'
+                write-output $str
+            }
+            elseif ( $eval -eq 'c' ) {
+                $env:EVAL_MODEL_TYPE="-modelc"
+                $modelx = $env:EVAL_MODEL_TYPE
+                $str = '・評価モデルタイプが畳み込み(' + $modelx + ')に設定されました。'
+                write-output $str
+            }
+            else {
+                $str = '不正な評価モデルタイプが指定されました。：' + $eval
                 write-output $str
             }
         }
@@ -139,6 +163,12 @@ function model {
             $env:INPUT_KEY="$key"
             $inputkey = $env:INPUT_KEY
             $str = '・入力データキーが ' + $inputkey + ' に設定されました。'
+            write-output $str
+        }
+        elseif ( $evalkey -gt 0 ) {
+            $env:EVAL_INPUT_KEY="$evalkey"
+            $evalkey = $env:EVAL_INPUT_KEY
+            $str = '・評価データキーが ' + $evalkey + ' に設定されました。'
             write-output $str
         }
         elseif ( $pt -ne '' ) {
@@ -197,13 +227,17 @@ function model {
         }
         else{
             write-output '>>' 
-            $str = '・モデルオプション    ：  ' + $env:MODEL_TYPE
+            $str = '・GRUモデルタイプ     ：  ' + $env:MODEL_TYPE
+            Write-Output $str
+            $str = '・評価モデルタイプ    ：  ' + $env:EVAL_MODEL_TYPE
             Write-Output $str
             $str = '・学習済モデル        ： ' + $env:MODEL_PT 
             write-output $str
             $str = '・ハイパーパラメータ  ： ' + $env:HYPER_PARAM
             write-output $str
             $str = '・入力データキー      ： ' + $env:INPUT_KEY
+            write-output $str
+            $str = '・評価入力データキー  ： ' + $env:EVAL_INPUT_KEY
             write-output $str
             $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
             write-output $str
@@ -656,9 +690,11 @@ function eval {
     param(
         [switch]$help,
         [switch]$h,
+        [string]$list='',
         [string]$update='',
         [string]$score='',
         [string]$case,
+        [switch]$img,
         [string]$train,
         [string]$valid='none',
         [string]$predict,
@@ -675,20 +711,31 @@ function eval {
     }
     $hparam = $hp_vals -join ','
     # モデルタイプ取得
-    $modelx = "-model"
+    $modelx = $env:EVAL_MODEL_TYPE
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output ">eval  -update  <登録ケース名> -score '<スコア>'                  ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
-        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...          ：評価データを表示する"
-        write-output '>eval  -case    <登録ケース名> [-input_frames <表示フレーム数>]   ：評価データをグラフ表示する'
+        write-output '>eval  -list    key|pt                                                ：入力データキー,または作成済モデルファイルの一覧を表示する'
+        write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
+        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
+        write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
         write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
-        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]          ：解析結果データで予測する'
+        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]              ：解析結果データで予測する'
         write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
         # 詳細ヘルプ表示
         python ./src/evalApp.py -h
+    } 
+    elseif ($list -ne '') {
+        if ( $list -eq 'pt' ) {
+            # 作成済モデルファイル一覧表示
+            get-childitem ./eval*.pt
+        }
+        elseif ( $list -eq 'key' ) {
+            # 入力データキー一覧表示
+            python ./src/evalApp.py -d -inputkey
+        }
     } 
     elseif ($update -ne '') {
         if ($score -ne '') {
@@ -701,9 +748,15 @@ function eval {
         python ./src/evalApp.py -d  -case $print -eval | Tee-Object $logfile
     }    
     elseif ($case -ne '') {
-        # 解析結果データをグラフ表示
-        python ./src/evalApp.py -d  -case $case -f0 $input_frames  -m
-        #python ./src/evalApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m 
+        if ($img) {
+             # 解析結果画像を表示
+            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"
+        }
+        else {
+            # 解析結果データをグラフ表示
+            python ./src/evalApp.py -d  -case $case -f0 $input_frames  -m
+            #python ./src/evalApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m
+        } 
     }
     elseif ($train -ne '') {
         # 学習実行
