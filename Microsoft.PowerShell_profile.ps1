@@ -229,15 +229,15 @@ function model {
             write-output '>>' 
             $str = '・GRUモデルタイプ     ：  ' + $env:MODEL_TYPE
             Write-Output $str
+            $str = '・入力データキー      ： ' + $env:INPUT_KEY
+            write-output $str
             $str = '・評価モデルタイプ    ：  ' + $env:EVAL_MODEL_TYPE
             Write-Output $str
+            $str = '・評価入力データキー  ： ' + $env:EVAL_INPUT_KEY
+            write-output $str
             $str = '・学習済モデル        ： ' + $env:MODEL_PT 
             write-output $str
             $str = '・ハイパーパラメータ  ： ' + $env:HYPER_PARAM
-            write-output $str
-            $str = '・入力データキー      ： ' + $env:INPUT_KEY
-            write-output $str
-            $str = '・評価入力データキー  ： ' + $env:EVAL_INPUT_KEY
             write-output $str
             $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
             write-output $str
