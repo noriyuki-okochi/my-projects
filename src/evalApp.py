@@ -385,7 +385,7 @@ def main():
             # 教師ラベルデータの読み込み
             df_y = db.pandas_read_eval( ['label as label'] , case_names)    # 教師ラベル(input_frames, 1)
             df_x, df_y = correct_singular_values(df_x, df_y)                # 特異値の補正
-            df_x['section'] = df_x['section'] / 8.0
+            df_x['section'] = df_x['section'] / 8
             np_x = df_x.to_numpy(dtype=np.float32)                          # (input_frames, input_dim)
             np_y = df_y.to_numpy(dtype=np.int64)                            # (input_frames, 1)
             print(f"[evalApp]info:np_x.shape={np_x.shape}")
