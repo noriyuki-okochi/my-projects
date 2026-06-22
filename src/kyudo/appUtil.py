@@ -534,12 +534,13 @@ class MyEval:
              "label,inserted_at,time_epoch\n"
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
-    Eval_Features_list = [  'rl_deg', 'er_deg', 'sl_deg', 'se_deg',\
-                            'eyes_ratio', 'pull_rate',\
-                            'split_m',\
-                            'completed','section'
-                        ]
-    debug_file = f"./log/eval_debug.csv"
+    Features_list = [  'rl_deg', 'er_deg', 'sl_deg', 'se_deg',\
+                        'eyes_ratio', 'pull_rate',\
+                        'split_m',\
+                        'completed','section'
+                    ]
+    One_shot_list = [ 'sec_0', 'sec_1', 'sec_2', 'sec_3', 'sec_4', 'sec_5', 'sec_6', 'sec_7' ]
+    debug_file = f"./log/myeval_debug"
     #
     def __init__(self):
         self.eval_init = { # 評価データ初期値
@@ -569,10 +570,10 @@ class MyEval:
         #
         self.predict:bool = True           # 予測モードのON/OFF
         self.evalPdf:pd.DataFrame = None    # 特徴量のデータフレームクラスのインスタンス
-        self.eval_list = [None]*len(MyEval.Eval_Features_list)   # 特徴量データリスト
+        self.eval_list = [None]*len(MyEval.Features_list)   # 特徴量データリスト
         
     def set_eval_list(self):
-        for i, key in enumerate(MyEval.Eval_Features_list):
+        for i, key in enumerate(MyEval.Features_list):
             if '_deg' in key:  # 角度の特徴量は0.01度単位で整数化して保存する
                 key_name = key.replace('_deg', '_angle')                        # 角度の特徴量名をevalのキー名に変換
                 self.eval_list[i] = round((self.eval[key_name]+180)/360.0, 3)   # 角度を360度で正規化して保存する
@@ -585,26 +586,47 @@ class MyEval:
                 self.eval_list[i] = self.eval['alart_cnt']                      # カウント
             elif key != 'section':
                 self.eval_list[i] = self.eval[key]
-        self.eval_list[-1] = self.section
+        self.eval_list[-1] = self.section                                       # sectionは常に最後
         
     def add_eval_pdf(self):
         narray = np.array(self.eval_list).reshape(1, -1)
-        pdf = pd.DataFrame(narray, columns=MyEval.Eval_Features_list)
+        pdf = pd.DataFrame(narray, columns=MyEval.Features_list)
         if self.evalPdf is None:
             self.evalPdf = pdf
         else:
-            self.evalPdf = pd.concat([self.evalPdf, pdf])  # 過去データに結合
+            self.evalPdf = pd.concat([self.evalPdf, pdf])       # 過去データに結合
+        self.eval_list = [None]*len(MyEval.Features_list)   # 特徴量データリスト初期化
 
-    def get_eval_pdf(self):
+    def get_eval_pdf(self, input_dim):
+        if input_dim >= 16:
+            eval_pdf = self.evalPdf.loc[:,MyEval.Features_list[0]:MyEval.Features_list[-3]]
+            sect_pdf = self.evalPdf.loc[:,MyEval.Features_list[-2]:MyEval.Features_list[-1]]            
+            
+            # sectionのone-hot encodingを作成
+            ones_np = np.zeros( (len(sect_pdf), len(MyEval.One_shot_list)), dtype=int )
+            ones_pdf = pd.DataFrame(ones_np, columns=MyEval.One_shot_list)
+            for i in range(len(sect_pdf)):
+                isec = int(sect_pdf.iloc[i, 1])
+                if isec > 0 and isec < 9:
+                    ones_pdf.iloc[i, isec - 1] = 1
+            
+            # indexを再構成して列方向に結合する
+            eval_pdf = eval_pdf.reset_index(drop=True)
+            sect_pdf = sect_pdf.reset_index(drop=True)
+            self.evalPdf = pd.concat( (eval_pdf, ones_pdf, sect_pdf), axis=1 )
+        #           
         return self.evalPdf
- 
+    #
+    # 特徴量のデータフレームクラスの削除
     def free_eval_pdf(self):
         self.evalPdf = None
         
-    def debug_to_csv(self):
-        self.evalPdf.to_csv(MyEval.debug_file, mode='w', float_format='%.4f', na_rep='NaN', sep='\t')
+    # 特徴量のデータのCSVファイル出力
+    def df_to_csv(self, case_name='real'):
+        file_path = f"{MyEval.debug_file}_{case_name}.csv"
+        self.evalPdf.to_csv(file_path, mode='a', float_format='%.4f', na_rep='NaN', sep='\t')
 #
-    # CSVファイルを開いてヘッダーを書き込む
+    # 評価データ保存CSVファイルを開いてヘッダーを書き込む
     def open_csv(self,case_name: str, lv_no: int, path: str):
         self.case_name = case_name
         self.lv_no = lv_no
@@ -651,7 +673,8 @@ class MyEval:
             self.evals.append(self.eval.copy()) 
         # 警告リストの初期化
         self.alarts.clear()  
-        #self.deduct_msgs.clear()                                      
+        self.free_eval_pdf()
+       #self.deduct_msgs.clear()                                      
         print(f"[my_evaluate]: reset.")
         
     # 評価点数の減算条件をチェックして減点数を計算する    
@@ -755,10 +778,7 @@ class MyEval:
                 # 現在の評価データを保存
                 self.evals[self.section - 1] = self.eval.copy()
                 # 次のセクションの評価データを初期化
-                self.eval['score'] = Eval_perfect_score       # 満点(Eval_perfect_score)
-                self.eval['alart_cnt'] = 0      # 警告カウントはセクションごとにリセット   
-                self.eval['push_cnt'] = 0
-                self.eval['pull_cnt'] = 0
+                self.eval = self.eval_init.copy() 
                 
         elif completed != self.completed:   # (0 -> 1)
             # 完了移行時の角度データを更新

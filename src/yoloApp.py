@@ -1321,7 +1321,7 @@ def clip_process( frame , rotate = False):
 #
 # 検出結果をフレームに描画する関数
 #
-def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None, evalModel=None):
+def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None, evalModel=None, evalInput_dim=None):
     global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
     global Split_start, Split_sec, Split_last, Lap_start, Lap_sec,Pull_counter, Push_counter
     global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
@@ -1414,12 +1414,10 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             RSE_angle, EYE_ratio, Alart_id)
         
         if bSectionChanged and evalModel is not None: 
-            Eval.debug_to_csv()
             # 予測実行(predict)
-            df_x = Eval.get_eval_pdf()                  # 評価用の特徴量データフレームを取得
+            df_x = Eval.get_eval_pdf(evalInput_dim)     # 評価用の特徴量データフレームを取得
+            Eval.df_to_csv()
             df_x = df_x.astype({'section': 'Int64'})    # 整数型に変換する   
-            if evalModel.get_class_name() == 'EvalCN':
-                df_x['section'] = df_x['section']/8.0   # セクション番号を正規化する（0-1）
             # numpy配列に変換
             x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
             pred_score  = predict_Eval( evalModel, x, Eval_sframes ) # x=numpy(input_frames, input_dim)
@@ -2449,25 +2447,28 @@ def main():
         # EvalNNモデルのインスタンス生成
         #------------------------------------------------------------------------
         evalModel = None
+        eval_input_dim = None
         if eval_model_pth is not None:
             # 学習済みモデルファイル名からパラメータを取得（eval_model_pthの例：eval_modeln_9-48-6.pth）
             parts = eval_model_pth.split('_') 
             params = parts[-1].split('-')
+            eval_input_dim = int(params[0]) if len(params) > 0 and params[0].isnumeric() else len(Eval_Features_lists[Eval_feature_key])
+            eval_output_dim = int(params[2]) if len(params) > 2 and params[2].isnumeric() else Eval_output_dim
             Eval_sframes = int(params[1]) if len(params) > 1 and params[1].isnumeric() else Eval_sframes
-            print(f"[main]:Eval_sframes={Eval_sframes}")
+            print(f"[main]:input_dim={eval_input_dim}, s_frames={Eval_sframes}, output_dim={eval_output_dim}")
             completed_dim = 0 
             if 'modeln' in parts:
                 
-                evalModel = EvalNN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
+                evalModel = EvalNN( input_dim = eval_input_dim, 
                                 s_frames = Eval_sframes,
-                                output_size = Eval_output_dim,
+                                output_size = eval_output_dim,
                                 section_embed_dim = section_dim)
                 #evalModel.to( get_device() )
                 #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
             elif 'modelc' in parts:
-                evalModel = EvalCN( input_dim = len(Eval_Features_lists[Eval_feature_key]), 
+                evalModel = EvalCN( input_dim = eval_input_dim, 
                                 s_frames = Eval_sframes,
-                                output_size = Eval_output_dim)
+                                output_size = eval_output_dim)
                 #evalModel.to( get_device() )
                 #evalModel.load_state_dict( torch.load(eval_model_pth, map_location = get_device()) )
             else :
@@ -2646,7 +2647,7 @@ def main():
                     if prePointsBuffer.len() > 1:
                         annotated_frame = plot( myResult, frame, output_dim, \
                                                 nn_gru, gruModel if nn_gru else None,\
-                                                evalModel)
+                                                evalModel, eval_input_dim)
                         if annotated_frame is None and preFrame is not None:  # 前回のフレームを描画
                             annotated_frame = preFrame
                             mylog.log(INFO, "[main]: 前回フレームを描画")
