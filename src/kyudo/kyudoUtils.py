@@ -20,7 +20,7 @@ CSV_FILE_MODE = 'a'
 LOSS_FILE_MODE = 'w'
 
 ulog = logging.getLogger(__name__)
-filehandler = logging.FileHandler('./log/kyudoApp.log', mode=LOG_FILE_MODE)  # ログファイルの設定
+filehandler = logging.FileHandler('./log/kyudoUtils.log', mode=LOG_FILE_MODE)  # ログファイルの設定
 #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
 formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
@@ -234,7 +234,7 @@ def eval_data_unSqueeze( np_x, np_yact, s_frames ):
             print(f"[eval_data_unSqueeze]:Warning: section {c_section} has more than {s_frames} frames. Extra frames will be ignored.")
             break
 
-    log_write(f"[eval_data_unSqueeze]:x_data={x_data.shape}, y_data={y_data.shape}")
+    log_write(f"[eval_data_unSqueeze]:x_data={x_data.shape}, y_data={y_data.shape}", False)
     return x_data, y_data
 #
 # EVALモデルの学習用TensorDatasetを編集する関数
@@ -498,7 +498,7 @@ def predict_Kyudo( model, np_x, s_frames, log_print=True):
 def predict_Eval( model, np_x, s_frames, log_print=True):
     # 予測データ
     _, input_dim = np_x.shape
-    print(f"[predict_Eval]:np_x={np_x.shape}") 
+    #print(f"[predict_Eval]:np_x={np_x.shape}") 
     
     np_data, _ = eval_data_unSqueeze( np_x, None, s_frames )        
     n_samples = np_data.shape[0]
@@ -507,7 +507,7 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
         # 特徴量のデータサイズが17以上の場合、sectionのone-hot encodingを使用
         x_data = x_data[:,:,:-1]    # sectionの列(-1)は削除する
         input_dim -= 1
-    print(f"[predict_Eval]:np_data={np_data.shape}, x_data={x_data.shape}")
+    #print(f"[predict_Eval]:np_data={np_data.shape}, x_data={x_data.shape}")
     ulog.debug(f"[predict_Eval]:x_data={x_data.shape}")
         
     y_data = np.zeros( (n_samples, 1) ,dtype=np.int64)
