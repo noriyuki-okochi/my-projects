@@ -178,7 +178,7 @@ Eval_input_key = os.getenv('EVAL_INPUT_KEY')
 if Eval_input_key != None:
     Eval_feature_key = int(Eval_input_key)
 Eval_sframes = 48                               # 評価用の入力シーケンスのフレーム数（ハイパーパラメータのシーケンスフレーム数と同じ値を使用）
-Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
+Eval_output_dim = Eval_perfect_score            # 出力クラス数（1-5段階の完成度評価）
 
 # モデル保存用のファイルベース名
 EVAL_MODEL_NAME = 'eval_model'
