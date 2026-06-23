@@ -760,7 +760,7 @@ class MyEval:
                 bool_section_change = True
                 # 評価点数の減算
                 deduction = self.check_deduction(self.section)  # 減点数の計算                
-                self.eval['score'] -= deduction if deduction < self.eval['score'] else 0 
+                self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0 
                 
                 print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction})") 
                 mylog.log(INFO, f"[my_evaluate]:section={self.section} score={self.eval['score']} alart={self.eval['alart_cnt']}"\
