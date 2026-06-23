@@ -517,7 +517,7 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
         ulog.debug(f"[predict_Eval]:t={t}:{x}")
         with torch.no_grad():
             y_pred = model(x)
-            score = torch.argmax( y_pred, dim=1).item()
+            score = torch.argmax( y_pred, dim=1).item() + 1
         #
         log_write(f"[predict_Eval]:({t:2d}) section={int(np_data[t,0,-1])}, score={score}", log_print)    
         y_data[t] = score
