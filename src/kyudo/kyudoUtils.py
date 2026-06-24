@@ -132,6 +132,36 @@ def update_section_completed( action, section, completed, output_size):
       
         
 #
+#  Ordinal Regression 用の損失関数（CORAL Loss）
+#
+class CoralLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, logits, y):
+        """
+        logits: (batch, K-1)  K=6 → 5個のロジット
+        y: (batch,) 0〜5 の整数ラベル
+        """
+        batch_size, num_levels = logits.size()
+
+        # y を (batch, num_levels) の 0/1 マスクに変換
+        y_expanded = y.unsqueeze(1).repeat(1, num_levels)
+        label_mask = (y_expanded > torch.arange(num_levels).to(y.device)).float()
+
+        # ロジットにシグモイド
+        prob = torch.sigmoid(logits)
+
+        # Binary Cross Entropy
+        loss = F.binary_cross_entropy(prob, label_mask, reduction='mean')
+        return loss
+#
+#  **推論時のスコア復元**
+def ordinal_predict(logits):
+    prob = torch.sigmoid(logits)
+    # True が続く限りカウント
+    return torch.sum(prob > 0.5, dim=1)
+#
 # earlystoppingクラス
 # patience: 最小値の非更新数カウンタ
 # verbose: 表示設定 
@@ -383,9 +413,10 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     log_write(f"[train_Kyudo]:model will be saved as {model_pth}")
 
     # 損失関数と最適化手法の定義
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss() if 'GRU' in class_name else CoralLoss()
     optimizer = optim.Adam(model.parameters(), lr=Learning_rate)
     
+    print(f"[train_kyudo]:criterion={criterion}, optimizer={optimizer}")
     # 学習過程の損失値をCSVファイルに出力するための準備
     model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
     
@@ -404,6 +435,8 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
             scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,mode = 'min',factor = r_factor,patience = 3)
         # EarlyStoppingのインスタンスを作成
         earlystop = EarlyStopping(patience = 7, delta = 0, path = model_pth, verbose = False)  
+    
+    print(f"[train_kyudo]:scheduler={scheduler}, earlystop={earlystop}")
     #   
     # 学習ループ
     train_loop( model, loader, criterion, optimizer, n_epoch, \
@@ -517,7 +550,8 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
         ulog.debug(f"[predict_Eval]:t={t}:{x}")
         with torch.no_grad():
             y_pred = model(x)
-            score = torch.argmax( y_pred, dim=1).item()
+            #score = torch.argmax( y_pred, dim=1).item()
+            score = ordinal_predict( y_pred).item()
         #
         log_write(f"[predict_Eval]:({t:2d}) section={int(np_data[t,0,-1])}, score={score}", log_print)    
         y_data[t] = score

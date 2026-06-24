@@ -3,9 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from datetime import datetime
-
+''''''
+# 規定モデル(Module)の定義
+''''''
 class EvalModule(nn.Module):
-  def __init__(self, input_dim=9, s_frames=48,  output_size=11 ):
+  def __init__(self, input_dim=9, s_frames=48,  output_size=6 ):
 
     super(EvalModule, self).__init__()     
     self.input_dim = input_dim
@@ -55,12 +57,12 @@ class EvalModule(nn.Module):
           self.csvfile.close()
           self.csvfile = None
           print(f"[EvalNN]:close_csv:{self.csvpath}")
-#
-#
+
+''''''
 # NNモデルの定義
-#
+''''''
 class EvalNN(EvalModule):
-  def __init__(self, input_dim=9, s_frames=40,  output_size=11,
+  def __init__(self, input_dim=9, s_frames=40,  output_size=6,
                      section_vocab_size=10, section_embed_dim=8 
                      ):
 
@@ -81,7 +83,8 @@ class EvalNN(EvalModule):
     
     self.fc1 = nn.Linear(self.input_size, 256)
     self.fc2 = nn.Linear(256, 128)
-    self.fc3 = nn.Linear(128, output_size)
+    #self.fc3 = nn.Linear(128, output_size)
+    self.fc3 = nn.Linear(128, output_size - 1)          # 損失関数をCoralLossに変更
 
   def forward(self, x):
     _, s_frames, input_dim = x.size()
@@ -108,12 +111,12 @@ class EvalNN(EvalModule):
     x = torch.tanh(self.fc2(x))
     x = self.fc3(x)
     return x
-#
-#
+''''''
 # CNNモデルの定義
-#
-class EvalCN(EvalModule):
-  def __init__(self, input_dim=9, s_frames=48,  output_size=11):
+''''''
+# （試作版）
+class EvalCN_(EvalModule):
+  def __init__(self, input_dim=9, s_frames=48,  output_size=6):
 
     super(EvalCN, self).__init__(
         input_dim=input_dim, s_frames=s_frames, output_size=output_size
@@ -125,18 +128,56 @@ class EvalCN(EvalModule):
     self.act1 = nn.ReLU()
     self.flat = nn.Flatten()
     self.fc1 = nn.Linear(self.out_ch * self.s_frames * self.input_dim, 128)
-    self.fc2 = nn.Linear(128, output_size)
+    #self.fc2 = nn.Linear(128, output_size)
+    self.fc2 = nn.Linear(128, output_size - 1)      # 損失関数をCoralLossに変更
 
   def forward(self, x):
     _, s_frames, input_dim = x.size()
 
-    out = torch.tanh(self.cnn1(x.unsqueeze(1)))     # (batch_size, in_ch, s_frames, input_dim)
+    x = self.act1(self.cnn1(x.unsqueeze(1)))     # (batch_size, in_ch, s_frames, input_dim)
     # バッチサイズを維持して、特徴量をフラット化
     #x = x.reshape(-1, s_frames*input_dim ) 
-    x = self.flat(out)                              # (batch_size, out_ch * s_frames * input_dim)         
+    x = self.flat(x)                              # (batch_size, out_ch * s_frames * input_dim)         
     
-    out = torch.tanh(self.fc1(x))
-    out = self.fc2(out)
-    return out
+    #x = torch.tanh(self.fc1(x))
+    x = torch.relu(self.fc1(x))
+    x = self.fc2(x)
+    return x
+#
+#（改良版）
+class EvalCN(EvalModule):
+  def __init__(self, input_dim=9, s_frames=48,  output_size=6):
+
+    super(EvalCN, self).__init__(
+        input_dim=input_dim, s_frames=s_frames, output_size=output_size
+    )
+    self.in_ch = 1
+    self.out_ch = 16
+    
+    self.cnn1 = nn.Conv2d(self.in_ch, self.out_ch, kernel_size=3, padding=1)
+    self.act1 = nn.ReLU()
+    self.pool1 = nn.MaxPool2d(kernel_size=(2, 2))   # 時間x特徴量を圧縮
+    
+    # Global Average Pooling（Flatten の代わり）
+    self.gap = nn.AdaptiveAvgPool2d((1, 1))
+
+    # 全結合
+    self.fc1 = nn.Linear(self.out_ch, 64)
+    #self.fc2 = nn.Linear(64, output_size)
+    self.fc2 = nn.Linear(64, output_size - 1)       # 損失関数をCoralLossに変更
+
+  def forward(self, x):
+    # x: (batch, s_frames, input_dim)
+    x = x.unsqueeze(1)              # → (batch, 1, s_frames, input_dim)
+    x = self.act1(self.cnn1(x))
+    x = self.pool1(x)               # → (batch, out_ch, s_frames/2, input_dim/2)
+
+    x = self.gap(x)                 # → (batch, out_ch, 1, 1)
+    x = x.squeeze(-1).squeeze(-1)   # → (batch, out_ch)
+
+    x = torch.relu(self.fc1(x))
+    #x = torch.tanh(self.fc1(x))
+    x = self.fc2(x)
+    return x
 #
 #eof 
