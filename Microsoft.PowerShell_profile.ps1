@@ -63,7 +63,7 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
-$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,iwata_2.0_2,okochi_2.0_1,okochi_2.0_2,okochi_2.0_3,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,kanoda_2.0_2,y.shihan_2.0_1,yoshida_2.0_1,sueyoshi_2.3_1,oshima_2.0_1,n.iijima_2.0_1"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,y.shihan_2.0_1,yoshida_2.0_1,sueyoshi_2.3_1,oshima_2.0_1,n.iijima_2.0_1"
 $env:CASE_LIST=$cases_list
 #
 function help {
@@ -74,7 +74,8 @@ function help {
     write-output '> help         : このヘルプを表示する'
     write-output '> yoloAp -help : 動画再生・解析ツールの使用ガイダンスを表示する'
     write-output '> chart  -help : 解析データ登録／データ表示ツールの使用ガイダンスを表示する'
-    write-output '> kyudo  -help : 学習データ登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
+    write-output '> kyudo  -help : 姿勢形解析データの登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
+    write-output '> eval   -help : 射形評価データの学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
 }
 # 仮想環境アクティベート関数
@@ -719,7 +720,7 @@ function eval {
         write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
         write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
         write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
-        write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
+        write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-model <モデルファイル>] [-eta <学習率>]：解析結果データで学習する'
         write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]              ：解析結果データで予測する'
         write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
     } 
