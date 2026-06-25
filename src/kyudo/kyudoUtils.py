@@ -165,13 +165,13 @@ def data_augment(x, d_augment=(None, None, None)):
     #print(f'[data_augment]:x={x.shape}')
     _, input_dim = x.shape
     t_shift, t_warp, noise = d_augment
-    if t_shift != None and torch.rand(1).item() < 0.5:
+    if (t_shift != None and t_shift != 0) and torch.rand(1).item() < 0.5:
         x = time_shift(x, t_shift)
 
     end = -10 if input_dim >= 17 else -2
-    if t_warp != None and torch.rand(1).item() < 0.5:
+    if (t_warp != None  and t_warp != 0) and torch.rand(1).item() < 0.5:
         x[:, :end] = time_warp( x[:, :end] , t_warp)
-    if noise != None and torch.rand(1).item() < 0.5:
+    if (noise != None  and noise != 0) and torch.rand(1).item() < 0.5:
         x[:, :end] = add_noise( x[:, :end] , noise)
     '''
     if torch.rand(1).item() < 0.5:
