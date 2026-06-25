@@ -86,6 +86,7 @@ def main():
             + "        [ {-train|-predict} [eta=<rate>] [{-modeln|-modelc} ['<model-path>']] ]\n"\
             + "        [-valid <case_name>|none]\n"\
             + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
+            + "        [-dparam '(<t_shift>,<t_warp>,<noise>)']\n"\
             + "        [-inputkey][-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
         print(" --- Notation---")
         print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
@@ -219,8 +220,13 @@ def main():
     # (1,2,3)までの指定時は、埋め込みなし
     hyper_parameters = Hyper_parameters   
     if '-hparam' in cmds:
-        hyper_parameters = get_hyper_parameters( cmds, hyper_parameters )
+        hyper_parameters = get_hyper_parameters( cmds, '-hparam', hyper_parameters )
         log_write( f"[evalApp]:hyper_parameters={hyper_parameters}")
+    
+    d_augments = None
+    if '-dparam' in cmds:
+        d_augments = get_hyper_parameters( cmds, '-dparam', (None, None, None) )
+    log_write( f"[evalApp]:d_augments={d_augments}")
 
     df_k = None     # 予測結果データフレーム
     num_classes:int = Eval_output_dim
@@ -284,7 +290,7 @@ def main():
             df_x = db.pandas_read_eval( features, valid_case )             # 評価用特徴量(input_frames, input_dim)                       
             df_y = db.pandas_read_eval( ['label as label'] , valid_case)   # 教師ラベル(input_frames, 1)
             df_x, df_y = correct_singular_values(df_x, df_y)                # 特異値の補正
-            print(f"[evalApp]val_x.shape={df_x.shape}, val_y.shape={df_y.shape}")   
+            print(f"[evalApp]:val_x.shape={df_x.shape}, val_y.shape={df_y.shape}")   
             np_valid = (df_x.to_numpy(dtype=np.float32), df_y.to_numpy(dtype=np.int64))
         
         # 学習パラメータ
@@ -339,7 +345,8 @@ def main():
             log_write( f"[evalApp]:Learning_rate={learning_rate:.5f}, r_factor={r_factor:.2f}")
             log_write( f"[evalApp]:L2_lambda={L2_lambda:.5f}")
             # 学習実行(train)
-            train_Kyudo( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, pth = model_pth )
+            train_Kyudo( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, 
+                        pth = model_pth, d_augment=d_augments )
             
             # 学習結果のlossデータの読み込み、プロット準備
             csvfile = model.csvpath

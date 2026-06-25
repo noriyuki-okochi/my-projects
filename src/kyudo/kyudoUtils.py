@@ -64,9 +64,9 @@ def df2csv(df, case_name='none', title=None, file=None, mode='a'):
 # cmds: コマンドライン引数リスト
 # def_parameters: デフォルトのハイパーパラメータタプル
 # 戻り値: ハイパーパラメータタプル
-def get_hyper_parameters(cmds, def_parameters):
+def get_hyper_parameters(cmds, opt_name, def_parameters):
     parameters = def_parameters
-    i = cmds.index('-hparam')
+    i = cmds.index(opt_name)
     if len(cmds) > (i + 1):
         params = cmds[i+1][1:-1].split(',')   # (1,2,3,4,5)の形式で指定
         #print(f"[get_hyper_parameters]:params={params}")
@@ -130,7 +130,54 @@ def update_section_completed( action, section, completed, output_size):
             completed = 0
     return section, completed
       
-        
+# **(1) 時間方向の伸縮（±10%）**
+def time_warp(x, warp_factor=0.1):
+    """
+    x: (s_frames, input_dim)
+    warp_factor: ±10% の伸縮
+    """
+    s_frames, input_dim = x.shape
+    scale = 1.0 + (torch.rand(1).item() * 2 - 1) * warp_factor
+    new_frames = int(s_frames * scale)
+
+    x = x.unsqueeze(0).unsqueeze(0)  # (1,1,s_frames,input_dim)
+    x = F.interpolate(x, size=(new_frames, input_dim), mode='bilinear')
+    x = F.interpolate(x, size=(s_frames, input_dim), mode='bilinear')
+    return x.squeeze()
+
+# **(2) 特徴量に微小ノイズ（±1〜2%）**
+def add_noise(x, noise_level=0.02):
+    noise = torch.randn_like(x) * noise_level
+    return x + noise
+
+# **(3) 特徴量のランダムマスク（DropFeature）**
+def drop_feature(x, drop_prob=0.1):
+    mask = (torch.rand_like(x) > drop_prob).float()
+    return x * mask
+
+# **(4) 時間方向のランダムシフト**
+def time_shift(x, max_shift=3):
+    shift = torch.randint(-max_shift, max_shift+1, (1,)).item()
+    return torch.roll(x, shifts=shift, dims=0)
+
+# **データ拡張をまとめて適用する関数**
+def data_augment(x, d_augment=(None, None, None)):
+    #print(f'[data_augment]:x={x.shape}')
+    _, input_dim = x.shape
+    t_shift, t_warp, noise = d_augment
+    if t_shift != None and torch.rand(1).item() < 0.5:
+        x = time_shift(x, t_shift)
+
+    end = -10 if input_dim >= 17 else -2
+    if t_warp != None and torch.rand(1).item() < 0.5:
+        x[:, :end] = time_warp( x[:, :end] , t_warp)
+    if noise != None and torch.rand(1).item() < 0.5:
+        x[:, :end] = add_noise( x[:, :end] , noise)
+    '''
+    if torch.rand(1).item() < 0.5:
+        x = drop_feature(x)
+    '''
+    return x
 #
 #  Ordinal Regression 用の損失関数（CORAL Loss）
 #
@@ -143,7 +190,7 @@ class CoralLoss(nn.Module):
         logits: (batch, K-1)  K=6 → 5個のロジット
         y: (batch,) 0〜5 の整数ラベル
         """
-        batch_size, num_levels = logits.size()
+        _, num_levels = logits.size()
 
         # y を (batch, num_levels) の 0/1 マスクに変換
         y_expanded = y.unsqueeze(1).repeat(1, num_levels)
@@ -271,14 +318,22 @@ def eval_data_unSqueeze( np_x, np_yact, s_frames ):
 # np_x: 評価データ (input_frames, input_dim)
 # np_yact: 評価の正解ラベル (input_frames, 1)
 # s_frames: 1サンプルのフレーム数
-def eval_tesorDataset( np_x, np_yact, s_frames ):
+def eval_tesorDataset( np_x, np_yact, s_frames, d_augment=None ):
     x_data, y_data = eval_data_unSqueeze( np_x, np_yact, s_frames )
     #    
     # データをTensorに変換してTensorDatasetを作成する
-    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_dim]
-    y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[i_frame, s_frames, input_dim]
+    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[batch, s_frames, input_dim]
+    y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[batch, s_frames, input_dim]
 
     print(f"[eval_tesorDataset]:x_data={x_data.shape}, y_data={y_data.shape}")
+    
+    # データ拡張
+    if d_augment is not None:
+        print(f"[eval_tesorDataset]:d_argument={d_augment}")
+        batch_size, _, _ = x_data.shape
+        for i in range( batch_size ):
+            x_data[i] = data_augment( x_data[i], d_augment )
+        
     return TensorDataset(x_data, y_data)
 #
 # 学習ループ関数
@@ -302,7 +357,8 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
         for x, t in loader:
             _,_,input_size = x.shape
             if class_name == 'EvalCN' and input_size >= 17:
-                x = x[:,:,:-1]        # sectionカラム(-1)は削除
+                x = x[:,:,:-1]          # sectionカラム(-1)は削除
+                #x = augment( x )        # データ拡張
             # 順伝搬、損失計算、逆伝搬、パラメータ更新
             y = model(x)
             loss = criterion(y, t.squeeze())
@@ -348,13 +404,17 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
                         log_write(f"Early stopping at epoch {epoch:3d}")
                         break
             else:
-                # EvalNN:正解率測定のための検証ループ
+                # EvalNN/CN:正解率測定のための検証ループ
                 with torch.no_grad():
                     correct = 0
                     total = 0
                     for x, t in valid_loader:
+                        _,_,input_size = x.shape
+                        if class_name == 'EvalCN' and input_size >= 17:
+                            x = x[:,:,:-1]        # sectionカラム(-1)は削除
                         y = model(x)
-                        predicted = torch.argmax(y, dim=1)
+                        #predicted = torch.argmax(y, dim=1)
+                        predicted = ordinal_predict( y)
                         total += t.shape[0]
                         correct += int((predicted == t.squeeze()).sum().item())
                     accuracy = (correct / total) if total > 0 else 0
@@ -370,7 +430,7 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
 # batch_size: バッチサイズ
 # n_epoch: エポック数
 # pth: 学習結果のモデルを保存するファイルパス（Noneの場合はデフォルト名）
-def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, r_factor=1.0, pth=None):
+def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, r_factor=1.0,pth=None,d_augment=None):
     # モデルのクラス名からモデルのベース名を決定する
     class_name:str = model.get_class_name()
     if 'GRU' in class_name: model_name = f'{MODEL_NAME}{class_name[-1]}'
@@ -385,7 +445,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
         dataset = kyudo_tesorDataset( np_x, np_yact, s_frames )
     else:
         # np_x: (i_sections, s_frames, input_dim), np_yact: (i_sections, 1)
-        dataset = eval_tesorDataset( np_x, np_yact, s_frames )  
+        dataset = eval_tesorDataset( np_x, np_yact, s_frames , d_augment)  
     loader = DataLoader(dataset, batch_size, shuffle=False)
 
     # 検証TensorDatasetを編集する
