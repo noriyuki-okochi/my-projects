@@ -48,6 +48,14 @@ $env:HYPER_PARAM=($s,$b,$e,$r,$d_s,$d_c)
 $hp_vals = @($s,$b,$e,$r,$d_s,$d_c)
 $hparam = $hp_vals[0],$hp_vals[1],$hp_vals[2],$hp_vals[3],$hp_vals[4],$hp_vals[5]
 #
+# データ拡張（オーギュメント）パラメータ設定
+$t_s = 3     # シフト
+$t_w = 0.1   # 伸縮
+$n = 0.02    # ノイズ
+$env:AUGMENT_PARAM=($t_s,$t_w,$n)
+$dp_vals = @($t_s,$t_w,$n)
+$dparam = $dp_vals[0],$dp_vals[1],$dp_vals[2]
+#
 # 登録ケース名リスト
 #
 # 個別ケース設定例
@@ -96,6 +104,7 @@ function model {
         [string]$case='',
         [string]$pt='',
         [string]$hp='',
+        [string]$dp='',
         [string]$roll='',
         [float]$l2=0.0,
         [int]$key=0,
@@ -111,6 +120,7 @@ function model {
         write-output ">model -pt <model_pt_file_path>   ：学習済モデルファイルを設定する"
         write-output ">model -l2 <L2_lambda>            ：L2正則化係数を設定する"
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
+        write-output ">model -dp ({<para>, }...)        ：データ拡張パラメータ（シフト最大長、伸縮率、最大ノイズ率）を設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
         write-output ">model -roll *|'<roll-path>'      ：動画ファイルの検索位置を設定する（'*'指定時は、ダイアログで選択）"
         write-output ">model -alpha '<add-weight-alpha>'：重ね画像アルファ値を設定する"
@@ -214,6 +224,18 @@ function model {
             $str = '・ハイパーパラメータが ' + $hparam + ' に設定されました。'
             write-output $str
         }
+        elseif ( $dp -ne '' ) {
+            $val_list = $dp.Split(' ')
+            $i = 0
+            foreach ( $val in $val_list ) {
+                $dp_vals[$i] = $val
+                $i++    
+            }
+            $dparam = $dp_vals -join ' '
+            $env:AUGMENT_PARAM="$dparam"
+            $str = '・データ拡張パラメータが ' + $dparam + ' に設定されました。'
+            write-output $str
+        }
         elseif ( $l2 -gt 0.0 ) {
             $env:L2_LAMBDA="$l2"
             $l2_lambda = $env:L2_LAMBDA
@@ -239,6 +261,8 @@ function model {
             $str = '・学習済モデル        ： ' + $env:MODEL_PT 
             write-output $str
             $str = '・ハイパーパラメータ  ： ' + $env:HYPER_PARAM
+            write-output $str
+            $str = '・データ拡張パラメータ： ' + $env:AUGMENT_PARAM
             write-output $str
             $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
             write-output $str
@@ -698,11 +722,12 @@ function eval {
         [switch]$img,
         [string]$train,
         [string]$valid='none',
+        [switch]$augment,
         [string]$predict,
         [int]$input_frames = 0,
         [float]$eta = 0.001,
         [string]$print=''
-    )
+    )    
     # ハイパーパラメータ取得
     $val_list = $env:HYPER_PARAM.Split(' ')
     $i = 0
@@ -711,6 +736,15 @@ function eval {
         $i++    
     }
     $hparam = $hp_vals -join ','
+
+    # データ拡張パラメータ取得
+    $val_list = $env:AUGMENT_PARAM.Split(' ')
+    $i = 0
+    foreach ( $val in $val_list ) {
+        $dp_vals[$i] = $val
+        $i++    
+    }
+    $dparam = $dp_vals -join ','
     # モデルタイプ取得
     $modelx = $env:EVAL_MODEL_TYPE
     $model = "-model"
@@ -720,7 +754,7 @@ function eval {
         write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
         write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
         write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
-        write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-model <モデルファイル>] [-eta <学習率>]：解析結果データで学習する'
+        write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-augment] [-model <モデルファイル>] [-eta <学習率>]：解析結果データで学習する'
         write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]              ：解析結果データで予測する'
         write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
     } 
@@ -763,15 +797,21 @@ function eval {
         # 学習実行
         $idx = $args.IndexOf($model)
         $len = $args.Length
+        $dp_opt = ''
+        $dp_val = ''
+        if ($augment) {
+            $dp_opt = '-dparam'
+            $dp_val = "($dparam)"
+        }
         # 検証ケース名が指定さた場合は、-valid オプションで指定する
         $valid_case = $valid
         if ($train -ne 'list') {
             # 単一ケース学習（登録ケース名指定）
             if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
+                python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx $args[$idx+1] -f0 $input_frames     
             }
             else {
-                python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
+                python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx -f0 $input_frames   
             }
         }
         else {
@@ -782,10 +822,10 @@ function eval {
             $i = 1
             foreach ( $case_name in $cases_list ) {
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                 }
                 else {
-                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx -f0 $input_frames -n"$i" 
                 }
                 #Write-Output $LASTEXITCODE
                 if ( $LASTEXITCODE -ne 0 ) {
