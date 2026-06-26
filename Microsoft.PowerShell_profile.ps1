@@ -745,6 +745,12 @@ function eval {
         $i++    
     }
     $dparam = $dp_vals -join ','
+    $dp_opt = ''
+    $dp_val = ''
+    if ($augment) {
+        $dp_opt = '-dparam'
+        $dp_val = "($dparam)"
+    }
     # モデルタイプ取得
     $modelx = $env:EVAL_MODEL_TYPE
     $model = "-model"
@@ -752,8 +758,8 @@ function eval {
         write-output '・コマンド -オプション'
         write-output '>eval  -list    key|pt                                                ：入力データキー,または作成済モデルファイルの一覧を表示する'
         write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
-        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...              ：評価データを表示する"
-        write-output '>eval  -case    <登録ケース名> [-img|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
+        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...                         ：評価データを表示する"
+        write-output '>eval  -case    <登録ケース名> [-img [-augment]|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
         write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-augment] [-model <モデルファイル>] [-eta <学習率>]：解析結果データで学習する'
         write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]              ：解析結果データで予測する'
         write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
@@ -785,7 +791,7 @@ function eval {
     elseif ($case -ne '') {
         if ($img) {
              # 解析結果画像を表示
-            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"
+            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"  $dp_opt $dp_val 
         }
         else {
             # 解析結果データをグラフ表示
@@ -797,12 +803,6 @@ function eval {
         # 学習実行
         $idx = $args.IndexOf($model)
         $len = $args.Length
-        $dp_opt = ''
-        $dp_val = ''
-        if ($augment) {
-            $dp_opt = '-dparam'
-            $dp_val = "($dparam)"
-        }
         # 検証ケース名が指定さた場合は、-valid オプションで指定する
         $valid_case = $valid
         if ($train -ne 'list') {

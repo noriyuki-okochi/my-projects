@@ -400,16 +400,26 @@ def main():
             # section毎にフレーム数をs_framesに合わせて切り出す
             s_frames, _, _, _, _, _ = hyper_parameters                      # 1サンプルのフレーム数         np_x, _ = eval_data_squeeze(np_x, np_y, s_frames)     
             np_ch, _ = eval_data_unSqueeze(np_x, np_y, s_frames)            # (input_samples, s_frames, input_dim)
-            print(f"[evalApp]info:np_ch.shape={np_ch.shape}")
             inum, s_frames, input_dim = np_ch.shape
             print(f"[evalApp]info:inum={inum}, s_frames={s_frames}, input_dim={input_dim}")
+            
+            if d_augments is not None:
+                # データをTensorに変換しデータ拡張する
+                x_tensor = torch.tensor(np_ch, dtype=torch.float32).to(device )   #[inum, s_frames, input_dim]
+                print(f"[evalApp]:x_tensor={x_tensor.shape}")            
+                # データ拡張
+                for i in range( inum ):
+                    x_tensor[i] = data_augment( x_tensor[i], d_augments )
+                np_ch = x_tensor.to('cpu').detach().numpy().copy()
+
+            # 節ごとのデータを列方向に連結して表示する
             sections = []
             gray_img = np_ch[0,:, :]                                        # (s_frames, input_dim)
-            sections.append(np_ch[0, 0, -1])
-            
+            sections.append(np_ch[0, 0, -1])            
             for i in range(1, inum):
                 gray_img = np.concatenate( (gray_img, np_ch[i,:, :]), axis=1 )         # (i*s_frames, input_dim)
                 sections.append(np_ch[i, 0, -1])
+                
             print(f"[evalApp]info:gray_img.shape={gray_img.shape}")
             fig = px.imshow(gray_img, color_continuous_scale='gray', title=f"Eval-data({sections}) Image plot")
             fig.update_xaxes(range=(1, inum*input_dim), dtick=input_dim)
