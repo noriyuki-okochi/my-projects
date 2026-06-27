@@ -157,12 +157,12 @@ def drop_feature(x, drop_prob=0.1):
 
 # **(4) 時間方向のランダムシフト**
 def time_shift(x, max_shift=3):
-    shift = torch.randint(-max_shift, max_shift+1, (1,)).item()
+    #shift = torch.randint(-max_shift, max_shift+1, (1,)).item()
+    shift = torch.randint(0, max_shift+1, (1,)).item()
     return torch.roll(x, shifts=shift, dims=0)
 
 # **データ拡張をまとめて適用する関数**
 def data_augment(x, d_augment=(None, None, None)):
-    #print(f'[data_augment]:x={x.shape}')
     _, input_dim = x.shape
     t_shift, t_warp, noise = d_augment
     if (t_shift != None and t_shift != 0) and torch.rand(1).item() < 0.5:
