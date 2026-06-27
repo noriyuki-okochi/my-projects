@@ -530,7 +530,8 @@ class FeaturePdf:
 #    射法八節姿勢解析評価点数のクラス定義
 #
 class MyEval:
-    Header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,se,eyes,push,pull,alart,"\
+    # CSVファイルのカラムヘッダー
+    Header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,sr,se,eyes,push,pull,alart,"\
              "label,inserted_at,time_epoch\n"
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
@@ -547,7 +548,7 @@ class MyEval:
                       'completed': 0,'score': Eval_perfect_score ,\
                       'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
-                      'se_angle' : 0, 'eyes_ratio': 0.0, \
+                      'sr_angle': 0.0, 'se_angle' : 0, 'eyes_ratio': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0, \
                       'pull_rate': 0.0 \
                       }              
@@ -647,8 +648,8 @@ class MyEval:
         values = f"{self.case_name},{self.lv_no},{self.frame_no},{self.section+10*self.cycle},{self.completed},{self.step},"
                             
         for i, value in enumerate(self.eval.values()):
-            if i == 0 or i == 11: continue    # completed,pull_rate
-            elif i > 1 and i < 8:             # split, rl,er,sl, se, eyes_ratio
+            if i == 0 or i == 12: continue    # completed,pull_rate
+            elif i > 1 and i < 9:             # split, rl, er, sl, sr, se, eyes_ratio
                 values += f"{value:.3f},"
             elif i == 1:                      # score 
                 # 引数scoreが指定されている場合はscoreを、そうでない場合（節移行時の呼び出し）は評価データの値を出力する         
@@ -734,7 +735,7 @@ class MyEval:
     # 評価データの更新
     #
     def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
-                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0,\
+                       rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, sr_angle:float=0.0,\
                        se_angle:float=0.0, eyes_ratio:float=0.0, alart:int=0):
         # 
         bool_section_change = False  # セクションが変わったかどうか
@@ -785,6 +786,7 @@ class MyEval:
             self.eval['rl_angle'] = rl_angle
             self.eval['er_angle'] = er_angle
             self.eval['sl_angle'] = sl_angle
+            self.eval['sr_angle'] = sr_angle
             self.eval['se_angle'] = se_angle
             self.eval['eyes_ratio'] = eyes_ratio
             if self.section == 2:       # 2節は箆調べでプラス2点
@@ -820,6 +822,7 @@ class MyEval:
                 self.eval['rl_angle'] = rl_angle
                 self.eval['er_angle'] = er_angle
                 self.eval['sl_angle'] = sl_angle
+                self.eval['sr_angle'] = sr_angle
                 self.eval['se_angle'] = se_angle
                 self.eval['eyes_ratio'] = eyes_ratio
                 # 5節のとき、引き分けの「押し」／「引き」回数をカウント
@@ -1105,7 +1108,7 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
                 "",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>   <split(sec.)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <sr(°)>   <split(sec.)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     items_l = [ 
@@ -1115,12 +1118,12 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), split",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*sr), split",
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
             ]
     legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
-        + " sl:left Shoulder->Left wrist, rl:Right wrist->Left wrist\n"\
-        + " se:right Shoulder->right Elbow, er:right Elbow->Right wrist\n"\
+        + " sl:left Shoulder->wrist, rl:Right wrist->Left wrist\n"\
+        + " se:right Shoulder->Elbow, er:right Elbow->wrist, sr:right Shoulder->wrist\n"\
         + " split:完了状態の保持時間\n"\
         + " pull:大三からの引き分け’押／引'の'引'検知率（率が大きいほど、弓手の押しが弱い）\n"\
         + " eyes:眉間長さの尺度（section=2.0で正面向きの目安：ほぼ0.06以下で顔向け良）"
