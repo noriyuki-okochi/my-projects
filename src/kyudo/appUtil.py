@@ -687,8 +687,7 @@ class MyEval:
             deduction += Eval_alart_deduction
             mylog.log(INFO, f"[check_deduction]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
         #
-        # セクションごとの減点条件をチェックして減点数を計算する
-        
+        # セクションごとの減点条件をチェックして減点数を計算する        
         bRet = False
         c_key, c_msg, c_ope, c_value = '', '', '', 0
         for key_nm, data in Diduct_params.items():  # key_nm: 's<section_no>_<key of check data>'
@@ -1123,7 +1122,7 @@ def print_eval_data(db:MyDb, case_names:list):
             ]
     legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
         + " sl:left Shoulder->wrist, rl:Right wrist->Left wrist\n"\
-        + " se:right Shoulder->Elbow, er:right Elbow->wrist, sr:right Shoulder->wrist\n"\
+        + " se:right Shoulder->Elbow, er:Right Elbow->wrist, sr:Right Shoulder->wrist\n"\
         + " split:完了状態の保持時間\n"\
         + " pull:大三からの引き分け’押／引'の'引'検知率（率が大きいほど、弓手の押しが弱い）\n"\
         + " eyes:眉間長さの尺度（section=2.0で正面向きの目安：ほぼ0.06以下で顔向け良）"
