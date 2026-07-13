@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
+#import torch.nn.functional as F
+import torch.utils.tensorboard as tb
+#import numpy as np
 from datetime import datetime
 ''''''
 # 規定モデル(Module)の定義
@@ -19,6 +20,7 @@ class EvalModule(nn.Module):
 
     self.csvfile = None
     self.csvpath = None 
+    self.tb_writer = None
     
   def get_class_name(self):
     return self.__class__.__name__
@@ -26,11 +28,11 @@ class EvalModule(nn.Module):
   def forward(self, x):
     pass
     return x
-#
-# CSVファイルのオープン、書き込み、クローズ
-# CSVファイルは、モデルの学習や評価の過程で、損失値や精度などの指標を記録するために使用されます。
-# CSVファイルのオープンは、指定されたパスとファイル名で新しいCSVファイルを作成し、カラム名をヘッダーとして書き込みます。
-# 書き込みは、指定された値をCSVファイルに行として追加します。クローズは、CSVファイルを閉じてリソースを解放します。
+  #
+  # CSVファイルのオープン、書き込み、クローズ
+  # CSVファイルは、モデルの学習や評価の過程で、損失値や精度などの指標を記録するために使用されます。
+  # CSVファイルのオープンは、指定されたパスとファイル名で新しいCSVファイルを作成し、カラム名をヘッダーとして書き込みます。
+  # 書き込みは、指定された値をCSVファイルに行として追加します。クローズは、CSVファイルを閉じてリソースを解放します。
   def open_csv(self, headers='', path="./", fname='model', mode='w'):
       # CSV出力ファイルの作成
       timestamp = datetime.now().strftime('%Y%m%d')
@@ -43,20 +45,37 @@ class EvalModule(nn.Module):
           else: line += name
       self.csvfile.write(line + "\n")
       self.csvfile.flush()
+      #
+      if self.tb_writer is None:
+         # TensorBoardのログディレクトリを指定して、SummaryWriterを作成
+         tb_dir = path[:path.rfind('/')+1] + f"{fname}_{timestamp}_tb"
+         self.tb_writer = tb.SummaryWriter(log_dir=tb_dir)  
+
+  ## valuesを指定されたkeyでTensorBoardに記録
+  def write_tb(self, values, key, step=None):
+      if self.tb_writer is not None and key is not None:
+        step = step if step is not None else values[0]
+        self.tb_writer.add_scalar(key, values[1], step)  
+  #
+  def write_csv(self, values, key=None, step=None):
+      if self.csvfile is not None:
+        line = ''
+        for v in values:
+            if len(line) > 0: line += f"\t{v:.4f}"
+            else: line += f"{v}"
+        self.csvfile.write(line + "\n")
       
-  def write_csv(self, values):
-      if self.csvfile is None: return
-      line = ''
-      for v in values:
-          if len(line) > 0: line += f"\t{v:.4f}"
-          else: line += f"{v}"
-      self.csvfile.write(line + "\n")
+      if self.tb_writer is not None and key is not None:
+          self.write_tb(values, key, step)  
 
   def close_csv(self):
       if self.csvfile is not None:
           self.csvfile.close()
           self.csvfile = None
           print(f"[EvalNN]:close_csv:{self.csvpath}")
+      #      
+      if self.tb_writer is not None:
+          self.tb_writer.close()
 
 ''''''
 # NNモデルの定義

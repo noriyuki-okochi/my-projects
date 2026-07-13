@@ -163,6 +163,7 @@ def time_shift(x, max_shift=3):
 
 # **データ拡張をまとめて適用する関数**
 def data_augment(x, d_augment=(None, None, None)):
+    #print(f'[data_augment]:x={x.shape}')
     _, input_dim = x.shape
     t_shift, t_warp, noise = d_augment
     if (t_shift != None and t_shift != 0) and torch.rand(1).item() < 0.5:
@@ -422,6 +423,7 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
                         # 20エポックごとに学習過程を表示
                         print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")
 
+                    model.write_tb( [epoch, accuracy], key="accuracy" )    # 学習過程をtensorboardに出力
 # モデルの学習を実行する関数
 # model: GRU/EvalNNモデル
 # s_frames: 1サンプルのフレーム数 
@@ -476,7 +478,9 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     criterion = nn.CrossEntropyLoss() if 'GRU' in class_name else CoralLoss()
     optimizer = optim.Adam(model.parameters(), lr=Learning_rate)
     
-    print(f"[train_kyudo]:criterion={criterion}, optimizer={optimizer}")
+    print(f"[train_kyudo]:criterion={criterion}")
+    #print(f"[train_kyudo]:optimizer={optimizer}")
+    
     # 学習過程の損失値をCSVファイルに出力するための準備
     model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
     
