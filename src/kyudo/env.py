@@ -217,7 +217,12 @@ L2_lambda = 1e-5         # L2正則化の強度
 l2_lambda = os.getenv('L2_LAMBDA')
 if l2_lambda != None:
     L2_lambda = float(l2_lambda)
-    
+
+Early_stop = 0         # Early stoppingの基準
+early_stop = os.getenv('EARLY_STOP')
+if early_stop != None:
+    Early_stop = int(early_stop)
+
 Sequence_frames:int = 96                        # GRU用入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
