@@ -345,7 +345,7 @@ def main():
             log_write( f"[evalApp]:Learning_rate={learning_rate:.5f}, r_factor={r_factor:.2f}")
             log_write( f"[evalApp]:L2_lambda={L2_lambda:.5f}")
             # 学習実行(train)
-            train_Kyudo( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, 
+            train_Model( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, 
                         pth = model_pth, d_augment=d_augments )
             
             # 学習結果のlossデータの読み込み、プロット準備

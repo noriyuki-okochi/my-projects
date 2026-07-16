@@ -281,6 +281,8 @@ def kyudo_tesorDataset( np_x, np_yact, s_frames ):
     y_data = torch.tensor(y_data, dtype=torch.int64).to(device )
     log_write(f"[kyudo_tesorDataset]:x_data={x_data.shape}")
     log_write(f"[kyudo_tesorDataset]:y_data={y_data.shape}")
+    yy_data = y_data.repeat(1, 2)  
+    print(f"[kyudo_tesorDataset]:yy_data={yy_data.shape}")
     
     return TensorDataset(x_data, y_data)
 #
@@ -348,18 +350,12 @@ def eval_tesorDataset( np_x, np_yact, s_frames, d_augment=None ):
 # valid_loader: 検証用DataLoader
 # earlystop: EarlyStoppingのインスタンス
 # 学習ループは、指定されたエポック数だけ、学習用データローダーからデータを取得してモデルを訓練します。
-def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
-    # モデルのクラス名からモデルのベース名を決定する
-    class_name:str = model.get_class_name()
-
+def train_loop_kyudo(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
     for epoch in range(n_epoch):
         model.train()
         loss_train = 0
         for x, t in loader:
             _,_,input_size = x.shape
-            if class_name == 'EvalCN' and input_size >= 17:
-                x = x[:,:,:-1]          # sectionカラム(-1)は削除
-                #x = augment( x )        # データ拡張
             # 順伝搬、損失計算、逆伝搬、パラメータ更新
             y = model(x)
             loss = criterion(y, t.squeeze())
@@ -373,6 +369,7 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        # end of batch loop        
         # calculate average loss
         loss_train /= len(loader)
         model.write_csv( [epoch, loss_train] )          # 学習過程をCSVファイルに出力
@@ -386,44 +383,90 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
 
         if valid_loader is not None:
             model.eval()
-            if 'GRU' in class_name: 
-                # EaryStoppingのための検証ループ
-                loss_valid = 0
-                with torch.no_grad():
-                    for x, t in valid_loader:
-                        y = model(x)
-                        loss = criterion(y, t.squeeze())
-                        loss_valid += loss.item()
-                        #print(f"[train_loop]:y={y}, t={t}")
-                        #score = torch.argmax( y, dim=1).item()
-                loss_valid /= len(valid_loader)
-                #log_write(f'epoch:{epoch:3d}, loss_valid={loss_valid:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
-                if earlystop is not None:
-                    # EarlyStoppingの呼び出し
-                    earlystop(epoch, loss_valid, model)        
-                    if earlystop.early_stop:
-                        log_write(f"Early stopping at epoch {epoch:3d}")
-                        break
-            else:
-                # EvalNN/CN:正解率測定のための検証ループ
-                with torch.no_grad():
-                    correct = 0
-                    total = 0
-                    for x, t in valid_loader:
-                        _,_,input_size = x.shape
-                        if class_name == 'EvalCN' and input_size >= 17:
-                            x = x[:,:,:-1]        # sectionカラム(-1)は削除
-                        y = model(x)
-                        #predicted = torch.argmax(y, dim=1)
-                        predicted = ordinal_predict( y)
-                        total += t.shape[0]
-                        correct += int((predicted == t.squeeze()).sum().item())
-                    accuracy = (correct / total) if total > 0 else 0
-                    if epoch % 20 == 0 or epoch == (n_epoch - 1):
-                        # 20エポックごとに学習過程を表示
-                        print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")
-
-                    model.write_tb( [epoch, accuracy], key="accuracy" )    # 学習過程をtensorboardに出力
+            # EaryStoppingのための検証ループ
+            loss_valid = 0
+            correct = 0
+            with torch.no_grad():
+                for x, t in valid_loader:
+                    y = model(x)
+                    loss = criterion(y, t.squeeze())
+                    loss_valid += loss.item()
+                    #print(f"[train_loop]:y={y}, t={t}")
+                    predicted = torch.argmax( y, dim=1)
+                    correct += int((predicted == t.squeeze()).sum().item())
+            
+            total = len(valid_loader.dataset)
+            accuracy = (correct / total) if total > 0 else 0
+            print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")    
+            # 学習過程をtensorboardに出力
+            model.write_tb( [epoch, accuracy], key="accuracy" )
+            loss_valid /= len(valid_loader)
+            #log_write(f'epoch:{epoch:3d}, loss_valid={loss_valid:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
+            if earlystop is not None:
+                # EarlyStoppingの呼び出し
+                earlystop(epoch, loss_valid, model)        
+                if earlystop.early_stop:
+                    log_write(f"Early stopping at epoch {epoch:3d}")
+                    break
+    # end of train_loop_kyudo
+    return
+    
+def train_loop_eval(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
+    for epoch in range(n_epoch):
+        model.train()
+        loss_train = 0
+        for x, t in loader:
+            _,_,input_size = x.shape
+            if input_size >= 17:
+                x = x[:,:,:-1]          # sectionカラム(-1)は削除
+            # 順伝搬、損失計算、逆伝搬、パラメータ更新
+            y = model(x)
+            loss = criterion(y, t.squeeze())
+            # L2正則化の追加            
+            if l2_lambda > 0.0:
+                l2_norm = sum(p.pow(2.0).sum() for p in model.parameters())
+                loss = loss + l2_lambda * l2_norm
+            # accumulate loss
+            loss_train += loss.item()
+            # 勾配の初期化
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        #end of batch loop        
+        # calculate average loss
+        loss_train /= len(loader)
+        model.write_csv( [epoch, loss_train] )          # 学習過程をCSVファイルに出力
+        if epoch % 20 == 0 or epoch == (n_epoch - 1):
+            # 20エポックごとに学習過程を表示
+            log_write(f'epoch:{epoch:3d}, loss_train={loss_train:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
+        
+        if scheduler is not None:
+            # 学習率の更新
+            scheduler.step(loss_train)      
+    
+        if valid_loader is not None:
+            model.eval()
+            # EvalNN/CN:正解率測定のための検証ループ
+            with torch.no_grad():
+                correct = 0
+                for x, t in valid_loader:
+                    _,_,input_size = x.shape
+                    if input_size >= 17:
+                        x = x[:,:,:-1]        # sectionカラム(-1)は削除
+                    y = model(x)
+                    predicted = ordinal_predict( y)
+                    correct += int((predicted == t.squeeze()).sum().item())
+                    
+            total = len(valid_loader.dataset)
+            accuracy = (correct / total) if total > 0 else 0
+            # 学習過程をtensorboardに出力
+            model.write_tb( [epoch, accuracy], key="accuracy" )    
+            if epoch % 20 == 0 or epoch == (n_epoch - 1):
+                # 20エポックごとに学習過程を表示
+                print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")
+    # end of train_loop_eval
+    return
+    
 # モデルの学習を実行する関数
 # model: GRU/EvalNNモデル
 # s_frames: 1サンプルのフレーム数 
@@ -432,7 +475,7 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
 # batch_size: バッチサイズ
 # n_epoch: エポック数
 # pth: 学習結果のモデルを保存するファイルパス（Noneの場合はデフォルト名）
-def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, r_factor=1.0,pth=None,d_augment=None):
+def train_Model( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, r_factor=1.0,pth=None,d_augment=None):
     # モデルのクラス名からモデルのベース名を決定する
     class_name:str = model.get_class_name()
     if 'GRU' in class_name: model_name = f'{MODEL_NAME}{class_name[-1]}'
@@ -441,7 +484,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     # 学習用TensorDatasetを編集する
     np_x, np_yact = np_train
     _, input_size = np_x.shape
-    log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")
+    log_write(f"[train_Model]:np_x={np_x.shape}, np_yact={np_yact.shape}")
     if 'GRU' in class_name:
         # np_x: (input_frames, s_frames, input_dim), np_yact: (input_frames, 1)
         dataset = kyudo_tesorDataset( np_x, np_yact, s_frames )
@@ -459,7 +502,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
         else:
             valid_dataset = eval_tesorDataset( np_valid_x, np_valid_yact, s_frames )
         valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False)
-        print(f"[train_Kyudo]:valid_loader={len(valid_loader)} batches, batch_size={batch_size}")
+        print(f"[train_Model]:valid_loader={len(valid_loader)} batches, batch_size={batch_size}")
 
     # 学習結果のモデル保存用ファイル名の決定
     if pth is not None:
@@ -472,14 +515,14 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
             input_size = (input_size - 1) if input_size >= 17 else input_size
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
-    log_write(f"[train_Kyudo]:model will be saved as {model_pth}")
+    log_write(f"[train_Model]:model will be saved as {model_pth}")
 
     # 損失関数と最適化手法の定義
     criterion = nn.CrossEntropyLoss() if 'GRU' in class_name else CoralLoss()
     optimizer = optim.Adam(model.parameters(), lr=Learning_rate)
     
-    print(f"[train_kyudo]:criterion={criterion}")
-    #print(f"[train_kyudo]:optimizer={optimizer}")
+    print(f"[train_Model]:criterion={criterion}")
+    #print(f"[train_Model]:optimizer={optimizer}")
     
     # 学習過程の損失値をCSVファイルに出力するための準備
     model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
@@ -496,16 +539,22 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
             #scheduler = lr_scheduler.StepLR(optimizer, step_size = 10, gamma = r_factor)  
     else:
         if r_factor < 1.0:
+            # schedulerのインスタンスを作成
             scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,mode = 'min',factor = r_factor,patience = 3)
-        # EarlyStoppingのインスタンスを作成
-        earlystop = EarlyStopping(patience = 7, delta = 0, path = model_pth, verbose = False)  
+        if Early_stop > 0:
+            # EarlyStoppingのインスタンスを作成
+            earlystop = EarlyStopping(patience = Early_stop, delta = 0, path = model_pth, verbose = False)  
     
-    print(f"[train_kyudo]:scheduler={scheduler}, earlystop={earlystop}")
+    print(f"[train_Model]:scheduler={scheduler}, earlystop={earlystop}")
     #   
     # 学習ループ
-    train_loop( model, loader, criterion, optimizer, n_epoch, \
-                l2_lambda=L2_lambda, scheduler=scheduler, valid_loader=valid_loader, earlystop=earlystop)
-    
+    if 'GRU' in class_name:
+        train_loop_kyudo(model, loader, criterion, optimizer, n_epoch, \
+                         l2_lambda=L2_lambda, scheduler=scheduler, valid_loader=valid_loader, earlystop=earlystop)
+    else:
+        train_loop_eval(model, loader, criterion, optimizer, n_epoch, \
+                        l2_lambda=L2_lambda, scheduler=scheduler, valid_loader=valid_loader, earlystop=earlystop)
+
     # 学習過程の損失値をCSVファイルに出力するための後処理
     model.close_csv()    
       
@@ -513,7 +562,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     torch.save(model.state_dict(), model_pth)
     #
     ulog.debug(model.state_dict())
-    log_write(f"[train_Kyudo]:model saved as {model_pth}")
+    log_write(f"[train_Model]:model saved as {model_pth}")
     
     return #record_loss_train
 #  

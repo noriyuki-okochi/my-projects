@@ -403,7 +403,7 @@ if ('-train' in cmds or '-predict' in cmds) and len(case_names) > 0 :
         log_write(f"[kyudoApp]:L2_lambda={L2_lambda:.5f}")
         log_write(f"[kyudoApp]:section-option={section}")
         # 学習実行(train)
-        train_Kyudo( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, pth = model_pth )
+        train_Model( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, pth = model_pth )
 
         # 学習結果のlossデータの読み込み、プロット準備
         csvfile = model.csvpath
