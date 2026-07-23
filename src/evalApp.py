@@ -46,7 +46,7 @@ def correct_singular_values(df_x:pd.DataFrame, df_y:pd.DataFrame) :
 #
 #
 def main():
-    global  Eval_output_dim, Eval_model_pt
+    global  Eval_output_dim, Eval_model_pt, Learning_rate, Augment_level
     verbose:bool = False         # debug write
     m_flg:bool = False           # not display section/conf
     slider:bool = False          # display slider
@@ -79,12 +79,12 @@ def main():
 
     opts:str = [opt for opt in args if opt.startswith('-')]
     if '-h' in opts:        #debug write
-        print("evalApp.py -case {*|<case-name>{,<case_name>'}... |-E(val) <label>|-eval|-img}\n"\
+        print("evalApp.py -case {*|'<case-name>{,<case_name>'}... |-E(val) <label>|-eval|-img}\n"\
             + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
             + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
             + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
             + "        [ {-train|-predict} [eta=<rate>] [{-modeln|-modelc} ['<model-path>']] ]\n"\
-            + "        [-valid <case_name>|none]\n"\
+            + "        [-valid <case_name>|none] [augment=<level>]\n"\
             + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
             + "        [-dparam '(<t_shift>,<t_warp>,<noise>)']\n"\
             + "        [-inputkey][-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
@@ -223,10 +223,6 @@ def main():
         hyper_parameters = get_hyper_parameters( cmds, '-hparam', hyper_parameters )
         log_write( f"[evalApp]:hyper_parameters={hyper_parameters}")
     
-    d_augments = None
-    if '-dparam' in cmds:
-        d_augments = get_hyper_parameters( cmds, '-dparam', (None, None, None) )
-    log_write( f"[evalApp]:d_augments={d_augments}")
 
     df_k = None     # 予測結果データフレーム
     num_classes:int = Eval_output_dim
@@ -235,14 +231,26 @@ def main():
     input_key:int = Eval_feature_key
 
     # eta=<rate>の解析(学習率の指定)
-    learning_rate = Learning_rate
     num_opts = [opt for opt in args if opt.startswith('eta')]
     if len(num_opts) > 0: 
         # inputkey=<no>の解析
         params = num_opts[0].split('=')
         if len(params) == 2:
-            learning_rate = float(params[1])
-    print(f"[evalApp]info:Learning_rate = {learning_rate}")
+            Learning_rate = float(params[1])
+    print(f"[evalApp]info:Learning_rate = {Learning_rate}")
+
+    # データ拡張レベルの指定(augment=<level>)
+    augment_level:int = Augment_level
+    num_opts = [opt for opt in args if opt.startswith('augment')]
+    if len(num_opts) > 0:
+        params = num_opts[0].split('=')
+        if len(params) == 2 and params[1].isnumeric():
+            augment_level = int(params[1])
+    print(f"[evalApp]info:Augment_level = {augment_level}, Data_augment={Data_augment}")
+    
+    augment_params = get_augment_parameters( Data_augment, augment_level )
+    log_write( f"[evalApp]:augment_params={augment_params}")
+    
     #
     # <<< NNモデルの学習、または予測の実行 >>>
     #
@@ -340,13 +348,14 @@ def main():
             if value != 'y' or len(value) == 0: exit(1)
         
         # 学習、または予測の実行
-        if not predict:      
+        if not predict:   
+            # 学習実行前のパラメータの表示   
             log_write( f"[evalApp]:batch_size={batch_size}, n_epoch={n_epoch}")
-            log_write( f"[evalApp]:Learning_rate={learning_rate:.5f}, r_factor={r_factor:.2f}")
-            log_write( f"[evalApp]:L2_lambda={L2_lambda:.5f}")
+            log_write( f"[evalApp]:Learning_rate={Learning_rate:.5f}, r_factor={r_factor:.2f}")
+            log_write( f"[evalApp]:L2_lambda={L2_lambda:.5f}, Early_stop={Early_stop}")
             # 学習実行(train)
             train_Model( model, s_frames, np_train, np_valid, batch_size, n_epoch, r_factor, 
-                        pth = model_pth, d_augment=d_augments )
+                        pth = model_pth, augment_params=augment_params )
             
             # 学習結果のlossデータの読み込み、プロット準備
             csvfile = model.csvpath
@@ -403,13 +412,14 @@ def main():
             inum, s_frames, input_dim = np_ch.shape
             print(f"[evalApp]info:inum={inum}, s_frames={s_frames}, input_dim={input_dim}")
             
-            if d_augments is not None:
-                # データをTensorに変換しデータ拡張する
+            if augment_params is not None:
+                # データをTensorに変換しデータ拡張する（データ拡張の効果を視覚的に確認するため）
+                device = get_device()
                 x_tensor = torch.tensor(np_ch, dtype=torch.float32).to(device )   #[inum, s_frames, input_dim]
                 print(f"[evalApp]:x_tensor={x_tensor.shape}")            
                 # データ拡張
                 for i in range( inum ):
-                    x_tensor[i] = data_augment( x_tensor[i], d_augments )
+                    x_tensor[i] = eval_data_augment( x_tensor[i], augment_params )
                 np_ch = x_tensor.to('cpu').detach().numpy().copy()
 
             # 節ごとのデータを列方向に連結して表示する
@@ -779,6 +789,7 @@ def main():
                                     secondary_y = False
                             )
                 # < tag2:body>
+                '''                
                 fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                             name = "alart",
                                             y = mdfk["alart"], 
@@ -787,6 +798,7 @@ def main():
                                     col = 1,   
                                     secondary_y = False
                             )
+                '''
                 # < section >
                 fig = fig.add_trace( go.Bar(x=mdfk.index, 
                                         name="section",
