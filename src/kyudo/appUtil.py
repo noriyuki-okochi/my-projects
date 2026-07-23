@@ -1099,7 +1099,7 @@ def rename_frame_info(db:MyDb, from_name, to_name):
 def print_eval_data(db:MyDb, case_names:list):
     # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
     # 解析対象節番号('<section>.<step>')リスト
-    eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0', '8.0' ]  
+    eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0','7.0', '8.0' ]  
     headers = [
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
@@ -1107,7 +1107,8 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
                 "",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <sr(°)>   <split(sec.)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <split(sec.)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     items_l = [ 
@@ -1117,7 +1118,8 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*sr), split",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), split",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
             ]
     legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
