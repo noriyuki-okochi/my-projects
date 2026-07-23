@@ -172,13 +172,16 @@ Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']
 Eval_perfect_score = 5                          # 評価の満点スコア
 Eval_alart_deduction = 3                        # アラートがある場合の減点数
 
-Eval_feature_key = 90                           # 使用する特徴量のキー番号
+Eval_feature_key = 170                          # 使用する特徴量のキー番号
 # 環境変数 'EVAL_INPUT_KEY' が設定されていれば、それを使用する
 Eval_input_key = os.getenv('EVAL_INPUT_KEY')
 if Eval_input_key != None:
     Eval_feature_key = int(Eval_input_key)
 Eval_sframes = 48                               # 評価用の入力シーケンスのフレーム数（ハイパーパラメータのシーケンスフレーム数と同じ値を使用）
 Eval_output_dim = Eval_perfect_score + 1        # 出力クラス数（0-5段階の完成度評価）
+
+Sequence_frames:int = 48                        # eval用一節あたりの最大サンプル数
+Batch_size:int = 8                              # eval用のミニバッチサイズ
 
 # モデル保存用のファイルベース名
 EVAL_MODEL_NAME = 'eval_model'
@@ -212,16 +215,12 @@ Second_names = ['box_w', 'box_h', 'x', 'y', 'xy_conf', 'angle']
 Sample_frames:int = 1
 Sample_lag:int = 7
 Sample_lag_Max:int = 16
+
 # ハイパーパラメータのデフォルト値設定
 L2_lambda = 1e-5         # L2正則化の強度
 l2_lambda = os.getenv('L2_LAMBDA')
 if l2_lambda != None:
     L2_lambda = float(l2_lambda)
-
-Early_stop = 0         # Early stoppingの基準
-early_stop = os.getenv('EARLY_STOP')
-if early_stop != None:
-    Early_stop = int(early_stop)
 
 Sequence_frames:int = 96                        # GRU用入力シーケンスのフレーム数
 Batch_size:int = 192
@@ -236,6 +235,19 @@ Hyper_parameters = (Sequence_frames, \
 Learning_rate:float = 0.001  # 学習率   
 HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイズ
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
+
+# 学習の早期終了条件の設定
+Early_stop = 0         # Early stoppingの基準
+early_stop = os.getenv('EARLY_STOP')
+if early_stop != None:
+    Early_stop = int(early_stop)
+
+# Data augmentationのパラメータ（シフト、伸縮、ノイズ）
+Data_augment= (3, 0.1, 0.02)         
+augment_para = os.getenv('AUGMENT_PARAM')
+if augment_para != None:
+    Data_augment = tuple(map(float, augment_para.split(' ')))
+Augment_level:int = 0
 #
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
