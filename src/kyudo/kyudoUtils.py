@@ -86,25 +86,15 @@ def get_hyper_parameters(cmds, opt_name, def_parameters):
 # データ拡張パラメータの取得関数
 # def_augment: デフォルトのデータ拡張パラメータタプル(shift, warp, noise)
 # augment_level: データ拡張レベル（0〜7）
-def get_augment_parameters( def_augment, augment_level ):
-    augments = None
-    if  augment_level > 0:
-        shift, warp, noise = def_augment
-        if augment_level == 1:
-            augments = (int(shift), None, None)   
-        elif augment_level == 2:
-            augments = (None, warp, None)
-        elif augment_level == 3:
-            augments = (int(shift), warp, None)
-        elif augment_level == 4:
-            augments = (None, None, noise)
-        elif augment_level == 5:
-            augments = (int(shift), None, noise)
-        elif augment_level == 6:
-            augments = (None, warp, noise)
-        else:
-            augments = (int(shift), warp, noise)
-    return augments
+def get_augment_parameters( def_augment, augment_level=7 ):
+    shift, warp, noise = def_augment
+    augments = [None, 
+                (int(shift), None, None), (None, warp, None), (int(shift), warp, None), 
+                (None, None, noise), (int(shift), None, noise), (None, warp, noise),
+                (int(shift), warp, noise)]
+    if  augment_level < 0 or augment_level > 7: 
+        augment_level = 0
+    return augments[augment_level]
 #
 # 特徴量カラム名取得関数
 # features: 特徴量リスト

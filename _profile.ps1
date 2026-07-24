@@ -28,6 +28,7 @@ $modelx = $env:MODEL_TYPE
 $env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
+$env:EARLY_STOP="0"
 # 重ね画像アルファ値設定
 $env:ADD_WEIGHT="0.7"
 #
@@ -39,18 +40,25 @@ $r = 1.0    # 学習率の減衰率
 $d_s = 8    # 埋め込み次元数(section)
 $d_c = 4    # 埋め込み次元数(completed)
 #
-#$s = 128     # シーケンス長
+#$s = 128    # シーケンス長
 #$b = 256    # バッチサイズ
 #$e = 161    # エポック数
 #$d_c = 6    # 埋め込み次元数(completed)
+#
+# Evalモデルのハイパーパラメータ設定
+#$s = 48     # シーケンス長
+#$b = 8      # バッチサイズ
+#$e = 280    # エポック数
 $env:HYPER_PARAM=($s,$b,$e,$r,$d_s,$d_c)
 $hp_vals = @($s,$b,$e,$r,$d_s,$d_c)
 $hparam = $hp_vals[0],$hp_vals[1],$hp_vals[2],$hp_vals[3],$hp_vals[4],$hp_vals[5]
 #
 # データ拡張（オーギュメント）パラメータ設定
-$t_s = 3     # シフト
-$t_w = 0.1   # 伸縮
-$n = 0.02    # ノイズ
+$t_s = 3     # eval:縦軸シフト(下方向3フレーム以内)
+$t_s = 3     # kyudo:ラベルシフト(前後3フレーム以内)
+$t_w = 0.1   # eval:縦軸伸縮（0.1=10%）未使用
+$t_w = 5.0   # kyudo:ラベル伸張(前後5フレーム)
+$n = 0.02    # ノイズ（0.02=2%）
 $env:AUGMENT_PARAM=($t_s,$t_w,$n)
 $dp_vals = @($t_s,$t_w,$n)
 $dparam = $dp_vals[0],$dp_vals[1],$dp_vals[2]
@@ -58,20 +66,19 @@ $dparam = $dp_vals[0],$dp_vals[1],$dp_vals[2]
 # 登録ケース名リスト
 #
 # 個別ケース設定例
-$cases_list = "iwata_1.2", "okochi_1.2", "kanoda_1.2", "tuneyoshi_1.2"
-$cases_list = "iijima_1.1", "iijima_1.2", "anbe_1.1","anbe_1.2"
 $cases_list = "iijima_1.1", "iijima_1.2", "anbe_1.1"
-$cases_list = "iijima_1.1", "iijima_1.2", "iwata_1.1","iwata_1.2"
-$cases_list = "iijima_1.3", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
-$cases_list = "iijima_1.1","iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
-$cases_list = "iijima_1.3", "anbe_1.3", "iwata_1.3", "nemoto_1.3"
-$cases_list = "iijima_1.0", "anbe_1.0", "iwata_1.0", "nemoto_1.0"
+$cases_list = "iijima_1.1", "iijima_1.2", "anbe_1.1", "anbe_1.2"
+$cases_list = "iijima_1.1", "iijima_1.2", "iwata_1.1", "iwata_1.2"
+$cases_list = "iijima_1.1", "iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
 $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
-#$cases_list = "iijima_1.3,anbe_1.3,iwata_1.3,nemoto_1.3"
-$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,okochi_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,y.shihan_2.0_1,yoshida_2.0_1,sueyoshi_2.3_1,oshima_2.0_1,n.iijima_2.0_1"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1"
+# 一括を含む個別ケース設定例
+$cases_list = "okochi_2.0_1,okochi_2.0_2", "okochi_2.0_3"
 $env:CASE_LIST=$cases_list
+$augment_list = '1,2'
+$env:AUGMENT_LIST=$augment_list
 #
 function help {
     # プロファイルの表示
@@ -105,10 +112,12 @@ function model {
         [string]$hp='',
         [string]$dp='',
         [string]$roll='',
+        [string]$augment='',
         [float]$l2=0.0,
         [int]$key=0,
         [int]$evalkey=0,
-        [float]$alpha=1.0
+        [float]$alpha=1.0,
+        [int]$stop=-1
     )
     if ($help) {
         write-output '・コマンド -オプション'
@@ -121,8 +130,10 @@ function model {
         write-output ">model -hp ({<para>, }...)        ：ハイパーパラメータ（シーケンス長、バッチサイズ、エポック数、学習率の減衰率、埋め込み次元数）を設定する"
         write-output ">model -dp ({<para>, }...)        ：データ拡張パラメータ（シフト最大長、伸縮率、最大ノイズ率）を設定する"
         write-output ">model -case '{<case_name>,}...'  ：学習データリストを設定する（カンマ区切りで複数指定可。個別指定は’’不要）"
+        write-output ">model -augment '{<level>,}...'   ：データ拡張レベルを設定する（level={0|1|2|3|4|5}をカンマ区切りでケースの個別指定単位に指定）"
         write-output ">model -roll *|'<roll-path>'      ：動画ファイルの検索位置を設定する（'*'指定時は、ダイアログで選択）"
         write-output ">model -alpha '<add-weight-alpha>'：重ね画像アルファ値を設定する"
+        write-output ">model -stop '<early-stop>'       ：エポックを早期終了する条件（最小Loss値未更新回数）を設定する"
         write-output ">model		                  ：現在の環境変数を表示する"
         write-output ">actv26env	                  ：V26仮想環境をアクティベートする"
     }
@@ -167,6 +178,12 @@ function model {
             $env:CASE_LIST="$case"
             $cases_list = $env:CASE_LIST
             $str = '・学習データのリストが ' + $cases_list + ' に設定されました。'
+            write-output $str
+        }
+        elseif ( $augment -ne '' ) {
+            $env:AUGMENT_LIST="$augment"
+            $augment_levels = $env:AUGMENT_LIST
+            $str = '・データ拡張レベルが ' + $augment_levels + ' に設定されました。'
             write-output $str
         }
         elseif ( $key -gt 0 ) {
@@ -247,6 +264,12 @@ function model {
             $str = '・重ね画像アルファ値が ' + $add_alpha + ' に設定されました。'
             write-output $str
         }
+        elseif ( $stop -ge 0 ) {
+            $env:EARLY_STOP="$stop"
+            $early_stop = $env:EARLY_STOP
+            $str = '・早期停止回数が ' + $early_stop + ' に設定されました。'
+            write-output $str
+        }
         else{
             write-output '>>' 
             $str = '・GRUモデルタイプ     ：  ' + $env:MODEL_TYPE
@@ -263,12 +286,12 @@ function model {
             write-output $str
             $str = '・データ拡張パラメータ： ' + $env:AUGMENT_PARAM
             write-output $str
-            $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA
+            $str = '・早期停止回数        ： ' + $env:EARLY_STOP
+            write-output $str
+            $str = '・L2正則化係数        ： ' + $env:L2_LAMBDA 
             write-output $str
             $str = '・重ね画像アルファ値  ： ' + $env:ADD_WEIGHT
             write-output $str
-            $str = '・登録済ケースリスト  ： ' + $env:CASE_LIST 
-            Write-Output $str
             $str = '・動画ファイル検索位置： ' + $env:ROLL_PATH 
             Write-Output $str
             $str = '・ホームディレクトリ  ： ' + $HOME_DIR
@@ -277,6 +300,10 @@ function model {
                 $str = '・データベース名      ： ' + $env:DB_PATH
                 Write-Output $str
             }
+            $str = '・登録済ケースリスト  ： ' + $env:CASE_LIST 
+            Write-Output $str
+            $str = '・データ拡張リスト    ： ' + $env:AUGMENT_LIST 
+            Write-Output $str
         }
     }   
 }
@@ -487,16 +514,16 @@ function chart {
     param(
         [switch]$help,
         [switch]$h,
-        [switch]$list_case,
-        [switch]$list_key,
+        [string]$list='',
         [string]$import='',
         [string]$case,
-        [string]$key=''
+        [string]$key='',
+        [string]$tb=''
     )
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>chart  -list_case                    ：登録済ケース名の一覧を表示する'
-        write-output '>chart  -list_key                     ：ポイントキー名の一覧を表示する'
+        write-output '>chart  -list case|point|tb                   ：登録済ケース名、ポイントキー名、Tensor boardフォルダ一覧を表示する'
+        write-output ">chart  -tb   <Tensor board名>                ：指定されたTensor boardファルダのデータを表示する"
         write-output '>chart  -import <登録ケース名>                 ：解析結果ポイントデータファイルのデータをデータベースに登録する'
         write-output ">chart  -case   <登録ケース名> -key '<キー名>{,<キー名>}...' ：解析結果ポイントデータをグラフ表示する"
         write-output '>chart  -h	  ：コマンドの詳細パラメータを表示する'
@@ -505,13 +532,23 @@ function chart {
         # 詳細ヘルプ表示
         python ./src/chart.py -h
     } 
-    elseif ($list_case) {
-        # 登録済ケース名一覧表示
-        python ./src/chart.py  -d -case -L
+    elseif ($list -ne '') {
+        if ($list -eq 'case') {
+            # 登録済ケース名一覧表示
+            python ./src/chart.py  -d -case -L
+        } 
+        elseif ($list -eq 'point') {
+            # ポイントキー名一覧表示
+            python ./src/chart.py  -d -key
+        }
+        elseif ($list -eq 'tb') {
+            # Tensor board一覧表示
+            get-childitem ./*_tb
+        }
     } 
-    elseif ($list_key) {
-        # ポイントキー名一覧表示
-        python ./src/chart.py  -d -key
+    elseif ($tb -ne '') {
+        # 指定されたTensor boardのデータを表示
+        tensorboard --logdir $tb
     }
     elseif ($case -ne '') {
         # 解析結果ポイントデータをグラフ表示
@@ -567,6 +604,7 @@ function kyudo {
         [string]$train,
         [string]$valid='none',
         [switch]$section,
+        [int]$augment=-1,
         [string]$predict,
         [int]$input_frames = 0,
         [string]$input_key = '',
@@ -597,8 +635,9 @@ function kyudo {
         write-output ">kyudo  -update  <登録ケース名> -memo '<メモ>'            ：登録ケース名のメモを更新する"
         write-output ">kyudo  -eval    '*'|'<登録ケース名>{,<登録ケース名>}'... ：評価データを表示する"
         write-output '>kyudo  -case    <登録ケース名> [-input_key <番号>] [-input_frames <表示フレーム数>]         ：解析結果データをグラフ表示する'
-        write-output '>kyudo  -train   <登録ケース名>|list [-valid <検証ケース名>] [-section] [-model <モデルファイル>] [-eta <学習率>]    ：解析結果データで学習する'
-        write-output '>kyudo  -predict <登録ケース名> [-model <モデルファイル>]      	                            ：解析結果データで予測する'
+        write-output '>kyudo  -train   <登録ケース名>|list [-valid <検証ケース名>] [-section] [-augment <レベル>] [-model <モデルファイル>] [-eta <学習率>]'  
+        write-output '-                                                                                            ：解析結果データで学習する'
+        write-output '>kyudo  -predict <登録ケース名> [-model <モデルファイル>]      	                             ：解析結果データで予測する'
         write-output '>kyudo  -h		：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -655,14 +694,19 @@ function kyudo {
         $len = $args.Length
         # 検証ケース名が指定さた場合は、-valid オプションで指定する
         $valid_case = $valid
+        $aug_level = $augment
         if (-not $section ) {
             if ($train -ne 'list') {
                 # 単一ケース学習（登録ケース名指定）
+                if ($aug_level -lt 0) {
+                    # デフォルトは0に再設定
+                    $aug_level = 0
+                }
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/kyudoApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
+                    python ./src/kyudoApp.py -d -case $train -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
                 }
                 else {
-                    python ./src/kyudoApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
+                    python ./src/kyudoApp.py -d -case $train -valid $valid_case  classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
                 }
             }
             else {
@@ -670,13 +714,27 @@ function kyudo {
                 $cases_list = $env:CASE_LIST.Split(' ')
                 $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
                 write-output $str
+                $aug_levels = @()
+                if ($aug_level -lt 0) {
+                    $aug_levels = $env:AUGMENT_LIST.Split(',')
+                    $str = '・データ拡張のリスト： (' + $aug_levels.Length + 'ケース) ' + $aug_levels
+                    write-output $str
+                }
                 $i = 1
                 foreach ( $case_name in $cases_list ) {
-                    if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                    if ($aug_levels.Length -gt 0) {
+                        if ( $i -le $aug_levels.Length ) {
+                            $aug_level = $aug_levels[$i-1]
+                        }
+                        else {
+                            $aug_level = 0
+                        }
+                    }
+                    if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
+                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                     }
                     else {
-                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
                     }
                     #Write-Output $LASTEXITCODE
                     if ( $LASTEXITCODE -ne 0 ) {
@@ -688,8 +746,12 @@ function kyudo {
         }
         elseif ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
             # セクション毎（0 -> 9）学習
+            if ($aug_level -lt 0) {
+                # デフォルトは0に再設定
+                $aug_level = 0
+            }
             for( $i=0; $i -lt 10; $i++) {
-                python ./src/kyudoApp.py -d -case $train  classes=3 eta=$eta -hparam "($hparam)" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
+                python ./src/kyudoApp.py -d -case $train  classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
             } 
         }
         else{
@@ -703,7 +765,12 @@ function kyudo {
         if ($idx -ge 0 -and $len -gt $idx) {
             $modelpt = $args[$idx+1]
         }
-        python ./src/kyudoApp.py -d -case $predict -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
+        $aug_level = $augment
+        if ($aug_level -lt 0) {
+            # デフォルトは0に再設定
+            $aug_level = 0
+        }
+        python ./src/kyudoApp.py -d -case $predict augment=$aug_level -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -721,7 +788,7 @@ function eval {
         [switch]$img,
         [string]$train,
         [string]$valid='none',
-        [switch]$augment,
+        [int]$augment=-1,
         [string]$predict,
         [int]$input_frames = 0,
         [float]$eta = 0.001,
@@ -736,20 +803,8 @@ function eval {
     }
     $hparam = $hp_vals -join ','
 
-    # データ拡張パラメータ取得
-    $val_list = $env:AUGMENT_PARAM.Split(' ')
-    $i = 0
-    foreach ( $val in $val_list ) {
-        $dp_vals[$i] = $val
-        $i++    
-    }
-    $dparam = $dp_vals -join ','
-    $dp_opt = ''
-    $dp_val = ''
-    if ($augment) {
-        $dp_opt = '-dparam'
-        $dp_val = "($dparam)"
-    }
+    $aug_level = $augment
+
     # モデルタイプ取得
     $modelx = $env:EVAL_MODEL_TYPE
     $model = "-model"
@@ -757,10 +812,11 @@ function eval {
         write-output '・コマンド -オプション'
         write-output '>eval  -list    key|pt                                                ：入力データキー,または作成済モデルファイルの一覧を表示する'
         write-output ">eval  -update  <登録ケース名> -score '<スコア>'                      ：登録ケース名の評価データのスコア（1～8節をカンマ区切り）を更新する"
-        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...                         ：評価データを表示する"
-        write-output '>eval  -case    <登録ケース名> [-img [-augment]|-input_frames <表示フレーム数>]  ：評価データをグラフ表示する'
-        write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-augment] [-model <モデルファイル>] [-eta <学習率>]：解析結果データで学習する'
-        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]              ：解析結果データで予測する'
+        write-output ">eval  -print   '*'|'<登録ケース名>{,<登録ケース名>}'...                                  ：評価データを表示する"
+        write-output '>eval  -case    <登録ケース名> [-img [-augment <レベル>]] [-input_frames <表示フレーム数>] ：評価データをグラフ表示する'
+        write-output '>eval  -train   <登録ケース名>|list [-valid <検証ケース名>] [-augment <レベル>] [-model <モデルファイル>] [-eta <学習率>]'
+        write-output '-                                                                                         ：解析結果データで学習する'
+        write-output '>eval  -predict <登録ケース名> [-model <モデルファイル>]                                  ：解析結果データで予測する'
         write-output '>eval  -h	：コマンドの詳細パラメータを表示する'
     } 
     elseif ($h) {
@@ -789,8 +845,12 @@ function eval {
     }    
     elseif ($case -ne '') {
         if ($img) {
+            if ($aug_level -lt 0) {
+                # デフォルトは0に再設定
+                $aug_level = 0
+            }
              # 解析結果画像を表示
-            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"  $dp_opt $dp_val 
+            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"  augment=$aug_level 
         }
         else {
             # 解析結果データをグラフ表示
@@ -805,12 +865,16 @@ function eval {
         # 検証ケース名が指定さた場合は、-valid オプションで指定する
         $valid_case = $valid
         if ($train -ne 'list') {
-            # 単一ケース学習（登録ケース名指定）
+        # 単一ケース学習（登録ケース名指定）
+            if ($aug_level -lt 0) {
+                # デフォルトは0に再設定
+                $aug_level = 0
+            }
             if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx $args[$idx+1] -f0 $input_frames     
+                python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx $args[$idx+1] -f0 $input_frames     
             }
             else {
-                python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx -f0 $input_frames   
+                python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx -f0 $input_frames   
             }
         }
         else {
@@ -818,13 +882,27 @@ function eval {
             $cases_list = $env:CASE_LIST.Split(' ')
             $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
             write-output $str
+            $aug_levels = @()
+            if ($aug_level -lt 0) {
+                $aug_levels = $env:AUGMENT_LIST.Split(',')
+                $str = '・データ拡張のリスト： (' + $aug_levels.Length + 'ケース) ' + $aug_levels
+                write-output $str
+            }
             $i = 1
             foreach ( $case_name in $cases_list ) {
-                if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                if ($aug_levels.Length -gt 0) {
+                    if ( $i -le $aug_levels.Length ) {
+                        $aug_level = $aug_levels[$i-1]
+                    }
+                    else {
+                        $aug_level = 0
+                    }
+                }
+                if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
+                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                 }
                 else {
-                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" $dp_opt $dp_val -train $modelx -f0 $input_frames -n"$i" 
+                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx -f0 $input_frames -n"$i" 
                 }
                 #Write-Output $LASTEXITCODE
                 if ( $LASTEXITCODE -ne 0 ) {
