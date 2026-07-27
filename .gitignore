@@ -3,6 +3,7 @@ yolo.code-workspace
 .v26/
 csv/
 pt/
+*_tb/
 *.log
 !log/stub.log
 *.csv

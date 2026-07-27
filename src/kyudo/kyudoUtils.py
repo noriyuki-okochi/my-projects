@@ -35,7 +35,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # ログ出力関数
 # fmtmsg: フォーマット済みメッセージ
 # ログは標準出力とログファイルへ出力する
-def log_write(fmtmsg, print_enabled=True):
+def log_write(fmtmsg, print_enabled=True, time_stamp=False):
+    if time_stamp:
+        fmtmsg = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {fmtmsg}"
     if print_enabled: print(fmtmsg)
     ulog.info(fmtmsg)
 #
@@ -64,9 +66,9 @@ def df2csv(df, case_name='none', title=None, file=None, mode='a'):
 # cmds: コマンドライン引数リスト
 # def_parameters: デフォルトのハイパーパラメータタプル
 # 戻り値: ハイパーパラメータタプル
-def get_hyper_parameters(cmds, def_parameters):
+def get_hyper_parameters(cmds, opt_name, def_parameters):
     parameters = def_parameters
-    i = cmds.index('-hparam')
+    i = cmds.index(opt_name)
     if len(cmds) > (i + 1):
         params = cmds[i+1][1:-1].split(',')   # (1,2,3,4,5)の形式で指定
         #print(f"[get_hyper_parameters]:params={params}")
@@ -80,6 +82,19 @@ def get_hyper_parameters(cmds, def_parameters):
           parameters = tuple( values )
     
     return parameters
+#
+# データ拡張パラメータの取得関数
+# def_augment: デフォルトのデータ拡張パラメータタプル(shift, warp, noise)
+# augment_level: データ拡張レベル（0〜7）
+def get_augment_parameters( def_augment, augment_level=7 ):
+    shift, warp, noise = def_augment
+    augments = [None, 
+                (int(shift), None, None), (None, warp, None), (int(shift), warp, None), 
+                (None, None, noise), (int(shift), None, noise), (None, warp, noise),
+                (int(shift), warp, noise)]
+    if  augment_level < 0 or augment_level > 7: 
+        augment_level = 0
+    return augments[augment_level]
 #
 # 特徴量カラム名取得関数
 # features: 特徴量リスト
@@ -130,7 +145,102 @@ def update_section_completed( action, section, completed, output_size):
             completed = 0
     return section, completed
       
-        
+# **(1) 時間方向の伸縮（±10%）**
+def time_warp(x, warp_factor=0.1):
+    """
+    x: (s_frames, input_dim)
+    warp_factor: ±10% の伸縮
+    """
+    s_frames, input_dim = x.shape
+    scale = 1.0 + (torch.rand(1).item() * 2 - 1) * warp_factor
+    new_frames = int(s_frames * scale)
+
+    x = x.unsqueeze(0).unsqueeze(0)  # (batch,channel,s_frames,input_dim)
+    x = F.interpolate(x, size=(new_frames, input_dim), mode='bilinear') # 拡張
+    x = F.interpolate(x, size=(s_frames, input_dim), mode='bilinear')   # 収縮
+    return x.squeeze()
+
+# **(2) 特徴量に微小ノイズ（±1〜2%）**
+def add_noise(x, noise_level=0.02):
+    noise = torch.randn_like(x) * noise_level
+    return x + noise
+
+# **(3) 特徴量のランダムマスク（DropFeature）**
+def drop_feature(x, drop_prob=0.1):
+    mask = (torch.rand_like(x) > drop_prob).float()
+    return x * mask
+
+# **(4) 時間方向のランダムシフト**
+def time_shift(x, max_shift=3, min_shift=0):
+    shift = torch.randint(min_shift, max_shift+1, (1,)).item()
+    return torch.roll(x, shifts=shift, dims=0)
+
+# **データ拡張をまとめて適用する関数**
+def eval_data_augment(x, params):
+    """
+    x: (s_frames, input_dim)
+    params: (t_shift, t_warp, noise)
+    """
+    _, input_dim = x.shape
+    t_shift, t_warp, noise = params
+    # 時間（Y）軸シフト
+    if (t_shift != None) and (torch.rand(1).item() < 0.5):
+        x = time_shift(x, t_shift)
+
+    end = -10 if input_dim >= 17 else -2
+    # 特徴量ノイズ
+    if (noise != None) and (torch.rand(1).item() < 0.5):
+        x[:, :end] = add_noise( x[:, :end] , noise)
+    '''
+    if (t_warp != None) and (torch.rand(1).item() < 0.5):
+        x[:, :end] = time_warp( x[:, :end] , t_warp)
+    '''
+    return x
+#
+#  ラベルを前後に拡張する
+#
+def expand_label(label, warp):
+    """
+    label: (s_frames, 2)  ラベルの2列目を拡張する
+    warp: ラベルを前後に拡張するフレーム数
+    """
+    s_frames, _ = label.shape
+    for i in range(s_frames):
+        if label[i,0] != 0:
+            for j in range(1, warp+1):
+                if (i-j) >= 0:           label[i-j,1] = label[i,0]
+                if (i+j) < s_frames:     label[i+j,1] = label[i,0]
+    return label
+#
+#  Ordinal Regression 用の損失関数（CORAL Loss）
+#
+class CoralLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, logits, y):
+        """
+        logits: (batch, K-1)  K=6 → 5個のロジット
+        y: (batch,) 0〜5 の整数ラベル
+        """
+        _, num_levels = logits.size()
+
+        # y を (batch, num_levels) の 0/1 マスクに変換
+        y_expanded = y.unsqueeze(1).repeat(1, num_levels)
+        label_mask = (y_expanded > torch.arange(num_levels).to(y.device)).float()
+
+        # ロジットにシグモイド
+        prob = torch.sigmoid(logits)
+
+        # Binary Cross Entropy
+        loss = F.binary_cross_entropy(prob, label_mask, reduction='mean')
+        return loss
+#
+#  **推論時のスコア復元**
+def ordinal_predict(logits):
+    prob = torch.sigmoid(logits)
+    # True が続く限りカウント
+    return torch.sum(prob > 0.5, dim=1)
 #
 # earlystoppingクラス
 # patience: 最小値の非更新数カウンタ
@@ -184,7 +294,7 @@ class EarlyStopping:
 #
 # GRUモデルの学習用TensorDatasetを編集する関数
 #
-def kyudo_tesorDataset( np_x, np_yact, s_frames ):
+def kyudo_tesorDataset( np_x, np_yact, s_frames, augment_params=None ):
     input_frames, input_size = np_x.shape
     # 先頭s_frames分のデータを1セット（ゼロ値データ）として扱う
     x_zeros = np.zeros( (s_frames, input_size) )
@@ -203,7 +313,30 @@ def kyudo_tesorDataset( np_x, np_yact, s_frames ):
     y_data = torch.tensor(y_data, dtype=torch.int64).to(device )
     log_write(f"[kyudo_tesorDataset]:x_data={x_data.shape}")
     log_write(f"[kyudo_tesorDataset]:y_data={y_data.shape}")
+    # データ拡張
+    if augment_params is not None:
+        print(f"[kyudo_tesorDataset]:augment_params={augment_params}")
+        input_frames, _, _ = x_data.shape
+        t_shift, _, noise = augment_params
+        # 特徴量ノイズを全サンプル（フレーム）に適用する
+        if (noise is not None)  and (torch.rand(1).item() < 0.5):
+            print(f"[kyudo_tesorDataset]:noise added.(noise={noise:.3f})")
+            x_data = add_noise( x_data, noise )
+        
+        # ラベル（y_data::action）を前後にシフトする
+        if (t_shift is not None) and (torch.rand(1).item() < 0.5):
+            print(f"[kyudo_tesorDataset]:label shifted.(t_shift={t_shift})")
+            y_data = time_shift( y_data, t_shift, (-1)*t_shift )
     
+    # 次元１のラベルを2列[元ラベル、補正ラベル]にコピー変換する（正解率の補正用）
+    y_data = y_data.repeat(1, 2)  # (input_frames, 1) → (input_frames, 2)
+    # 補正用ラベルを前後にデータ拡張する
+    if augment_params is not None:
+        _,warp,_ = augment_params
+        if warp is not None:
+            print(f"[kyudo_tesorDataset]:valid-label expanded.(warp={warp:.1f})")
+            y_data =  expand_label(y_data, int(warp))
+
     return TensorDataset(x_data, y_data)
 #
 # 評価データ(input_frames,input_dim)をsectionごとに(samples,s_frames,input_dim)にunsqueezeする関数
@@ -241,14 +374,21 @@ def eval_data_unSqueeze( np_x, np_yact, s_frames ):
 # np_x: 評価データ (input_frames, input_dim)
 # np_yact: 評価の正解ラベル (input_frames, 1)
 # s_frames: 1サンプルのフレーム数
-def eval_tesorDataset( np_x, np_yact, s_frames ):
+def eval_tesorDataset( np_x, np_yact, s_frames, augment_params=None ):
     x_data, y_data = eval_data_unSqueeze( np_x, np_yact, s_frames )
     #    
     # データをTensorに変換してTensorDatasetを作成する
-    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[i_frame, s_frames, input_dim]
-    y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[i_frame, s_frames, input_dim]
+    x_data = torch.tensor(x_data, dtype=torch.float32).to(device )      #[input_frames, s_frames, input_dim]
+    y_data = torch.tensor(y_data, dtype=torch.int64).to(device )        #[input_frames, s_frames, input_dim]
 
     print(f"[eval_tesorDataset]:x_data={x_data.shape}, y_data={y_data.shape}")
+    
+    # データ拡張
+    if augment_params is not None:
+        print(f"[eval_tesorDataset]:augment_params={augment_params}")
+        for i in range(x_data.shape[0]):
+            x_data[i] = eval_data_augment( x_data[i], augment_params )
+        
     return TensorDataset(x_data, y_data)
 #
 # 学習ループ関数
@@ -262,17 +402,81 @@ def eval_tesorDataset( np_x, np_yact, s_frames ):
 # valid_loader: 検証用DataLoader
 # earlystop: EarlyStoppingのインスタンス
 # 学習ループは、指定されたエポック数だけ、学習用データローダーからデータを取得してモデルを訓練します。
-def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
-    # モデルのクラス名からモデルのベース名を決定する
-    class_name:str = model.get_class_name()
+def train_loop_kyudo(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
+    for epoch in range(n_epoch):
+        model.train()
+        loss_train = 0
+        for x, t in loader:
+            # 順伝搬、損失計算、逆伝搬、パラメータ更新
+            y = model(x)
+            # 損失関数は、正解ラベルの1列目を使用して計算されます。
+            loss = criterion(y, t[:,0].squeeze())   
+            # L2正則化の追加            
+            if l2_lambda > 0.0:
+                l2_norm = sum(p.pow(2.0).sum() for p in model.parameters())
+                loss = loss + l2_lambda * l2_norm
+            # accumulate loss
+            loss_train += loss.item()
+            # 勾配の初期化
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        # end of batch loop        
+        # calculate average loss
+        loss_train /= len(loader)
+        # 学習過程をCSVファイルに出力
+        model.write_csv( [epoch, loss_train] )          
+        if epoch % 20 == 0 or epoch == (n_epoch - 1):
+            # 20エポックごとに学習過程を表示
+            log_write(f'epoch:{epoch:3d}, loss_train={loss_train:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}', True, True)
+        
+        if scheduler is not None:
+            # 学習率の更新
+            scheduler.step(loss_train)      
 
+        if valid_loader is not None:
+            model.eval()
+            # EaryStoppingのための検証ループ
+            loss_valid = 0
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for x, t in valid_loader:
+                    y = model(x)
+                    # 損失関数は、正解ラベルの1列目を使用して計算されます。
+                    loss = criterion(y, t[:,0].squeeze()) 
+                    loss_valid += loss.item()
+                    predicted = torch.argmax( y, dim=1)
+                    # 正解率の計算は、正解ラベルの2列目を使用して行われます。
+                    # ラベル=0以外の正解率を計算する
+                    zeros = torch.zeros(t.size(0), dtype=torch.int64).to(device)
+                    total += int((t[:,0].squeeze() != zeros).sum().item())      
+                    correct += int( ((predicted != zeros) & (predicted == t[:,1].squeeze())).sum().item() )
+            
+            accuracy = (correct / total) if total > 0 else 0
+            loss_valid /= len(valid_loader)
+            print(f"accuracy:  {accuracy:.2f}, correct: {correct:3d}, total: {total}, loss_valid: {loss_valid:.4f}")    
+            # 学習過程をtensorboardに出力
+            model.write_tb( [epoch, accuracy], key="accuracy" )
+
+            if earlystop is not None:
+                loss_valid /= len(valid_loader)
+                # EarlyStoppingの呼び出し
+                earlystop(epoch, loss_valid, model)        
+                if earlystop.early_stop:
+                    log_write(f"Early stopping at epoch {epoch:3d}")
+                    break
+    # end of train_loop_kyudo
+    return
+    
+def train_loop_eval(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, scheduler=None, valid_loader=None, earlystop=None):
     for epoch in range(n_epoch):
         model.train()
         loss_train = 0
         for x, t in loader:
             _,_,input_size = x.shape
-            if class_name == 'EvalCN' and input_size >= 17:
-                x = x[:,:,:-1]        # sectionカラム(-1)は削除
+            if input_size >= 17:
+                x = x[:,:,:-1]          # sectionカラム(-1)は削除
             # 順伝搬、損失計算、逆伝搬、パラメータ更新
             y = model(x)
             loss = criterion(y, t.squeeze())
@@ -286,52 +490,42 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        #end of batch loop        
         # calculate average loss
         loss_train /= len(loader)
-        model.write_csv( [epoch, loss_train] )          # 学習過程をCSVファイルに出力
+        # 学習過程をCSVファイルに出力
+        model.write_csv( [epoch, loss_train] )          
         if epoch % 20 == 0 or epoch == (n_epoch - 1):
             # 20エポックごとに学習過程を表示
-            log_write(f'epoch:{epoch:3d}, loss_train={loss_train:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
+            log_write(f'epoch:{epoch:3d}, loss_train={loss_train:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}', True, True)
         
         if scheduler is not None:
             # 学習率の更新
             scheduler.step(loss_train)      
-
+    
         if valid_loader is not None:
             model.eval()
-            if 'GRU' in class_name: 
-                # EaryStoppingのための検証ループ
-                loss_valid = 0
-                with torch.no_grad():
-                    for x, t in valid_loader:
-                        y = model(x)
-                        loss = criterion(y, t.squeeze())
-                        loss_valid += loss.item()
-                        #print(f"[train_loop]:y={y}, t={t}")
-                        #score = torch.argmax( y, dim=1).item()
-                loss_valid /= len(valid_loader)
-                #log_write(f'epoch:{epoch:3d}, loss_valid={loss_valid:.4f}, lr={optimizer.param_groups[0]["lr"]:.8f}')
-                if earlystop is not None:
-                    # EarlyStoppingの呼び出し
-                    earlystop(epoch, loss_valid, model)        
-                    if earlystop.early_stop:
-                        log_write(f"Early stopping at epoch {epoch:3d}")
-                        break
-            else:
-                # EvalNN:正解率測定のための検証ループ
-                with torch.no_grad():
-                    correct = 0
-                    total = 0
-                    for x, t in valid_loader:
-                        y = model(x)
-                        predicted = torch.argmax(y, dim=1)
-                        total += t.shape[0]
-                        correct += int((predicted == t.squeeze()).sum().item())
-                    accuracy = (correct / total) if total > 0 else 0
-                    if epoch % 20 == 0 or epoch == (n_epoch - 1):
-                        # 20エポックごとに学習過程を表示
-                        print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")
-
+            # EvalNN/CN:正解率測定のための検証ループ
+            with torch.no_grad():
+                correct = 0
+                for x, t in valid_loader:
+                    _,_,input_size = x.shape
+                    if input_size >= 17:
+                        x = x[:,:,:-1]        # sectionカラム(-1)は削除
+                    y = model(x)
+                    predicted = ordinal_predict( y)
+                    correct += int((predicted == t.squeeze()).sum().item())
+                    
+            total = len(valid_loader.dataset)
+            accuracy = (correct / total) if total > 0 else 0
+            # 学習過程をtensorboardに出力
+            model.write_tb( [epoch, accuracy], key="accuracy" )    
+            if epoch % 20 == 0 or epoch == (n_epoch - 1):
+                # 20エポックごとに学習過程を表示
+                print(f"accuracy:  {accuracy:.2f}, correct: {correct}, total: {total}")
+    # end of train_loop_eval
+    return
+    
 # モデルの学習を実行する関数
 # model: GRU/EvalNNモデル
 # s_frames: 1サンプルのフレーム数 
@@ -340,7 +534,8 @@ def train_loop(model, loader, criterion, optimizer, n_epoch, l2_lambda=0.0, sche
 # batch_size: バッチサイズ
 # n_epoch: エポック数
 # pth: 学習結果のモデルを保存するファイルパス（Noneの場合はデフォルト名）
-def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, r_factor=1.0, pth=None):
+def train_Model( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epoch=280, \
+                 r_factor=1.0, pth=None, augment_params=None):
     # モデルのクラス名からモデルのベース名を決定する
     class_name:str = model.get_class_name()
     if 'GRU' in class_name: model_name = f'{MODEL_NAME}{class_name[-1]}'
@@ -349,13 +544,13 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     # 学習用TensorDatasetを編集する
     np_x, np_yact = np_train
     _, input_size = np_x.shape
-    log_write(f"[train_Kyudo]:np_x={np_x.shape}, np_yact={np_yact.shape}")
+    log_write(f"[train_Model]:np_x={np_x.shape}, np_yact={np_yact.shape}")
     if 'GRU' in class_name:
         # np_x: (input_frames, s_frames, input_dim), np_yact: (input_frames, 1)
-        dataset = kyudo_tesorDataset( np_x, np_yact, s_frames )
+        dataset = kyudo_tesorDataset( np_x, np_yact, s_frames, augment_params )
     else:
         # np_x: (i_sections, s_frames, input_dim), np_yact: (i_sections, 1)
-        dataset = eval_tesorDataset( np_x, np_yact, s_frames )  
+        dataset = eval_tesorDataset( np_x, np_yact, s_frames, augment_params)  
     loader = DataLoader(dataset, batch_size, shuffle=False)
 
     # 検証TensorDatasetを編集する
@@ -367,7 +562,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
         else:
             valid_dataset = eval_tesorDataset( np_valid_x, np_valid_yact, s_frames )
         valid_loader = DataLoader(valid_dataset, batch_size, shuffle=False)
-        print(f"[train_Kyudo]:valid_loader={len(valid_loader)} batches, batch_size={batch_size}")
+        print(f"[train_Model]:valid_loader={len(valid_loader)} batches, batch_size={batch_size}")
 
     # 学習結果のモデル保存用ファイル名の決定
     if pth is not None:
@@ -380,35 +575,41 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
             input_size = (input_size - 1) if input_size >= 17 else input_size
         output_size = model.output_size
         model_pth = pth if pth is not None else f"./{model_name}_{input_size}-{s_frames}-{output_size}.pt"
-    log_write(f"[train_Kyudo]:model will be saved as {model_pth}")
+    log_write(f"[train_Model]:model will be saved as {model_pth}")
 
     # 損失関数と最適化手法の定義
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss() if 'GRU' in class_name else CoralLoss()
     optimizer = optim.Adam(model.parameters(), lr=Learning_rate)
+    
+    print(f"[train_Model]:criterion={criterion}")
+    #print(f"[train_Model]:optimizer={optimizer}")
     
     # 学習過程の損失値をCSVファイルに出力するための準備
     model.open_csv( ['epoch','loss_train'], path="./", fname='loss_train',mode=LOSS_FILE_MODE )
     
     # 学習率のスケジューラー
     scheduler = None
-    earlystop = None
-    if np_valid is None:
+    if r_factor < 1.0:
         # 学習率を 1/10 に
         # 3エポック改善しなければ発動
-        if r_factor < 1.0:
-            scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,mode = 'min',factor = r_factor,patience = 3)
-            # 10エポックごとに学習率を0.95倍に減衰
-            #scheduler = lr_scheduler.StepLR(optimizer, step_size = 10, gamma = r_factor)  
-    else:
-        if r_factor < 1.0:
-            scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,mode = 'min',factor = r_factor,patience = 3)
+        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer,mode = 'min',factor = r_factor,patience = 3)
+        # 10エポックごとに学習率を0.95倍に減衰
+        #scheduler = lr_scheduler.StepLR(optimizer, step_size = 10, gamma = r_factor)  
+    earlystop = None
+    if np_valid is not None and Early_stop > 0:
         # EarlyStoppingのインスタンスを作成
-        earlystop = EarlyStopping(patience = 7, delta = 0, path = model_pth, verbose = False)  
+        earlystop = EarlyStopping(patience = Early_stop, delta = 0, path = model_pth, verbose = False)  
+    
+    print(f"[train_Model]:scheduler={scheduler}, earlystop={earlystop}")
     #   
     # 学習ループ
-    train_loop( model, loader, criterion, optimizer, n_epoch, \
-                l2_lambda=L2_lambda, scheduler=scheduler, valid_loader=valid_loader, earlystop=earlystop)
-    
+    if 'GRU' in class_name:
+        train_loop_kyudo(model, loader, criterion, optimizer, n_epoch, \
+                         l2_lambda=L2_lambda, scheduler=scheduler, valid_loader=valid_loader, earlystop=earlystop)
+    else:
+        train_loop_eval(model, loader, criterion, optimizer, n_epoch, \
+                        l2_lambda=L2_lambda, scheduler=scheduler, valid_loader=valid_loader, earlystop=earlystop)
+
     # 学習過程の損失値をCSVファイルに出力するための後処理
     model.close_csv()    
       
@@ -416,7 +617,7 @@ def train_Kyudo( model ,s_frames, np_train, np_valid=None,  batch_size=32, n_epo
     torch.save(model.state_dict(), model_pth)
     #
     ulog.debug(model.state_dict())
-    log_write(f"[train_Kyudo]:model saved as {model_pth}")
+    log_write(f"[train_Model]:model saved as {model_pth}")
     
     return #record_loss_train
 #  
@@ -517,7 +718,8 @@ def predict_Eval( model, np_x, s_frames, log_print=True):
         ulog.debug(f"[predict_Eval]:t={t}:{x}")
         with torch.no_grad():
             y_pred = model(x)
-            score = torch.argmax( y_pred, dim=1).item()
+            #score = torch.argmax( y_pred, dim=1).item()
+            score = ordinal_predict( y_pred).item()
         #
         log_write(f"[predict_Eval]:({t:2d}) section={int(np_data[t,0,-1])}, score={score}", log_print)    
         y_data[t] = score

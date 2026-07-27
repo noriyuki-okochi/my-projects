@@ -58,6 +58,7 @@ Alart_id:int = 0            # アラート番号
 Alart_message:str = ''      # アラートメッセージ
 Section_color:list = YELLOW # セクションの色（黄色）BGR
 RL_angle:float = 0.0        # 右手首ー＞左手首の角度
+SR_angle:float = 0.0        # 右腕の角度
 SL_angle:float = 0.0        # 左腕の角度
 ER_angle:float = 0.0        # 右肘ー＞右手首の角度
 HR_angle:float = 0.0        # 右腰ー＞右手首の角度
@@ -227,7 +228,7 @@ def get_camera_pos(myResult):
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
-    global  RL_angle, SL_angle, ER_angle, HR_angle, RSE_angle, EYE_ratio
+    global  RL_angle, SR_angle, SL_angle, ER_angle, HR_angle, RSE_angle, EYE_ratio
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -281,6 +282,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         # グローバル変数にセット(評価データ参照用)
         RL_angle = rl_angle
         HR_angle = hr_angle
+        SR_angle = sr_angle
         SL_angle = sl_angle
         ER_angle = rew_angle
         RSE_angle = rse_angle
@@ -326,7 +328,6 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 #
 def section_started(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    #global ER_angle, SL_angle, RL_angle
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
     ibox = myResult.boxid
@@ -341,10 +342,6 @@ def section_started(section_no, myResult:MyResult):
     normS, _ = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
     xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
 
-    #_, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
-    #_, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
-    #_, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
-    
     started = False
     # 共通の開始条件を取得
     PRM = StartAction_param['param'][10]        # 10は共通の開始条件     
@@ -550,7 +547,6 @@ def section_started(section_no, myResult:MyResult):
 #
 def section_completed(section_no, myResult:MyResult):
     global Step_counter, Step_error, Alart_id
-    #global RL_angle, SL_angle, ER_angle
     global Pull_counter, Push_counter
     
     keyPoints = myResult                            # キーポイントのデータ解析インスタンス
@@ -572,10 +568,6 @@ def section_completed(section_no, myResult:MyResult):
 
     lenY, _ = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
 
-    #_, RL_angle = keyPoints.norm('right_wrist', 'left_wrist')       # 右手首から左手首へのベクトルの長さと角度を計算
-    #_, ER_angle = keyPoints.norm('right_elbow', 'right_wrist')      # 右肘から右手首へのベクトルの長さと角度を計算
-    #_, SL_angle = keyPoints.norm('left_shoulder', 'left_wrist')     # 左肩から左手首へのベクトルの長さと角度を計算
-        
     completed = False
     # 共通の開始条件を取得
     PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
@@ -1410,7 +1402,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     if Eval_enabled:
         bSectionChanged = Eval(Frame_counter, Section_no, 1 if Completed else 0, \
             Step_counter, Split_sec, \
-            RL_angle, ER_angle, SL_angle, \
+            RL_angle, ER_angle, SL_angle, SR_angle,\
             RSE_angle, EYE_ratio, Alart_id)
         
         if bSectionChanged and evalModel is not None: 
