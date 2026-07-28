@@ -318,7 +318,7 @@ function yoloAp {
         [switch]$raw,
         [float]$fps=1.0,
         [switch]$yolo,
-        [int]$kpt=0,
+        [int]$kpt=3,
         [switch]$clip,
         [switch]$rotate,
         [string]$case,
@@ -380,6 +380,9 @@ function yoloAp {
     if ( $mask ) {
         $maskon = '-z'
     }
+    if ($rotate) {
+        write-output '・動画を時計回りに90度回転して表示します'
+    }
     #
     if ($help) {
         write-output '・コマンド -オプション'
@@ -430,7 +433,11 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py -d1 -a  -r -w $fps -at $at --
+        $clockwise = ''
+        if ($rotate) {
+            $clockwise = '-rotate'
+        }
+        python ./src/yoloApp.py -d1 -a  -r $clockwise -w $fps -at $at --
     }
     elseif ($yolo) {         
         # 動画姿勢解析再生
