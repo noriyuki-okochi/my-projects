@@ -1539,13 +1539,13 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # 'w'キーで一開始／停止
         ctl['videoWrite'] = True if ctl['videoWrite'] is False else False  
         if ctl['videoWrite']: 
-            print(f"出力ファイルに書き込みを開始します: {out_file}")
-            mylog.log(INFO, ">> video write start")
             if Cv2Video is None:
                 # 動画ファイルの書き込みオブジェクトを作成
                 frame_height, frame_width = annotated_frame.shape[0:2]
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps*ctl['fps_ratio'], (frame_width, frame_height))
+            print(f"出力ファイルに書き込みを開始します: {out_file}: Fps={(Fps*ctl['fps_ratio']):.2f}")
+            mylog.log(INFO, ">> video write start")
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
             mylog.log(INFO, ">> video write pause")
@@ -1853,6 +1853,7 @@ def main():
     global StartAction_param, CompleteAction_param
     global Rect_area
     global InputPdf
+    global Fps
 
     #
     # start of main
