@@ -195,7 +195,7 @@ class MyResult(Keypoint):
                 Kn2idx['right_knee'], 
                 Kn2idx['right_ankle']]      # 右胴体ー＞足首のキーポイントインデックス
     
-    def __init__(self, result, frame, boxid=None):
+    def __init__(self, result, frame, manual=False, boxid=None):
         if boxid is None:
             # 検出結果から最大（対象）のボックスを取得
             boxno = self.get_max_box(result)
@@ -203,25 +203,26 @@ class MyResult(Keypoint):
                 raise BoundaryBoxError('Target boundary-box can not be found.')
             else: boxid = boxno - 1
         super().__init__(result, boxid)
-        
+        self.manual = manual
         self.result = result
         self.confs = result.keypoints.conf[boxid].numpy()   # 対象ボックスのキーポイントの信頼度リスト
         self.points = result.keypoints.xy[boxid].numpy()    # 対象ボックスのキーポイントの座標リスト
         self.xywh = result.boxes.xywh[boxid].numpy()        # バウンディングボックスの座標リスト [x, y, w, h]
 
-        # 対象ボックスの合理性検証
-        if boxid != MyResult.MaxBox_id or MyResult.Skip == True:
-            mylog.log(DEBUG, f"[MyResult]:frame={frame}, "\
-                            f" MaxBox_id changed.[{MyResult.MaxBox_id} -> {boxid}], xywh={self.xywh}") 
-            if MyResult.MaxBox_id != None and abs(int(self.xywh[0]) - int(MyResult.XYWH[0])) > int(MyResult.XYWH[2]):
-                # 前のボックスと現在のボックスの位置が大きくずれている場合、スキップ
-                MyResult.Skip = True
-                # 例外を発生させる
-                raise BoundaryBoxError('Target boundary-box can not be found.')
-            
-            # クラス変数の初期化a5
-            MyResult.Skip = False
-            MyResult.MaxBox_id = boxid
+        if manual:        
+            # 対象ボックスの合理性検証
+            if boxid != MyResult.MaxBox_id or MyResult.Skip == True:
+                mylog.log(DEBUG, f"[MyResult]:frame={frame}, "\
+                                f" MaxBox_id changed.[{MyResult.MaxBox_id} -> {boxid}], xywh={self.xywh}") 
+                if MyResult.MaxBox_id != None and abs(int(self.xywh[0]) - int(MyResult.XYWH[0])) > int(MyResult.XYWH[2]):
+                    # 前のボックスと現在のボックスの位置が大きくずれている場合、スキップ
+                    MyResult.Skip = True
+                    # 例外を発生させる
+                    raise BoundaryBoxError('Target boundary-box can not be found.')
+                
+                # クラス変数の初期化a5
+                MyResult.Skip = False
+                MyResult.MaxBox_id = boxid
         #
         MyResult.XYWH = self.xywh
         

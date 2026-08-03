@@ -1868,6 +1868,7 @@ def main():
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = True                                 # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
+    idir = idir if idir[-1] == '/' else idir + '/'
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
     filetypes = f"WIN_{timestamp}_*.mp4"            #'*WIN_YYYYmmdd_10_46_55_Pro.mp4'  # 動画ファイル名
@@ -2610,7 +2611,7 @@ def main():
             # 面積最大のボックスを取得、信頼度の低いキーポイント座標データは前回採用データで置き換える
             result = results[0]
             try:
-                myResult = MyResult(result, Frame_counter)
+                myResult = MyResult(result, Frame_counter, manual_plot)
             except BoundaryBoxError as e:
                 print(f"フレーム({Frame_counter}):{e}")
                 mylog.log(INFO, f"[main]:フレーム({Frame_counter}):検出結果の描画をスキップ")
