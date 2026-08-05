@@ -1544,7 +1544,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
                 frame_height, frame_width = annotated_frame.shape[0:2]
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps*ctl['fps_ratio'], (frame_width, frame_height))
-            print(f"出力ファイルに書き込みを開始します: {out_file}: Fps={(Fps*ctl['fps_ratio']):.2f}")
+                print(f"出力ファイルに書き込みを開始します: {out_file}: {frame_width}x{frame_height}, Fps={(Fps*ctl['fps_ratio']):.2f}")
             mylog.log(INFO, ">> video write start")
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
@@ -2320,6 +2320,8 @@ def main():
     frame_height = int(cap[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width = int(cap[0].get(cv2.CAP_PROP_FRAME_WIDTH)) 
     keyCtl['frame_count'] = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
+
+    out_frame_width, out_frame_height = frame_width, frame_height
     # フレームレートを取得
     Fps = cap[0].get(cv2.CAP_PROP_FPS)       
     #
@@ -2341,7 +2343,7 @@ def main():
             elif len(rectAreas) > 0:                # 'c'押下で処理継続
                 # クリッピング領域座標の取得
                 rect = rectAreas.pop(0)
-                frame_width, frame_height = rect.width_height()
+                out_frame_width, out_frame_height = rect.width_height()
                 frame_x = rect.x[0]
                 frame_y = rect.y[0]
                 break
@@ -2384,7 +2386,7 @@ def main():
             base_name = os.path.basename(file_name[0])
             out_file = f"{idir}_{base_name}"
 
-        print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
+        print(f"[main]:出力ファイル：{out_file}")
         #print(f"os.sep: {os.sep}")
         if not clip_video:
             # '-w'指定時のみ、出力FPS値の検査
@@ -2578,7 +2580,8 @@ def main():
                 frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             if clip_video:
                 # クリッピング処理
-                annotated_frame = frame[ frame_y:frame_y + frame_height, frame_x:frame_x + frame_width ]
+                annotated_frame = frame[ frame_y:frame_y + out_frame_height, frame_x:frame_x + out_frame_width ]
+                #print(f"[main]:クリッピング処理: {frame.shape} -> {annotated_frame.shape}")
                 for rect in rectAreas:
                     # モザイク処理
                     w, h = rect.width_height()
