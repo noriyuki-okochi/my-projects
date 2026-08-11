@@ -89,7 +89,7 @@ function help {
     write-output '> help         : このヘルプを表示する'
     write-output '> yoloAp -help : 動画再生・解析ツールの使用ガイダンスを表示する'
     write-output '> chart  -help : 解析データ登録／データ表示ツールの使用ガイダンスを表示する'
-    write-output '> kyudo  -help : 姿勢形解析データの登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
+    write-output '> kyudo  -help : 姿勢解析データの登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> eval   -help : 射形評価データの学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
 }
@@ -318,7 +318,7 @@ function yoloAp {
         [switch]$raw,
         [float]$fps=1.0,
         [switch]$yolo,
-        [int]$kpt=0,
+        [int]$kpt=3,
         [switch]$clip,
         [switch]$rotate,
         [string]$case,
@@ -380,6 +380,9 @@ function yoloAp {
     if ( $mask ) {
         $maskon = '-z'
     }
+    if ($rotate) {
+        write-output '・動画を時計回りに90度回転して表示します'
+    }
     #
     if ($help) {
         write-output '・コマンド -オプション'
@@ -388,8 +391,8 @@ function yoloAp {
         write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
-        write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3}）'
+        write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを生再生する"
         write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
@@ -430,7 +433,11 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py -d1 -a  -r -w $fps -at $at --
+        $clockwise = ''
+        if ($rotate) {
+            $clockwise = '-rotate'
+        }
+        python ./src/yoloApp.py -d1 -a  -r $clockwise -w $fps -at $at --
     }
     elseif ($yolo) {         
         # 動画姿勢解析再生

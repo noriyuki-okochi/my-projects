@@ -103,9 +103,9 @@ Add_beta:float = 1.0 - Add_alpha
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip [-rotate]|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
+    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-w [<fps>]] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-rortate] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
         + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [--] [-at <frame_no>]")
@@ -120,7 +120,7 @@ def help():
     print(" -s(kill):skill-level default=1(0-3)")
     print(" -r(aw-video)")
     print(" -clip(:raw-video)")
-    print(" -rotate(:90°clockwise)")
+    print(" -rotate(:90°clockwise): enabled only '-r' or '-clip'")
     print(" -multi(-video-layer display)")
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
@@ -134,7 +134,7 @@ def help():
     print(" -P(arameter set in CompletedAction_parames)")
     print(" -S(kip illegal-action-check): section-no=3,5")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
-    print(" -kpt <no>: draw key-point-line type: default=0")
+    print(" -kpt <no>: draw key-point-line type:1=upper,2=right-side,3=front(default),other=yolo standard")
     print(" -h(elp)")
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
     print(" -v(erborse)")
@@ -1539,13 +1539,13 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         # 'w'キーで一開始／停止
         ctl['videoWrite'] = True if ctl['videoWrite'] is False else False  
         if ctl['videoWrite']: 
-            print(f"出力ファイルに書き込みを開始します: {out_file}")
-            mylog.log(INFO, ">> video write start")
             if Cv2Video is None:
                 # 動画ファイルの書き込みオブジェクトを作成
                 frame_height, frame_width = annotated_frame.shape[0:2]
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps*ctl['fps_ratio'], (frame_width, frame_height))
+                print(f"出力ファイルに書き込みを開始します: {out_file}: {frame_width}x{frame_height}, Fps={(Fps*ctl['fps_ratio']):.2f}")
+            mylog.log(INFO, ">> video write start")
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
             mylog.log(INFO, ">> video write pause")
@@ -1853,6 +1853,7 @@ def main():
     global StartAction_param, CompleteAction_param
     global Rect_area
     global InputPdf
+    global Fps
 
     #
     # start of main
@@ -1868,6 +1869,7 @@ def main():
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = True                                 # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
+    idir = idir if idir[-1] == '/' else idir + '/'
     ALL_TYPES = "*.*"                               # 動画ファイル名[*.mp4;*.avi;*.mov;*.mkv"]
     timestamp = datetime.now().strftime('%Y%m%d')
     filetypes = f"WIN_{timestamp}_*.mp4"            #'*WIN_YYYYmmdd_10_46_55_Pro.mp4'  # 動画ファイル名
@@ -1934,6 +1936,8 @@ def main():
     #
     if '-r' in opts:
         raw_video = True        # 生画像を表示するオプション
+        if '-rotate' in opts: 
+            rotate_video = True # 動画を90度回転して表示するオプション   
     
     eval_model_pth = None      # 評価モデル(EvalNN)ファイルのパス   
     if '-eval' in opts:
@@ -2016,7 +2020,7 @@ def main():
         manual_plot = True
 
     # キーポイントの描画形式番号を指定する
-    draw_kpt_no = 0
+    draw_kpt_no = 3
     if '-kpt' in opts:
         opt_vals, _ = get_opt_values(args, '-kpt', 'n')
         if len(opt_vals) > 0: draw_kpt_no = opt_vals[0]
@@ -2316,6 +2320,8 @@ def main():
     frame_height = int(cap[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width = int(cap[0].get(cv2.CAP_PROP_FRAME_WIDTH)) 
     keyCtl['frame_count'] = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
+
+    out_frame_width, out_frame_height = frame_width, frame_height
     # フレームレートを取得
     Fps = cap[0].get(cv2.CAP_PROP_FPS)       
     #
@@ -2337,7 +2343,7 @@ def main():
             elif len(rectAreas) > 0:                # 'c'押下で処理継続
                 # クリッピング領域座標の取得
                 rect = rectAreas.pop(0)
-                frame_width, frame_height = rect.width_height()
+                out_frame_width, out_frame_height = rect.width_height()
                 frame_x = rect.x[0]
                 frame_y = rect.y[0]
                 break
@@ -2380,7 +2386,7 @@ def main():
             base_name = os.path.basename(file_name[0])
             out_file = f"{idir}_{base_name}"
 
-        print(f"[main]:出力ファイル：{out_file}: {frame_width}x{frame_height}")
+        print(f"[main]:出力ファイル：{out_file}")
         #print(f"os.sep: {os.sep}")
         if not clip_video:
             # '-w'指定時のみ、出力FPS値の検査
@@ -2569,12 +2575,13 @@ def main():
         #
         Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_video is True:
+            if rotate_video:
+                frame = cv2.resize(frame, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
+                frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             if clip_video:
-                if rotate_video:
-                    frame = cv2.resize(frame, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
-                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
                 # クリッピング処理
-                annotated_frame = frame[ frame_y:frame_y + frame_height, frame_x:frame_x + frame_width ]
+                annotated_frame = frame[ frame_y:frame_y + out_frame_height, frame_x:frame_x + out_frame_width ]
+                #print(f"[main]:クリッピング処理: {frame.shape} -> {annotated_frame.shape}")
                 for rect in rectAreas:
                     # モザイク処理
                     w, h = rect.width_height()
@@ -2608,7 +2615,7 @@ def main():
             # 面積最大のボックスを取得、信頼度の低いキーポイント座標データは前回採用データで置き換える
             result = results[0]
             try:
-                myResult = MyResult(result, Frame_counter)
+                myResult = MyResult(result, Frame_counter, manual_plot)
             except BoundaryBoxError as e:
                 print(f"フレーム({Frame_counter}):{e}")
                 mylog.log(INFO, f"[main]:フレーム({Frame_counter}):検出結果の描画をスキップ")
