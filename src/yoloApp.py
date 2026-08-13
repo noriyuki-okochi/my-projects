@@ -2754,6 +2754,10 @@ def main():
             # キー操作が終了（'q'）で、ループを抜ける
             print("[main]:Interrapted by 'q'")
             break
+        if key == ord('a'):
+            # 'a'キーが押された場合の処理
+            val = myResult.get_normalization_value('right_shoulder', 'left_shoulder')
+            print(f"Normalization value: {val:.4f}")
         #
         # 繰り返し再生の処理
         if keyCtl['repeat'] and keyCtl['stop_frame'] != 0 and Frame_counter >= keyCtl['stop_frame']:

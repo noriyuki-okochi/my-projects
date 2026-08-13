@@ -354,6 +354,11 @@ class MyResult(Keypoint):
         else:
             mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
+        
+    # キーポイント間の距離を正規化して値を返す関数    
+    def get_normalization_value(self, key1, key2):
+        norm, _ = self.norm(key1, key2)     # 指定されたキーポイント間の距離
+        return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
 
     # キーポイントの接続ライン（腕、胴、目）を描画する関数
     def plot(self, annotated_frame):        
@@ -1106,7 +1111,7 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <er(°)/pull(%)>",
                 "",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <split(sec.)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
@@ -1117,8 +1122,8 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), eyes",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), (-1*se)",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), (-1*er)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), split",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
