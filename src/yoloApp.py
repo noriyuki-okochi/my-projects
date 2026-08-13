@@ -1462,6 +1462,34 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
 #
     return annotated_frame
 #
+# 節の移行処理
+#
+def transition_to(section_no, ctl):
+    global Section_no, Completed, Split_sec, Split_start, Lap_sec, Lap_start
+    global Step_counter, Nop_counter, Step_error, Section_color, Alart_message
+    Completed = False
+    Split_sec = 0
+    Split_start = 0
+    Step_counter = 0                    # セクション内の動作カウンターをリセット
+    Nop_counter = 0                     # セクション内の動作カウンターをリセット
+    Step_error = False                  # 不正な動作フラグ
+    Section_color =  YELLOW             # セクションの色（黄色）BGR
+    Alart_message = ''                  # アラートメッセージをリセット
+    ctl['tag1_section'] = Section_no
+    ctl['tag2_section'] = Section_no
+    if Section_no == 0:
+        Lap_start = Frame_counter       # ラップ開始時間を記録
+        Lap_sec = 0.0
+        ctl['tag1_section'] = 0         # tag登録用セクション番号
+        ctl['tag2_section'] = 0         # tag登録用セクション番号
+    else: 
+        Split_start = Frame_counter
+        if Lap_start > 0: Lap_start = Frame_counter
+        if Section_no == 2 and ctl['key_inter'] != 0: 
+            # セクション2の連打は動作カウンターを20に設定
+            Step_counter = 20
+    return
+#
 # キー入力操作関数
 #
 def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
@@ -1608,27 +1636,9 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             if Eval_enabled: Eval(section = 0)  # 評価用のデータをリセット 
             print(f"姿勢解析を開始します")
         else:  print(f"セクション番号を設定: {Section_no}")
-        Completed = False
-        Split_sec = 0
-        Split_start = 0
-        Step_counter = 0                    # セクション内の動作カウンターをリセット
-        Nop_counter = 0                     # セクション内の動作カウンターをリセット
-        Step_error = False                  # 不正な動作フラグ
-        Section_color =  YELLOW             # セクションの色（黄色）BGR
-        Alart_message = ''                  # アラートメッセージをリセット
-        ctl['tag1_section'] = Section_no
-        ctl['tag2_section'] = Section_no
-        if Section_no == 0:
-            Lap_start = Frame_counter       # ラップ開始時間を記録
-            Lap_sec = 0.0
-            ctl['tag1_section'] = 0         # tag登録用セクション番号
-            ctl['tag2_section'] = 0         # tag登録用セクション番号
-        else: 
-            Split_start = Frame_counter
-            if Lap_start > 0: Lap_start = Frame_counter
-            if Section_no == 2 and ctl['key_inter'] != 0: 
-                # セクション2の連打は動作カウンターを20に設定
-                Step_counter = 20
+
+        #  動作開始（節の移行）
+        transition_to(Section_no, ctl)
         #
         if ctl['key_inter'] == 0: ctl['key_inter'] = int(time.time())  
 
@@ -1639,12 +1649,18 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         Step_counter = 0                    # セクション内の動作カウンターをリセット              
 
     elif key == ord(' '):
-        #  動作完了
-        print(f"動作完了を設定")
-        Completed = True
-        if Section_no != 6 and Section_no != 8: # 「会」、「残身」はスプリットを計測
-            Split_start = 0                     # スプリット開始時間をリセット
-    
+        if Completed == False:
+            #  動作完了
+            print(f"動作完了を設定")
+            Completed = True
+            if Section_no != 6 and Section_no != 8: # 「会」、「残身」はスプリットを計測
+                Split_start = 0                     # スプリット開始時間をリセット
+        else:
+            #  動作開始（節の移行）
+            Section_no = (Section_no + 1) if Section_no < 9 else 2
+            print(f"節の移行: Section_no={Section_no}")
+            transition_to(Section_no, ctl)
+
     elif key == ord('.') and len(ctl['para_data']) == 0: 
                                             # (.) フレームカウンターを2秒進める
         Frame_counter += int(Fps)*2     
