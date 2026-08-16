@@ -356,7 +356,7 @@ class MyResult(Keypoint):
             return None
         
     # キーポイント間の距離を正規化して値を返す関数    
-    def get_normalization_value(self, key1, key2):
+    def get_normalized_value(self, key1, key2):
         norm, _ = self.norm(key1, key2)     # 指定されたキーポイント間の距離
         return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
 

@@ -1278,7 +1278,7 @@ def clip_process( frame , rotate = False):
             cv2.rectangle(temp_frame, Rect_area.start, Rect_area.end, GREEN, 2)
         # キーオペレーションのヘルプ表示
         hight, _ = temp_frame.shape[:2]
-        help_str = "r(eset)|c(onfirm)|q(uit)"
+        help_str = "r(eset)|c(onfirm)|p(ass)|q(uit)"
         cv2.putText(temp_frame, help_str, (10, hight - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, YELLOW, 2)
         cv2.imshow("Select ROI", temp_frame)
         #
@@ -1295,6 +1295,10 @@ def clip_process( frame , rotate = False):
             continue
         elif key_val == ord("q"):
             # 処理を中断
+            rectAreas.clear()
+            break
+        elif key_val == ord("p"):
+            # クリッピング処理をパス
             rectAreas.clear()
             break
         elif key_val == ord("c"):
@@ -1573,7 +1577,10 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 Cv2Video = cv2.VideoWriter(out_file, fourcc, Fps*ctl['fps_ratio'], (frame_width, frame_height))
                 print(f"出力ファイルに書き込みを開始します: {out_file}: {frame_width}x{frame_height}, Fps={(Fps*ctl['fps_ratio']):.2f}")
-            mylog.log(INFO, ">> video write start")
+                mylog.log(INFO, ">> video write start")
+            else:
+                print(f"出力ファイルに書き込みを再開します: {out_file}")
+                mylog.log(INFO, ">> video write re-start")
         else: 
             print(f"出力ファイルに書き込みを停止します: {out_file}")
             mylog.log(INFO, ">> video write pause")
@@ -2756,8 +2763,8 @@ def main():
             break
         if key == ord('a'):
             # 'a'キーが押された場合の処理
-            val = myResult.get_normalization_value('right_shoulder', 'left_shoulder')
-            print(f"Normalization value: {val:.4f}")
+            val = myResult.get_normalized_value('right_shoulder', 'left_shoulder')
+            print(f"Normalized value: {val:.4f}")
         #
         # 繰り返し再生の処理
         if keyCtl['repeat'] and keyCtl['stop_frame'] != 0 and Frame_counter >= keyCtl['stop_frame']:
