@@ -3,7 +3,7 @@ $env:DB_PATH = './yolo-kyudo_local.db'
 #$env:DB_PATH = './yolo-kyudo.db'
 #
 # 動画ファイル検索位置設定
-$env:ROLL_PATH='H:/share/Pictures/Camera Roll/'
+$env:ROLL_PATH='E:/share/Pictures/Camera Roll/'
 # ホームディレクトリ設定
 $HOME_DIR = 'f:/share/YOLO'
 #
@@ -80,6 +80,9 @@ $cases_list = "okochi_2.0_1,okochi_2.0_2", "okochi_2.0_3"
 $env:CASE_LIST=$cases_list
 $augment_list = '1,2'
 $env:AUGMENT_LIST=$augment_list
+#
+$dbg_level = '-d1'
+$dbg_option = '-d'
 #
 function help {
     # プロファイルの表示
@@ -224,9 +227,15 @@ function model {
                 }
             }
             else {
-                $env:ROLL_PATH="$roll"
-                $str = '・動画ファイル検索位置が ' + $roll + ' に設定されました。'
-                write-output $str
+                $ans = & Test-Path -Path $roll 2>&1
+                if ( $ans ) {
+                    $env:ROLL_PATH="$roll"
+                    $str = '・動画ファイル検索位置が ' + $roll + ' に設定されました。'
+                    write-output $str
+                }
+                else {
+                    Write-Host  "・'$roll' does not exist."
+                } 
             }
         }
         elseif ( $hp -ne '' ) {
@@ -420,11 +429,11 @@ function yoloAp {
     } 
     elseif ($update) {      
         # 解析パラメータ更新
-        python ./src/yoloApp.py -d1 -I $param_id $slevel
+        python ./src/yoloApp.py $dbg_level -I $param_id $slevel
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py -d1 -a -m -w $v $slevel $maskon $evalon $eval_model --
+        python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model --
     }
     elseif ($raw) {         
         # 動画生再生
@@ -437,7 +446,7 @@ function yoloAp {
         if ($rotate) {
             $clockwise = '-rotate'
         }
-        python ./src/yoloApp.py -d1 -a  -r $clockwise -w $fps -at $at --
+        python ./src/yoloApp.py $dbg_level -a  -r $clockwise -w $fps -at $at --
     }
     elseif ($yolo) {         
         # 動画姿勢解析再生
@@ -446,11 +455,11 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py -d1 -a $v -kpt $kpt -w -at $at --
+        python ./src/yoloApp.py $dbg_level -a $v -kpt $kpt -w -at $at --
     }
     elseif ($multi -ne '') {         
         # マルチ指定動画再生
-        python ./src/yoloApp.py -d1 -a -multi $multi --
+        python ./src/yoloApp.py $dbg_level -a -multi $multi --
     }
     elseif ($one -ne '') {         
         # 単一ケース指定再生
@@ -459,18 +468,18 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py -d1 -o  $one -at $at -r --
+        python ./src/yoloApp.py $dbg_level -o  $one -at $at -r --
     }
     elseif ($comp -ne '') {         
         $case_list = $comp.Split(',')
         $i = $case_list.Length
         if ( $i -eq 1 ) {
             # 単一ケース動画再生（指定ケースの動画ファイルを再生）
-            python ./src/yoloApp.py -d1 -o $comp -at $at -m --
+            python ./src/yoloApp.py $dbg_level -o $comp -at $at -m --
         }
         else{
             # マルチ動画再生（指定ケースの動画ファイルを重ねて再生）
-            python ./src/yoloApp.py -d1 -o $comp -multi $at -r --
+            python ./src/yoloApp.py $dbg_level -o $comp -multi $at -r --
         }
     }
     elseif ($clip) {        
@@ -479,7 +488,7 @@ function yoloAp {
         if ($rotate) {
             $clockwise = '-rotate'
         }
-        python ./src/yoloApp.py -d1 -a -clip $clockwise --
+        python ./src/yoloApp.py $dbg_level -a -clip $clockwise --
     }
     elseif ($case -ne '' -and $gru -eq '') {    
         # 動画再生・ロジック解析、結果保存
@@ -487,7 +496,7 @@ function yoloAp {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py -d1 -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model --
+        python ./src/yoloApp.py $dbg_level -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model --
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -502,11 +511,11 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model --
+            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model --
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py -d1 -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model --
+            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model --
         }
     }
     else{
@@ -543,11 +552,11 @@ function chart {
     elseif ($list -ne '') {
         if ($list -eq 'case') {
             # 登録済ケース名一覧表示
-            python ./src/chart.py  -d -case -L
+            python ./src/chart.py  $dbg_option -case -L
         } 
         elseif ($list -eq 'point') {
             # ポイントキー名一覧表示
-            python ./src/chart.py  -d -key
+            python ./src/chart.py  $dbg_option -key
         }
         elseif ($list -eq 'tb') {
             # Tensor board一覧表示
@@ -574,10 +583,10 @@ function chart {
                 $i++
             }
             if ( $i -eq 1 ) {
-                python ./src/chart.py -d  $keys[0] -case $case  -f0 0  -m 
+                python ./src/chart.py $dbg_option  $keys[0] -case $case  -f0 0  -m 
             }
             elseif ( $i -eq 2-or $i -eq 4) {
-                python ./src/chart.py -d  $keys[0] $keys[1] $keys[2] $keys[3] -case $case  -f0 0 
+                python ./src/chart.py $dbg_option  $keys[0] $keys[1] $keys[2] $keys[3] -case $case  -f0 0 
             }
             else {
                 write-output '1、2、または4つのキーを指定してください' 
@@ -585,12 +594,12 @@ function chart {
         }
         else {
             # デフォルトキーのデータをグラフ表示
-            python ./src/chart.py -d  right_wrist left_wrist right_elbow left_elbow -case $case  -f0 0      
+            python ./src/chart.py $dbg_option  right_wrist left_wrist right_elbow left_elbow -case $case  -f0 0      
         }
     }
     elseif ($import -ne '') {
         # 解析結果ポイントデータファイルのデータをデータベースに登録
-        python ./src/chart.py  -d -case $import  -import -m -f0 0 right_wrist -second box_h
+        python ./src/chart.py  $dbg_option -case $import  -import -m -f0 0 right_wrist -second box_h
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -655,15 +664,15 @@ function kyudo {
     elseif ($list -ne '') {
         if ( $list -eq 'key' ) {
             # 入力データキー一覧表示
-            python ./src/kyudoApp.py  -d -inputkey
+            python ./src/kyudoApp.py  $dbg_option -inputkey
         }
         elseif ( $list -eq 'case' ) {
             # 登録済ケース名一覧表示（詳細）
-            python ./src/kyudoApp.py  -d -case -L
+            python ./src/kyudoApp.py  $dbg_option -case -L
         }
         elseif ( $list -eq 'case_name' ) {
             # 登録済ケース名一覧表示
-            python ./src/kyudoApp.py  -d -case -l
+            python ./src/kyudoApp.py  $dbg_option -case -l
         }
         elseif ( $list -eq 'pt' ) {
             # 作成済モデルファイル一覧表示
@@ -672,29 +681,29 @@ function kyudo {
     } 
     elseif ($delete -ne '') {
         # 登録ケース名、データファイル削除
-        python ./src/kyudoApp.py -d -case $delete -D
+        python ./src/kyudoApp.py $dbg_option -case $delete -D
     }
     elseif ($rename -ne '' -and $to -ne '') {
         # 登録ケース名リネーム
-        python ./src/kyudoApp.py -d -case $rename,$to -R
+        python ./src/kyudoApp.py $dbg_option -case $rename,$to -R
     }
     elseif ($update -ne '') {
         if ($memo -ne '') {
             # 登録ケースのメモ更新
-            python ./src/kyudoApp.py -d -case $update -U $memo
+            python ./src/kyudoApp.py $dbg_option -case $update -U $memo
         }
     }
     elseif ($import -ne '') {
         # 解析結果データファイルのデータをデータベースに登録
-        python ./src/kyudoApp.py -d inputkey=$input_key -case $import -import -m -f0 0
+        python ./src/kyudoApp.py $dbg_option inputkey=$input_key -case $import -import -m -f0 0
     }
     elseif ($eval -ne '') {
         # 評価データ表示
-        python ./src/kyudoApp.py -d  -case $eval -eval | Tee-Object $logfile
+        python ./src/kyudoApp.py $dbg_option  -case $eval -eval | Tee-Object $logfile
     }    
     elseif ($case -ne '') {
         # 解析結果データをグラフ表示
-        python ./src/kyudoApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m 
+        python ./src/kyudoApp.py $dbg_option inputkey=$input_key -case $case -f0 $input_frames  -m 
     }
     elseif ($train -ne '') {
         # 学習実行
@@ -711,10 +720,10 @@ function kyudo {
                     $aug_level = 0
                 }
                 if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/kyudoApp.py -d -case $train -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
+                    python ./src/kyudoApp.py $dbg_option -case $train -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames     
                 }
                 else {
-                    python ./src/kyudoApp.py -d -case $train -valid $valid_case  classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
+                    python ./src/kyudoApp.py $dbg_option -case $train -valid $valid_case  classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames   
                 }
             }
             else {
@@ -739,10 +748,10 @@ function kyudo {
                         }
                     }
                     if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
-                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                        python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                     }
                     else {
-                        python ./src/kyudoApp.py -d -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                        python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
                     }
                     #Write-Output $LASTEXITCODE
                     if ( $LASTEXITCODE -ne 0 ) {
@@ -759,7 +768,7 @@ function kyudo {
                 $aug_level = 0
             }
             for( $i=0; $i -lt 10; $i++) {
-                python ./src/kyudoApp.py -d -case $train  classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
+                python ./src/kyudoApp.py $dbg_option -case $train  classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" section=$i  -train $modelx $args[$idx+1] -f0 $input_frames -n 
             } 
         }
         else{
@@ -778,7 +787,7 @@ function kyudo {
             # デフォルトは0に再設定
             $aug_level = 0
         }
-        python ./src/kyudoApp.py -d -case $predict augment=$aug_level -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
+        python ./src/kyudoApp.py $dbg_option -case $predict augment=$aug_level -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
     }
     else{
         write-output '不正なパラメータが指定されました' 
@@ -838,18 +847,18 @@ function eval {
         }
         elseif ( $list -eq 'key' ) {
             # 入力データキー一覧表示
-            python ./src/evalApp.py -d -inputkey
+            python ./src/evalApp.py $dbg_option -inputkey
         }
     } 
     elseif ($update -ne '') {
         if ($score -ne '') {
             # 登録ケースのラベル更新
-            python ./src/evalApp.py -d -case $update -E $score
+            python ./src/evalApp.py $dbg_option -case $update -E $score
         }
     }
     elseif ($print -ne '') {
         # 評価データ表示
-        python ./src/evalApp.py -d  -case $print -eval | Tee-Object $logfile
+        python ./src/evalApp.py $dbg_option  -case $print -eval | Tee-Object $logfile
     }    
     elseif ($case -ne '') {
         if ($img) {
@@ -858,11 +867,11 @@ function eval {
                 $aug_level = 0
             }
              # 解析結果画像を表示
-            python ./src/evalApp.py -d  -case $case -img -hparam "($hparam)"  augment=$aug_level 
+            python ./src/evalApp.py $dbg_option  -case $case -img -hparam "($hparam)"  augment=$aug_level 
         }
         else {
             # 解析結果データをグラフ表示
-            python ./src/evalApp.py -d  -case $case -f0 $input_frames  -m
+            python ./src/evalApp.py $dbg_option  -case $case -f0 $input_frames  -m
             #python ./src/evalApp.py -d inputkey=$input_key -case $case -f0 $input_frames  -m
         } 
     }
@@ -879,10 +888,10 @@ function eval {
                 $aug_level = 0
             }
             if ($idx -ge 0 -and $len -gt ($idx + 1) ) {
-                python ./src/evalApp.py -d -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx $args[$idx+1] -f0 $input_frames     
+                python ./src/evalApp.py $dbg_option -case $train -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx $args[$idx+1] -f0 $input_frames     
             }
             else {
-                python ./src/evalApp.py -d -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx -f0 $input_frames   
+                python ./src/evalApp.py $dbg_option -case $train -valid $valid_case  classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx -f0 $input_frames   
             }
         }
         else {
@@ -907,10 +916,10 @@ function eval {
                     }
                 }
                 if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
-                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                    python ./src/evalApp.py $dbg_option -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                 }
                 else {
-                    python ./src/evalApp.py -d -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx -f0 $input_frames -n"$i" 
+                    python ./src/evalApp.py $dbg_option -case $case_name -valid $valid_case classes=3 eta=$eta -hparam "($hparam)" augment=$aug_level -train $modelx -f0 $input_frames -n"$i" 
                 }
                 #Write-Output $LASTEXITCODE
                 if ( $LASTEXITCODE -ne 0 ) {
@@ -927,7 +936,7 @@ function eval {
         if ($idx -ge 0 -and $len -gt $idx) {
             $modelpt = $args[$idx+1]
         }
-        python ./src/evalApp.py -d -case $predict -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
+        python ./src/evalApp.py $dbg_option -case $predict -hparam "($hparam)" -predict $modelx $modelpt -f0 $input_frames -m    
     }
     else{
         write-output '不正なパラメータが指定されました' 
