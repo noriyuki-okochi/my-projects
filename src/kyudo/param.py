@@ -159,7 +159,7 @@ StartAction_params = [
         [0.050, 0.020, 8, None, None, None, None, None],             # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 3, None, None, None, None, None],             # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     },          
@@ -176,7 +176,7 @@ StartAction_params = [
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     },          
@@ -193,7 +193,7 @@ StartAction_params = [
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     },          
@@ -210,7 +210,7 @@ StartAction_params = [
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.085, 0.085, 2, None, None, None, None, None],          # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     },          
@@ -227,7 +227,7 @@ StartAction_params = [
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     },          
@@ -244,7 +244,7 @@ StartAction_params = [
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],                # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     },          
@@ -261,7 +261,7 @@ StartAction_params = [
         [0.050, 0.020, 10, None, None, None, None, None],            # 6.会
         [0.085, None, None, None, None, None, None, None],           # 7.離れ
         [0.050, 0.050, 2,   None, None, None, None, None],           # 8.残心
-        [0.085, 2, 0.085, 2, None, None, None, None],                # 9.弓倒し
+        [0.085, 2, 0.085, 2, -45.0, 45.0, None, None],               # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]            #10.共通
      ]
     }          

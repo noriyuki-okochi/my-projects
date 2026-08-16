@@ -518,10 +518,8 @@ def section_started(section_no, myResult:MyResult):
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
         if Step_counter == 0: Step_counter = 10
-        mylog.log(INFO, f">>>   normS={int(normS)}({thsd.ratio(normS):.3f}), HR_angle={HR_angle:.1f}°")
-
+        mylog.log(INFO, f">>>   normS={int(normS)}({thsd.ratio(normS):.3f})")
         mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[0]))} ]")
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
         if normS > thsd(PRM[0]):
@@ -530,12 +528,19 @@ def section_started(section_no, myResult:MyResult):
             Step_counter += 1
             if Step_counter%10 == PRM[1]: started = True
         else:
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
             Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
             if normR > thsd(PRM[2]):
-                # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
-                if Step_counter/10 == 2: Step_counter = 10
-                Step_counter += 1
-                if Step_counter%10 == PRM[3]: started = True
+                mylog.log(INFO, f">>>   [ anglR > {PRM[4]:.1f} and anglR < {PRM[5]:.1f} ]")
+                Stkp.push( [(4,PRM[4]), (5,PRM[5])] )  
+                if anglR > PRM[4] and anglR < PRM[5]:
+                    Step_counter = 30
+                    started = True
+                else:
+                    # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
+                    if Step_counter/10 == 2: Step_counter = 10
+                    Step_counter += 1
+                    if Step_counter%10 == PRM[3]: started = True
     else:
         mylog.log(ERROR, f">>> section_no={section_no}は未定義のセクションです")
         started = False
@@ -841,21 +846,22 @@ def section_completed(section_no, myResult:MyResult):
     
     # 8-Zan-shin(弓倒し)        
     elif section_no == 9:  
+        xy_hipR = keyPoints.xy('right_hip')                                 # 右腰の座標
         _, angER = keyPoints.norm('right_elbow', 'right_wrist')             # 右肘から右手首へのベクトルの長さと角度を計算
         normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
         mylog.log(INFO, f">>>   angER= {angER:.1f}°, normS={int(normS)}({thsd.ratio(normS):.3f})")
-        mylog.log(INFO, f">>>   [ angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f} ]")
+        mylog.log(INFO, f">>>   [ angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f} and {xy_wristR[0]:.0f} < {xy_hipR[0]:.0f} ]")
         
         if Step_counter == 0: Step_counter = 1
         Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if ( angER > PRM[0] and angER < PRM[1] ):
+        if ( (angER > PRM[0] and angER < PRM[1]) and xy_wristR[0] < xy_hipR[0] ):
             # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
             mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[2]))} ]")
 
             Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
             if normR <= thsd(PRM[2]) : 
                 Step_counter = Step_counter + 1
-                if Step_counter == PRM[3]: completed = True
+                if (Step_counter%10) == PRM[3]: completed = True
 
         mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[4]))} ]")
 
@@ -1001,11 +1007,15 @@ def manual_analize_start(section_no, myResult:MyResult):
             Step_counter = 0                                # セクション内の動作カウンター
         else: 
             counter = int(Step_counter/10)      
-            mylog.log(INFO, f"[man_analize]: Step_counter={Step_counter}, {counter}") 
+            mylog.log(INFO, f"[man_analize]: Step_counter={Step_counter}") 
             if counter == 2: 
                 Lap_start = 0                               # 退場動作開始の場合、解析終了
                 Split_sec = 0.0
                 Split_start = 0
+            elif counter == 3:                              # 乙矢の矢つがえ前の動作開始
+                Completed = False                           # 完了フラグをリセット
+                print(f"[man_analize]: section({section_no}), Reset completed=False")
+                #Step_counter = 0
             else:                                           # 乙矢の矢つがえ動作開始
                 # セクション番号を2にリセット、動作カウンターを30に設定
                 Section_no = 2
