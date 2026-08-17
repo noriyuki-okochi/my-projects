@@ -74,11 +74,12 @@ $cases_list = "iijima_1.1", "iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
 $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
-$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1"
-# 一括を含む個別ケース設定例
-$cases_list = "okochi_2.0_1,okochi_2.0_2", "okochi_2.0_3"
+$cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
 $env:CASE_LIST=$cases_list
-$augment_list = '1,2'
+
+# データ拡張レベル設定例（個別ケース毎に指定：0=拡張なし,1=shift,2=warp,4=noize）
+#$augment_list = '0,1,2,3,4,5,6,7'
+$augment_list = ''
 $env:AUGMENT_LIST=$augment_list
 #
 $dbg_level = '-d1'
@@ -732,18 +733,28 @@ function kyudo {
                 $str = '・学習データのリスト： (' + $cases_list.Length + 'ケース) ' + $cases_list
                 write-output $str
                 $aug_levels = @()
-                if ($aug_level -lt 0) {
-                    $aug_levels = $env:AUGMENT_LIST.Split(',')
-                    $str = '・データ拡張のリスト： (' + $aug_levels.Length + 'ケース) ' + $aug_levels
-                    write-output $str
+                if ($aug_level -lt 0 ) {
+                    # オプションで指定されなかった場合、環境変数AUGMENT_LISTを参照する
+                    if ($null -ne $env:AUGMENT_LIST) {
+                        # ケース毎のデータ拡張レベルを配列に格納する
+                        $aug_levels = $env:AUGMENT_LIST.Split(',')
+                        $str = '・データ拡張のリスト： (' + $aug_levels.Length + 'ケース) ' + $aug_levels
+                        write-output $str
+                    }
+                    else {
+                        # 環境変数に未設定の時はデフォルトに再設定
+                        $aug_level = 0
+                    }
                 }
                 $i = 1
                 foreach ( $case_name in $cases_list ) {
                     if ($aug_levels.Length -gt 0) {
+                        # ケース毎のデータ拡張レベルを参照する
                         if ( $i -le $aug_levels.Length ) {
                             $aug_level = $aug_levels[$i-1]
                         }
                         else {
+                            # デフォルトに再設定
                             $aug_level = 0
                         }
                     }
@@ -901,9 +912,15 @@ function eval {
             write-output $str
             $aug_levels = @()
             if ($aug_level -lt 0) {
-                $aug_levels = $env:AUGMENT_LIST.Split(',')
-                $str = '・データ拡張のリスト： (' + $aug_levels.Length + 'ケース) ' + $aug_levels
-                write-output $str
+                if ($null -ne $env:AUGMENT_LIST) {
+                    $aug_levels = $env:AUGMENT_LIST.Split(',')
+                    $str = '・データ拡張のリスト： (' + $aug_levels.Length + 'ケース) ' + $aug_levels
+                    write-output $str
+                }
+                else {
+                    # デフォルトは0に再設定
+                    $aug_level = 0
+                }
             }
             $i = 1
             foreach ( $case_name in $cases_list ) {
