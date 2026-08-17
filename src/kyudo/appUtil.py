@@ -388,45 +388,47 @@ class FeaturePdf:
     Features_list_60 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
                         'hr_ratio',\
                         'section','completed' ]
+    # 正規化の種類を指定する辞書（<Kyudo_data_namesのインデクス>:<正規化の種類>）
+    # （h:height, w:width, d:degree, '':no normalization）
     Kyudo_index_60   = { 4:'h', 8:'h', 20:'w',\
                         10:'h'}
+    # 61
     Features_list_61 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'face',\
                         'section','completed' ]
     Kyudo_index_61   = { 4:'h', 8:'h', 10:'h',\
                         22:''}
-
+    # 70
     Features_list_70 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
                         'section','completed' ]
     Kyudo_index_70   = { 4:'h', 6:'h', 20:'w',\
                         10:'h', 11:'d'}
-
+    # 71
     Features_list_71 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'hr_deg', 'face',\
                         'section','completed' ]
     Kyudo_index_71   = { 4:'h', 8:'h', 10:'h',\
                         11:'d', 22:''}
-
+    # 72
     Features_list_72 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'body', 'face',\
                         'section','completed' ]
     Kyudo_index_72   = { 4:'h', 8:'h', 10:'h',\
                         23:'', 22:''}
-
-
+    # 80
     Features_list_80 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'hr_deg', 'body', 'face',\
                         'section','completed' ]
     Kyudo_index_80   = { 4:'h', 8:'h', 10:'h',\
                         11:'d', 23:'', 22:'' }
-
+    # 81
     Features_list_81 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'rl_ratio', 'hr_ratio', 'hr_deg',\
                         'section','completed' ]
     Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
                          8:'h', 10:'h', 11:'d' }
-
+    # 90
     Features_list_90 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'rl_ratio', 'hr_ratio', 'hr_deg', \
                         'face', \
@@ -434,6 +436,12 @@ class FeaturePdf:
     Kyudo_index_90   = { 4:'h', 6:'h', 20:'w',\
                          8:'h', 10:'h', 11:'d',\
                          22:'' }
+    # 91
+    Features_list_91 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'hr_deg', 'ew_deg', 'body', 'face',\
+                        'section','completed' ]
+    Kyudo_index_91   = { 4:'h', 8:'h', 10:'h',\
+                        11:'d', 16:'d',23:'', 22:'' }
     
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
@@ -442,7 +450,8 @@ class FeaturePdf:
                        72: (Features_list_72, Kyudo_index_72), 
                        80: (Features_list_80, Kyudo_index_80), 
                        81: (Features_list_81, Kyudo_index_81), 
-                       90: (Features_list_90, Kyudo_index_90) 
+                       90: (Features_list_90, Kyudo_index_90), 
+                       91: (Features_list_91, Kyudo_index_91)
                        }
     
     def __init__(self, input_key:int=Current_feature_key, seq_frames:int=Input_dim):

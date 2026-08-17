@@ -120,6 +120,16 @@ Features_list_90 = ['rw_norm/box_h as rw_ratio',\
                 'tag1 as face',\
                 'section','completed'
                 ]
+
+Features_list_91 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'section','completed'
+                ]
 #
 Features_lists = {
     50: Features_list_50,       # プロット専用特徴量リスト
@@ -130,7 +140,8 @@ Features_lists = {
     72: Features_list_72,
     80: Features_list_80,
     81: Features_list_81,
-    90: Features_list_90
+    90: Features_list_90,
+    91: Features_list_91
     }
 #
 # EvalNNで使用する特徴量リスト
