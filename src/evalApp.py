@@ -246,9 +246,9 @@ def main():
         params = num_opts[0].split('=')
         if len(params) == 2 and params[1].isnumeric():
             augment_level = int(params[1])
-    print(f"[evalApp]info:Augment_level = {augment_level}, Data_augment={Data_augment}")
+    print(f"[evalApp]info:Augment_level = {augment_level}, Augment_param={Augment_param}")
     
-    augment_params = get_augment_parameters( Data_augment, augment_level )
+    augment_params = get_augment_parameters( Augment_param, augment_level )
     log_write( f"[evalApp]:augment_params={augment_params}")
     
     #
