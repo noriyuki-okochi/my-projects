@@ -103,11 +103,11 @@ Features_list_80 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 Features_list_81 = ['rw_norm/box_h as rw_ratio',\
-                'lw_norm/box_h as lw_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
-                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -254,41 +254,16 @@ if early_stop != None:
     Early_stop = int(early_stop)
 
 # Data augmentationのパラメータ（シフト、伸縮、ノイズ）
-Data_augment= (3, 0.1, 0.02)         
-augment_para = os.getenv('AUGMENT_PARAM')
-if augment_para != None:
-    Data_augment = tuple(map(float, augment_para.split(' ')))
+Augment_param= (3, 0.1, 0.02)         
+augment_param = os.getenv('AUGMENT_PARAM')
+if augment_param != None:
+    Augment_param = tuple(map(float, augment_param.split(' ')))
 Augment_level:int = 0
 #
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
 Param_max = 10    # パラメータの最大個数
-#
-# アラートID、メッセージの定義
-#
-Alart_Asibumi= 10     # 「正対不完全」のアラートID
-Alart_Monomi = 30     # 「物見を定まらず」のアラートID
-Alart_Daisan = 40     # 「大三移行不安定」のアラートID
-Alart_KaiNasi = 50    # 「会なし離れ」のアラートID
-Alart_KaiFusoku = 60  # 「会不十分な離れ」のアラートID
-Alart_Hanare = 70     # 「離れタイミングずれ」のアラートID
-#
-Alart_msg = {
-   0:'',
-   10:'Warning:Detected illegal action in section-1.(SEITAI fukanzen)',
-   100:'<警告>：「正対不完全」を検知しました。',
-   30:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
-   300:'<警告>：「物見定まらず」を検知しました。',
-   40:'Warning:Detected illegal action in section-5.(DAISAN fumeikaku)',
-   400:'<警告>：「大三移行不安定」を検知しました。',
-   50:'Warning:Detected illegal action in section-5.(KAI nasi)',
-   500:'<警告>：「会なし離れ」を検知しました。',
-   60:'Warning:Detected illegal action in section-6.(KAI fusoku)',
-   600:'<警告>：「会不十分な離れ」を検知しました。',
-   70:'Warning:Detected illegal action in section-7.(Timing un-match)',
-   700:'<警告>：「弓手押しタイミングの遅れ」を検知しました。'
-}
 # 
 # テキスト属性
 #

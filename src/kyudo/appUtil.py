@@ -423,11 +423,11 @@ class FeaturePdf:
     Kyudo_index_80   = { 4:'h', 8:'h', 10:'h',\
                         11:'d', 23:'', 22:'' }
     # 81
-    Features_list_81 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
-                        'rl_ratio', 'hr_ratio', 'hr_deg',\
+    Features_list_81 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'ew_deg', 'body', 'face',\
                         'section','completed' ]
-    Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
-                         8:'h', 10:'h', 11:'d' }
+    Kyudo_index_81   = { 4:'h', 8:'h', 10:'w',\
+                         16:'d', 23:'', 22:'' }
     # 90
     Features_list_90 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'rl_ratio', 'hr_ratio', 'hr_deg', \
