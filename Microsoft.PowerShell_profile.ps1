@@ -17,7 +17,7 @@ $logfile = './log/console.log'
 # 環境変数の設定
 #
 # データ入力キー設定
-$env:INPUT_KEY="80"
+$env:INPUT_KEY="91"
 $inputkey = $env:INPUT_KEY
 $env:EVAL_INPUT_KEY="170"
 $evalkey = $env:EVAL_INPUT_KEY
@@ -26,12 +26,12 @@ $env:MODEL_TYPE="-models"               # シングルヘッドをデフォルト
 $env:EVAL_MODEL_TYPE="-modelc"          # 畳み込みモデルをデフォルト
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo2_80_modelse_8-96-3.pt"
+$env:MODEL_PT="./kyudo_91a_modelse_9-96-3.pt"
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
 $env:EARLY_STOP="0"
 # 重ね画像アルファ値設定
-$env:ADD_WEIGHT="0.7"
+$env:ADD_WEIGHT="0.55"
 #
 # ハイパーパラメータ設定
 $s = 96     # シーケンス長
@@ -74,6 +74,7 @@ $cases_list = "iijima_1.1", "iijima_1.2", "iwata_1.1", "iwata_1.2", "nemoto_1.3"
 $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
+#$cases_list_91a = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
 $cases_list = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
 $env:CASE_LIST=$cases_list
 
