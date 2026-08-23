@@ -357,7 +357,7 @@ Alart_Hanare = 70     # 「離れタイミングずれ」のアラートID
 Alart_msg = {
    0:'',
    10:'Warning:Detected illegal action in section-1.(SEITAI fukanzen)',
-   100:'<警告>：「正対不完全」を検知しました。',
+   100:'<警告>：「正対不明確」を検知しました。',
    30:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
    300:'<警告>：「物見定まらず」を検知しました。',
    40:'Warning:Detected illegal action in section-5.(DAISAN fumeikaku)',
