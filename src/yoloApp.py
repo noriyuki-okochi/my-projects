@@ -92,6 +92,7 @@ Num_classes:int = Output_dim    # 出力クラス数（ラベル[0=移行,1=完�
 Hybrid_model:bool = False       # GRUモデルとロジック解析の併用フラグ
 # YOLOv8モデル
 V8_model:str = 'v8s'            # YOLOv8のモデルファイル名
+Level:int = 0                   # 解析パラメータレベル（0-3,9）
 # ビデオ出力設定
 Cv2Video = None                 # OpenCVのビデオライターインスタンス
 Add_alpha:float = float(ADD_WEIGHT)   # 画像重ねのアルファ値
@@ -117,7 +118,7 @@ def help():
     print(" -o <case_name>: specify the case name")
     print(" -m(anual-plot::dont use YOLO plot)")
     print(" -gru(:analize with RNN-model)")
-    print(" -s(kill):skill-level default=1(0-3)")
+    print(" -s(kill):skill-level default=1(0-3,9)")
     print(" -r(aw-video)")
     print(" -clip(:raw-video)")
     print(" -rotate(:90°clockwise): enabled only '-r' or '-clip'")
@@ -524,23 +525,25 @@ def section_started(section_no, myResult:MyResult):
         Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
         if normS > thsd(PRM[0]):
             # 右肩の移動ベクトルの長さが大きい場合（退場）
-            if Step_counter/10 == 1: Step_counter = 20
+            if int(Step_counter/10) == 1: Step_counter = 20
             Step_counter += 1
             if Step_counter%10 == PRM[1]: started = True
         else:
             mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
             Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
             if normR > thsd(PRM[2]):
-                mylog.log(INFO, f">>>   [ anglR > {PRM[4]:.1f} and anglR < {PRM[5]:.1f} ]")
+                mylog.log(INFO, f">>>   [ counter < 30 and (anglR > {PRM[4]:.1f} and anglR < {PRM[5]:.1f}) ]")
                 Stkp.push( [(4,PRM[4]), (5,PRM[5])] )  
-                if anglR > PRM[4] and anglR < PRM[5]:
+                if Step_counter < 30 and (anglR > PRM[4] and anglR < PRM[5]):
                     Step_counter = 30
                     started = True
                 else:
                     # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
-                    if Step_counter/10 == 2: Step_counter = 10
+                    if int(Step_counter/10) == 2: Step_counter = 10
                     Step_counter += 1
-                    if Step_counter%10 == PRM[3]: started = True
+                    if Step_counter%10 == PRM[3]:
+                        Step_counter = 10 + (Step_counter%10) 
+                        started = True
     else:
         mylog.log(ERROR, f">>> section_no={section_no}は未定義のセクションです")
         started = False
@@ -630,7 +633,7 @@ def section_completed(section_no, myResult:MyResult):
             mylog.log(INFO, f">>>   x_wristR={int(xy_wristR[0])}, x_hipL={int(xy_hipL[0])}")
             mylog.log(INFO, f">>>   int(x_wristR) > int(x_hipL")
             if int(xy_wristR[0]) > int(xy_hipL[0]):
-                # 右手首が左腰の前にある（足踏み完了なしで矢番え動作（胴作り）へ）
+                # 右手首が左腰の右にある（足踏み完了なしで矢番え動作（胴作り）へ）
                 Alart_id = Alart_Asibumi
                 Step_error = True
            
@@ -847,35 +850,64 @@ def section_completed(section_no, myResult:MyResult):
     # 8-Zan-shin(弓倒し)        
     elif section_no == 9:  
         xy_hipR = keyPoints.xy('right_hip')                                 # 右腰の座標
+        xy_hipL = keyPoints.xy('left_hip')                                  # 左腰の座標
         _, angER = keyPoints.norm('right_elbow', 'right_wrist')             # 右肘から右手首へのベクトルの長さと角度を計算
         normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
         mylog.log(INFO, f">>>   angER= {angER:.1f}°, normS={int(normS)}({thsd.ratio(normS):.3f})")
-        mylog.log(INFO, f">>>   [ angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f} and {xy_wristR[0]:.0f} < {xy_hipR[0]:.0f} ]")
+        mylog.log(INFO, f">>>   x_wristR= {int(xy_wristR[0])}, x_hipR= {int(xy_hipR[0])}")
         
-        if Step_counter == 0: Step_counter = 1
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if ( (angER > PRM[0] and angER < PRM[1]) and xy_wristR[0] < xy_hipR[0] ):
-            # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
-            mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[2]))} ]")
-
-            Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
-            if normR <= thsd(PRM[2]) : 
-                Step_counter = Step_counter + 1
-                if (Step_counter%10) == PRM[3]: completed = True
-
-        mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[4]))} ]")
-
-        Stkp.push( [(4,PRM[4])] )  
-        if normS > thsd(PRM[4]):
-            # 右肩の移動ベクトルの長さが大きい場合（退場）
-            Step_counter = 0
-            completed = True
+        if Step_counter == 30:
+            mylog.log(INFO, f">>>   [ x_wristR < x_hipR ]")
+            if ( int(xy_wristR[0]) < int(xy_hipR[0]) ):  Step_counter += 1
+        else:
+            if Step_counter == 0: Step_counter = 1
+            mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and x_wristR < x_hipR ]")
             
+            Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
+            if ( (angER > PRM[0] and angER < PRM[1]) and int(xy_wristR[0]) < int(xy_hipR[0]) ):
+                # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
+                mylog.log(INFO, f">>>   [ normR <= {int(thsd(PRM[2]))} ]")
+
+                Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
+                if normR <= thsd(PRM[2]) : 
+                    Step_counter += 1
+                    if (Step_counter%10) == PRM[3]:
+                        Step_counter = 0 
+                        completed = True
+            if not completed : 
+                mylog.log(INFO, f">>>  [ x_wristR > x_hipR ]")
+                if int(xy_wristR[0]) > int(xy_hipR[0]):
+                    if Step_counter > 30: 
+                        # 右手首が右腰の右に戻る（取り消した完了を復帰）
+                        completed = True
+                    else:
+                        # （完了なしで矢番え動作（胴作り）へ）
+                        Alart_id = Alart_Asibumi
+                        Step_error = True
+        if not completed:    
+            mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[4]))} ]")
+            Stkp.push( [(4,PRM[4])] )  
+            if normS > thsd(PRM[4]):
+                # 右肩の移動ベクトルの長さが大きい場合（退場）
+                Step_counter = -1
+                completed = True            
     else:
         mylog.log(ERROR, f">>>  section_no={section_no}は未定義のセクションです")
         completed = False
     #
     mylog.log(INFO, f">>>   completed({section_no}): completed={completed}")
+    return completed
+#
+#
+def section_started_L9(section_no, myResult:MyResult):
+    global Step_counter, Step_error, Alart_id
+    started = False
+    return started
+
+def section_completed_L9(section_no, myResult:MyResult):
+    global Step_counter, Step_error, Alart_id
+    global Pull_counter, Push_counter
+    completed = False
     return completed
 #
 # ハイブリッドモデルの場合、動作予測結果を補正
@@ -922,8 +954,8 @@ def correct_action_by_rules(action, section, completed):
             if action == 2 and Step_counter < 1:    # 動作開始が早すぎる
                 r_action = 0
         elif section == 9:      # 「弓倒し」
-            if action == 1 and Step_counter < 2:    # 動作完了が早すぎる
-                r_action = 0
+            #if action == 1 and Step_counter < 2:    # 動作完了が早すぎる
+            #    r_action = 0
             if action == 2 and Step_counter < 11:   # 動作開始が早すぎる
                 r_action = 0
             if action == 2 and HR_angle > -90.0:    # 動作開始が早すぎる
@@ -1005,14 +1037,15 @@ def manual_analize_start(section_no, myResult:MyResult):
         if Section_no != 9: 
             Section_no = Section_no + 1                     # セクション番号をインクリメント
             Step_counter = 0                                # セクション内の動作カウンター
-        else: 
+        else:
+            #早矢弓倒し完了からの動作開始
             counter = int(Step_counter/10)      
             mylog.log(INFO, f"[man_analize]: Step_counter={Step_counter}") 
             if counter == 2: 
                 Lap_start = 0                               # 退場動作開始の場合、解析終了
                 Split_sec = 0.0
                 Split_start = 0
-            elif counter == 3:                              # 乙矢の矢つがえ前の動作開始
+            elif counter == 3:                              # 乙矢の持ち直し動作開始
                 Completed = False                           # 完了フラグをリセット
                 print(f"[man_analize]: section({section_no}), Reset completed=False")
                 #Step_counter = 0
@@ -1048,19 +1081,19 @@ def manual_analize_completed(section_no, myResult:MyResult):
         print(f"[man_analize]: section({section_no}), completed=True")
         Action_start = Lap_sec
         Completed = True 
-        #if Section_no != 6 and Section_no != 8:             # 「会」、「残身」はスプリットを計測
-        #   Split_start = 0                                 # スプリット開始時間をリセット
         Split_start = Frame_counter                         # スプリット開始時間を記録
-        if Section_no == 9 and Step_counter == 0:           # 退場動作の場合、解析終了 
+        if Section_no == 9 and Step_counter == -1:
+            # 退場動作の場合、解析終了 
             Lap_start = 0
-        Step_counter = 0
+        if not (Section_no == 9 and Step_counter > 30):
+            Step_counter = 0
         Nop_counter = 0
     else:
         Nop_counter += 1
         if Step_error:
             # セクション内の動作が不正な場合
             Alart_section = Section_no
-            mylog.log(INFO, f"[man_analizecompleted]: Step_error={Step_error}, Alart_id={Alart_id}")
+            mylog.log(INFO, f"[man_analize_completed]: Step_error={Step_error}, Alart_id={Alart_id}")
             if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
             if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
             if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
@@ -1069,6 +1102,27 @@ def manual_analize_completed(section_no, myResult:MyResult):
                 Step_counter = 0
                 Nop_counter = 0
         #
+    return Section_no, Completed  
+#
+def manual_analize_start_L9(section_no, myResult:MyResult):
+    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
+    global Completed, Step_counter, Nop_counter, Pull_counter, Push_counter
+    global Step_error, Alart_section, Alart_id
+    
+    if section_started_L9(section_no, myResult):
+        print(f"[man_analize]: section({section_no}), strated=True")
+    else:
+        pass
+    return Section_no, Completed  
+    
+def manual_analize_completed_L9(section_no, myResult:MyResult):
+    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
+    global Completed, Step_counter, Nop_counter
+    global Step_error, Alart_section, Alart_id
+    if section_completed_L9(section_no, myResult):
+        print(f"[man_analize]: section({section_no}), completed=True")
+    else:
+        pass
     return Section_no, Completed  
 #
 # 特徴量データフレームのインスタンス
@@ -1387,10 +1441,12 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                 # プログラムロジックによる姿勢解析
                 if Section_no == 0 or Completed:
                     # 動作の開始を判定
-                    Section_no, Completed = manual_analize_start(Section_no, myResult)
+                    Section_no, Completed = manual_analize_start(Section_no, myResult) if Level != 9 \
+                                            else manual_analize_start_L9(Section_no, myResult)
                 else:
                     # 動作の完了を判定
-                    Section_no, Completed = manual_analize_completed(Section_no, myResult)
+                    Section_no, Completed = manual_analize_completed(Section_no, myResult) if Level != 9 \
+                                            else manual_analize_completed_L9(Section_no, myResult)
             #
             if Section_no != p_section and Section_no == 5: 
                 Pull_counter,Push_counter = 0,0     # 「引き分け」引き・押しのカウンターリセット
@@ -1882,7 +1938,7 @@ def main():
     global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
     global Step_error, Section_color, Alart_message
     global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled, Eval_sframes
-    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Hybrid_model
+    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Hybrid_model, Level
     global StartAction_param, CompleteAction_param
     global Rect_area
     global InputPdf
@@ -2184,6 +2240,7 @@ def main():
             step_no = int(opt_val[0][2:])
             if nn_gru:
                 Hybrid_model = True
+    Level = step_no
     #
     if '-I' in opts:            # 動作開始解析パラメータの初期登録
         param_nms = []
