@@ -96,7 +96,7 @@ CompleteAction_params = [
      'act': 0,
      'param': [
         [None, None, None, None, None, None, None, None],            # 0.
-        [0.150, 0.9, 0.015, 0.015, 0.015, 0.015, 1.000, 9],          # 1.足踏み
+        [0.015, 0.015, 0.015, 75.0, 125.0, 9, None, None],          # 1.足踏み
         [50.0, 100.0, 120.0, 0.015, 2, 0.040, 3, 5, 0.00],           # 2.胴作り
         [0.015, 0.015, 0.015, 0.015, 5, 0.027, 2, 0.04 ],            # 3.弓構え
         [0.005, 1.000, 1.000, 1.000, 9, None, None, None],           # 4.打起こし
@@ -252,7 +252,7 @@ StartAction_params = [
      'step': 9,
      'act': 1,
      'param': [
-        [0.120, 0.140, None, None, None, None, None, None],          # 0.
+        [0.120, None, None, None, None, None, None, None],           # 0.
         [1.000, 2, None, None, None, None, None, None],              # 1.足踏み
         [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 5, None, None, None, None, None],             # 3.弓構え
