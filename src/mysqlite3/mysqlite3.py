@@ -90,11 +90,9 @@ class MyDb:
             self.cur.execute(sql)
 
         d = datetime.now()
-        timestamp = d.strftime('%Y-%m-%d %H:%M:%S')
-        
-        img_file = os.path.basename(data_list[0])        # 'memo'に初期設定する画像ファイル名を取得
-        values = f"'{self.case_name}', '{data_list[0]}', {data_list[1]:.3f}, {data_list[2]}, {data_list[3]}, '{data_list[4]}',"\
-               + f" '{img_file}:', "\
+        timestamp = d.strftime('%Y-%m-%d %H:%M:%S')        
+        values = f"'{self.case_name}', '{data_list[0]}', {data_list[1]:.3f}, {data_list[2]}, {data_list[3]},"\
+               + f" '{data_list[4]}','{data_list[5]}',"\
                + f" '{timestamp}', '{timestamp}'"
             
         sql = "insert into frame_info"\
