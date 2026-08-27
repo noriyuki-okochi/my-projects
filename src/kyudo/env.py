@@ -1,5 +1,19 @@
 import os
 import numpy as np
+import kyudo.globals as g
+
+# アプリ専用のロガー設定
+import logging
+#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
+formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
+
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+ERROR = logging.ERROR
+
+LOG_FILE_MODE = 'w'
+CSV_FILE_MODE = 'a'
+LOSS_FILE_MODE = 'w'
 
 ##############################
 # 共通定数
@@ -290,13 +304,13 @@ BG_PURPLE = '45'
 BG_CYAN = '46'
 BG_WHITE = '4f'
 #　カラー(B,G,R)
-YELLOW = (0, 255, 255)  # 黄色
-GREEN = (0, 255, 0)    # 緑色
-RED = (0, 0, 255)      # 赤色
-BLUE = (255, 0, 0)     # 青色  
-WHITE = (255, 255, 255)  # 白色
-BLACK = (0, 0, 0)      # 黒色
-CYAN = (255, 255, 0)   # シアン
-PURPLE= (255, 0, 255)  # 紫色
-GRAY = (128, 128, 128)  # グレー
+YELLOW = (0, 255, 255)      # 黄色
+GREEN = (0, 255, 0)         # 緑色
+RED = (0, 0, 255)           # 赤色
+BLUE = (255, 0, 0)          # 青色  
+WHITE = (255, 255, 255)     # 白色
+BLACK = (0, 0, 0)           # 黒色
+CYAN = (255, 255, 0)        # シアン
+PURPLE= (255, 0, 255)       # 紫色
+GRAY = (128, 128, 128)      # グレー
 # eof
