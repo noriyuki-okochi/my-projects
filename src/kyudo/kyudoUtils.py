@@ -8,25 +8,17 @@ import numpy as np
 #import matplotlib.pyplot as plt
 from datetime import datetime
 
-import logging
-DEBUG = logging.DEBUG
-INFO = logging.INFO
-ERROR = logging.ERROR
 # local package
 from kyudo.env import * 
 
-LOG_FILE_MODE = 'w'
-CSV_FILE_MODE = 'a'
-LOSS_FILE_MODE = 'w'
-
+import logging
 ulog = logging.getLogger(__name__)
 filehandler = logging.FileHandler('./log/kyudoUtils.log', mode=LOG_FILE_MODE)  # ログファイルの設定
-#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
-formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
 filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
 ulog.addHandler(filehandler)  # ログハンドラを追加
 ulog.setLevel(INFO)     # ログレベルの設定
 #ulog.setLevel(DEBUG)    # ログレベルの設定
+
 DF2CSV_enabled = True
 
 # GPUチェック
