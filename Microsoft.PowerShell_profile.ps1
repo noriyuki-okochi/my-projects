@@ -435,7 +435,7 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model --
+        python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
     }
     elseif ($raw) {         
         # 動画生再生
@@ -498,7 +498,7 @@ function yoloAp {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py $dbg_level -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model --
+        python ./src/yoloApp.py $dbg_level -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -513,11 +513,11 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model --
+            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model --
+            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
         }
     }
     else{
