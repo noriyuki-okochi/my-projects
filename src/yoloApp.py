@@ -21,55 +21,32 @@ from kyudo.evalModel import *
 from kyudo.kyudoUtils import *
 from mysqlite3.mysqlite3 import MyDb
 
-# Ultralytics YOLOv8とアプリ専用のロガー設定
-import logging
-DEBUG = logging.DEBUG
-INFO = logging.INFO
-ERROR = logging.ERROR
+# local module
+from gruAnal import gru_analize
+from manAnal import manual_analize_start
+from manAnal import manual_analize_completed
+from manAnal9 import manual_analize_start_L9
+from manAnal9 import manual_analize_completed_L9
+import kyudo.globals as g
 
+# Ultralytics YOLOv8とアプリ専用のロガー設定
 logger = logging.getLogger('ultralytics')
-logger.disabled = True  # ログ出力を無効化
+logger.disabled = True                      # ログ出力を無効化
 
 mylog = logging.getLogger(__name__)
 filehandler = logging.FileHandler('./log/yoloApp.log', mode='w')  # ログファイルの設定
-#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
-formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
-filehandler.setFormatter(formatter)  # フォーマッタをハンドラに設定
-mylog.addHandler(filehandler)  # ログハンドラを追加
+filehandler.setFormatter(formatter)         # フォーマッタをハンドラに設定
+mylog.addHandler(filehandler)               # ログファイルハンドラを追加
+
 
 #　アプリケーションのグローバル変数の定義
-Debug_opt:int = 0           # デバッグレベル
-Frame_counter:int = 0       # フレームカウンター
-Fps:float = 30              # フレームレート
-Section_no:int = 0          # セクション番号
-Split_sec:float = 0.0       # スプリット秒
-Split_last:float = 0.0      # スプリット秒
-Split_start:int = 0         # スプリットベースフレームカウント
-Lap_sec:float = 0.0         # ラップ秒 
-Lap_start:int = 0           # ラップベースフレームカウント
-Action_start:float = 0.0    # アクションベース時間
-Action:int = 0              # アクション（予測結果）
-Completed:bool = False      # 完了フラグ
-Step_counter:int = 0        # セクション内のステップカウンター
-Nop_counter:int = 0         # スキップカウンター
-Step_error:bool = False     # 不正な動作フラグ
-Alart_section:int = 0       # アラート発生セクション番号
-Alart_id:int = 0            # アラート番号
-Alart_message:str = ''      # アラートメッセージ
-Section_color:list = YELLOW # セクションの色（黄色）BGR
-RL_angle:float = 0.0        # 右手首ー＞左手首の角度
-SR_angle:float = 0.0        # 右腕の角度
-SL_angle:float = 0.0        # 左腕の角度
-ER_angle:float = 0.0        # 右肘ー＞右手首の角度
-HR_angle:float = 0.0        # 右腰ー＞右手首の角度
-RSE_angle:float = 0.0       # 右肩ー＞右肘の角度
-EYE_ratio:float = 0.0       # 眼の間隔比率
-Pull_counter:int = 0        # 引き分け時「引き」カウンター
-Push_counter:int = 0        # 引き分け時、「押し」カウンター
-# カメラの位置を定義
-Camera_position:int = 0     # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
-CameraPos:str = ''          # カメラの位置名
+Debug_opt:int = 0               # デバッグレベル
+Camera_position:int = 0         # カメラの位置（0:未定義、1:前面、2:右側面、3:上面）
 CameraPos_name = ['', 'Front-side', 'Right-side', 'Upper-side']  # カメラの位置
+Fps:float = 30                  # フレームレート
+Action:int = 0                  # アクション（予測結果）
+Section_color:list = YELLOW     # セクションの色（黄色）BGR
+Alart_message:str = ''          # アラートメッセージ
 
 # トラッキングフラグ
 Tracking_only:bool = False      # トラッキングフラグ
@@ -89,7 +66,6 @@ Input_key:int = Current_feature_key  # 使用する特徴量の個数(6,7,8)
 Num_input:int = Input_dim       # 入力データ次元数
 Num_frames = Sequence_frames    # 入力シーケンスのフレーム数
 Num_classes:int = Output_dim    # 出力クラス数（ラベル[0=移行,1=完了,2=開始]の区分数）
-Hybrid_model:bool = False       # GRUモデルとロジック解析の併用フラグ
 # YOLOv8モデル
 V8_model:str = 'v8s'            # YOLOv8のモデルファイル名
 Level:int = 0                   # 解析パラメータレベル（0-3,9）
@@ -132,10 +108,10 @@ def help():
     print(" -w(rite-video-file) <FPS-multi-ratio>")
     print(" -z(:hide the faces by mosaic)")
     print(" -p(arameter set in StartAction_parames)")
-    print(" -P(arameter set in CompletedAction_parames)")
+    print(" -P(arameter set in g.CompletedAction_parames)")
     print(" -S(kip illegal-action-check): section-no=3,5")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
-    print(" -kpt <no>: draw key-point-line type:1=upper,2=right-side,3=front(default),other=yolo standard")
+    print(" -kpt <no>: draw key-point-line type:1=upper,2=right-side,3=front(default),0=yolo standard")
     print(" -h(elp)")
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
     print(" -v(erborse)")
@@ -184,7 +160,7 @@ def help():
     return
 #
 # 動作解析パラメータ設定用のスタック   
-Stkp = StackActParam()  
+#Stkp = StackActParam()  
 #
 # 動作解析パラメータテーブルをログファイルに出力する
 def print_param(tbl):
@@ -229,7 +205,6 @@ def get_camera_pos(myResult):
 #
 # 解析結果をトラッキングする関数              
 def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
-    global  RL_angle, SR_angle, SL_angle, ER_angle, HR_angle, RSE_angle, EYE_ratio
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -281,29 +256,29 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
         
         # グローバル変数にセット(評価データ参照用)
-        RL_angle = rl_angle
-        HR_angle = hr_angle
-        SR_angle = sr_angle
-        SL_angle = sl_angle
-        ER_angle = rew_angle
-        RSE_angle = rse_angle
+        g.RL_angle = rl_angle
+        g.HR_angle = hr_angle
+        g.SR_angle = sr_angle
+        g.SL_angle = sl_angle
+        g.ER_angle = rew_angle
+        g.RSE_angle = rse_angle
         # アクション発生後の経過時間（x10秒）
-        # act_sec = int( (Lap_sec - Action_start)*10 ) if Action_start > 0.0 else 0
+        # act_sec = int( (g.Lap_sec - g.Action_start)*10 ) if g.Action_start > 0.0 else 0
         # 体の向き（0/1=的方向／正面向き）
         shouls_ratio = shouls_norm/box_h
         xy_conf = keyPoints.conf('left_shoulder')                  # キーポイントの信頼度(Numpy)
         body_front:int = 0 if xy_conf < 0.9 else \
                     (1 if shouls_ratio > Body_front_threshold else 0)    
-        if Section_no >= 2 and Section_no <= 9:
+        if g.Section_no >= 2 and g.Section_no <= 9:
             # 胴づくりー＞湯倒しは体正面向きに固定
             body_front = 1
 
         # 顔の向き（0/1/2=不定／正面／横）
         eyes_ratio = eyes_norm/box_w
-        EYE_ratio = eyes_ratio
+        g.EYE_ratio = eyes_ratio
         face_front:int = 0 if eyes_ratio > 0.5 else \
                     (1 if eyes_ratio > Face_front_threshold else 2)    
-        if Section_no >= 4 and Section_no <= 8:
+        if g.Section_no >= 4 and g.Section_no <= 8:
             # 打ちお越しー＞残身は顔の向きを横に固定
             face_front = 2
             
@@ -325,806 +300,6 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
     
     return
 #
-# 次のセクションが開始したかどうかを判定する関数
-#
-def section_started(section_no, myResult:MyResult):
-    global Step_counter, Step_error, Alart_id
-    
-    keyPoints = myResult                            # キーポイントのデータ解析インスタンス
-    ibox = myResult.boxid
-    
-    thsd = Threshold(keyPoints.block_height)        # バウンディングボックスの高さを基準に閾値設定インスタンス
-    
-    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
-    arrow = myResult.arrow_length_angles[Sample_lag]
-
-    normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
-    normL, anglL = arrow[Kn2idx['left_wrist']]                      # 左手首の移動ベクトルの長さと角度
-    normS, _ = arrow[Kn2idx['right_shoulder']]                      # 右肩の移動ベクトルの長さと角度
-    xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
-
-    started = False
-    # 共通の開始条件を取得
-    PRM = StartAction_param['param'][10]        # 10は共通の開始条件     
-    conf = keyPoints.conf('right_wrist')                            # 右手首の座標の信頼度
-    
-    if conf < PRM[0] and (section_no > 0 and section_no < 8):
-        # 右手首の信頼度が低い
-        mylog.log(INFO, f"started({section_no}): right-wrist-conf={conf:.2f}({PRM[0]:.2f}), "\
-                      + f" skip....")
-        return started
-
-    mylog.log(INFO, f"started ({section_no}):フレーム={Frame_counter}\n"\
-            + f"    boxid={ibox}, H={int(thsd.block_height)}:  wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
-            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, anglRL={int(RL_angle)}°, conf={conf:.2f}, counter={Step_counter}")
-    #
-    # 次の節への移行条件を判定
-    #
-    # セクションごとの開始条件を取得
-    PRM = StartAction_param['param'][section_no]  
-    # 0-Start  ->  1-Asi-bumi
-    if section_no == 0:    
-        lenS, _ = keyPoints.norm('left_shoulder', 'right_shoulder')          # 右肩と左肩のベクトルの長さと角度を計算
-        mylog.log(INFO, f">>>   lenS={int(lenS)}({thsd.ratio(lenS):.3f}), normS={(int(normS))}({thsd.ratio(normS):.3f})")
-        mylog.log(INFO, f">>>   [ lenS < {int(thsd(PRM[0]))} and normS > {int(thsd(PRM[1]))} ]")
-
-        Stkp.push([ (0,PRM[0]), (1,PRM[1]) ])  
-        if lenS < thsd(PRM[0]) and  normS > thsd(PRM[1]):
-            # 右肩と左肩のベクトルの長さが80未満、右肩の移動ベクトルの長さが50以上の場合（射位へ移動）
-            started = True
-    
-    # 1-Asi-bumi  ->  2-Dou-zukuri        
-    elif section_no == 1:  
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
-
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if normR > thsd(PRM[0]):
-            # 右手首の移動ベクトルの長さが50以上の場合（矢つがえ動作開始）
-            Step_counter += 1
-            if Step_counter == PRM[1]: started = True
-    
-    # 2-Dou-zukuri  ->  3-Yu-gamae        
-    elif section_no == 2:  
-        if Step_counter == 0: Step_counter = 30 # 初期化（弦調べ）
-
-        lenY, _ = keyPoints.norm('right_eye', 'left_eye')         # 右目と左目のベクトルの長さと角度を計算       
-        mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f})")
-        if thsd.ratio(lenY) > 1.0:
-            mylog.log(INFO, f"started({section_no}): lenY.ratio={thsd.ratio(lenY):.3f}, "\
-                      + f" skip....")
-            return started   # 目の間隔が異常に広い場合、開始判定しない
-
-        if Step_counter == 30:
-            mylog.log(INFO, f">>>   lenY < {int(thsd(PRM[0]))})")
-            if lenY < thsd(PRM[0]) :
-                # 目の間隔が狭くなる（箆調べ）
-                Step_counter = 40        
-        if Step_counter == 40:
-            mylog.log(INFO, f">>>   lenY > {int(thsd(PRM[0]))})")
-            if lenY > thsd(PRM[0]):
-                # 箆調べからの戻り
-                Step_counter = 50
-        '''            
-        mylog.log(INFO, f">>>   [ lenY > {int(thsd(PRM[0]))} and normR > {int(thsd(PRM[1]))} ]")
-        Stkp.push( [(0,PRM[0]),(1,PRM[1]), (2,PRM[2])] )  
-        if lenY > thsd(PRM[0]) and normR > thsd(PRM[1]):
-        '''
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[1]))} ]")
-        Stkp.push( [(1,PRM[1]), (2,PRM[2])] )  
-        if normR > thsd(PRM[1]):
-            # 右手首の移動ベクトルの長さが10以上の場合（取りかけ動作開始）
-            Step_counter += 1
-            if (Step_counter%10) == PRM[2]: started = True
-        else: Step_counter = int(Step_counter/10)*10
-    
-    # 3-Yu-gamae  ->  4-Uti-okosshi        
-    elif section_no == 3:  
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
-
-        if Step_counter == 0: Step_counter = 11 # 初期化（物見が定まる）
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
-        if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
-            # 右手首と左手首の移動ベクトルの長さが10以上の場合（打起し動作開始）
-            Step_counter += 1
-            if (Step_counter%10) == PRM[2]:   started = True
-    
-    # 4-Uti-okosshi  ->  5-Hiki-wake        
-    elif section_no == 4:  
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), anglL={int(anglL)}°, anglR={int(anglR)}°")
-        mylog.log(INFO, f">>>   [ (normR > {int(thsd(PRM[0]))} and anglR > {PRM[2]:.2f} and anglR < {PRM[3]:.2f})"\
-                      + f" or (normL > {int(thsd(PRM[1]))} and anglL > {PRM[2]:.2f} and anglL < {PRM[3]:.2f}) ]")
-
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
-        if  (normR > thsd(PRM[0]) and anglR > PRM[2] and anglR < PRM[3]) or \
-            (normL > thsd(PRM[1]) and anglL > PRM[2] and anglL < PRM[3]):
-            # 右手首の移動ベクトルの長さが15以上の場合（引分け大三への動作開始）
-            Step_counter += 1
-            if Step_counter == PRM[4]:   started = True
-    
-    # 5-Hiki-wake  ->  6-Kai        
-    elif section_no == 5:  
-        _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
-        if Step_counter > 90 :  # 離れアラート設定（仮）
-            mylog.log(INFO, f">>>   angER={angER:.1f}°")
-            if angER > 145 or angER < -145:                 # Yolo8の誤検出防止
-                # 右肘の角度が伸展している場合（会なしで離れ）
-                Alart_id = Alart_KaiNasi
-                Step_error = True
-            else: Step_counter = Step_counter%10
-        else:    
-            normER, _ = arrow[Kn2idx['right_elbow']]                    # 右肘の移動ベクトルの長さと角度
-            normEL, _ = arrow[Kn2idx['left_elbow']]                     # 左肘の移動ベクトルの長さと角度
-            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
-                            + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normL):.3f})")
-            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
-            
-            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
-            if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
-                # 右手首の移動ベクトルの長さが10以下の場合（引分けの完了）
-                Step_counter = Step_counter + 1
-                if Step_counter == PRM[4]: started = True    #  停止状態の５回保持で完了
-            else:
-                mylog.log(INFO, f">>>   angER={angER:.1f}°")
-                mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and angER < -90.0 ]")
-                Stkp.push( [(5,PRM[5])] )  
-                if normR > thsd(PRM[5]) and angER < -90.0:
-                    # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
-                    Step_counter += 90              # 離れアラート設定（仮）
-                #elif Hybrid_model:
-                #    Step_counter = int(Step_counter/10)*10                 # カウンターリセット
-    
-    # 6-Kai  ->  7-Hanare        
-    elif section_no == 6:  
-        mylog.log(INFO, f">>>   angR-EW={ER_angle:.1f}°")
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
-
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
-        if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
-            # 右手首、左手首の移動ベクトルの長さが大きい場合（離れ）
-            started = True
-        elif normR > thsd(PRM[0]) and ER_angle < -90.0:
-            # 右手首の動き検知のみあり
-            Step_counter += 1
-            if Step_counter > PRM[2]:
-                # 左手首（弓手）の押しタイミングズレ
-                Alart_id = Alart_Hanare
-                Step_error = True
-                started = True
-        elif Step_counter > 0: 
-            # 左手首（弓手）の動き検知なし
-            started = True
-    
-    # 7-Hanare  ->  8-Zan-shin        
-    elif section_no == 7:  
-        mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} ]")
-
-        Stkp.push( [(0,PRM[0])] )  
-        if normR < thsd(PRM[0]) :
-            started = True
-
-    # 8-Zan-shin  ->  9-''(弓倒し)
-    elif section_no == 8:  
-        mylog.log(INFO, f">>>   normR={int(normR)}({thsd.ratio(normR):.3f}), normL={int(normL)}({thsd.ratio(normL):.3f})")
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and normL > {int(thsd(PRM[1]))} ]")
-
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (1,PRM[2])] )  
-        if normR > thsd(PRM[0]) and normL > thsd(PRM[1]):
-            # 右手首と左手首の移動ベクトルの長さが大きい場合（弓だおし開始）
-            Step_counter += 1
-            if Step_counter == PRM[2]:
-                started = True
-    
-    # 9-''(弓倒し)  ->  0-Start
-    elif section_no == 9:  
-        if Step_counter == 0: Step_counter = 10
-        mylog.log(INFO, f">>>   normS={int(normS)}({thsd.ratio(normS):.3f})")
-        mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[0]))} ]")
-
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if normS > thsd(PRM[0]):
-            # 右肩の移動ベクトルの長さが大きい場合（退場）
-            if int(Step_counter/10) == 1: Step_counter = 20
-            Step_counter += 1
-            if Step_counter%10 == PRM[1]: started = True
-        else:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
-            Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
-            if normR > thsd(PRM[2]):
-                mylog.log(INFO, f">>>   [ counter < 30 and (anglR > {PRM[4]:.1f} and anglR < {PRM[5]:.1f}) ]")
-                Stkp.push( [(4,PRM[4]), (5,PRM[5])] )  
-                if Step_counter < 30 and (anglR > PRM[4] and anglR < PRM[5]):
-                    Step_counter = 30
-                    started = True
-                else:
-                    # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
-                    if int(Step_counter/10) == 2: Step_counter = 10
-                    Step_counter += 1
-                    if Step_counter%10 == PRM[3]:
-                        Step_counter = 10 + (Step_counter%10) 
-                        started = True
-    else:
-        mylog.log(ERROR, f">>> section_no={section_no}は未定義のセクションです")
-        started = False
-    #
-    mylog.log(INFO, f">>>   started  ({section_no}): started={started}")
-    return started
-#
-#セクションが完了したかどうかを判定する関数
-#
-def section_completed(section_no, myResult:MyResult):
-    global Step_counter, Step_error, Alart_id
-    global Pull_counter, Push_counter
-    
-    keyPoints = myResult                            # キーポイントのデータ解析インスタンス
-    ibox = myResult.boxid
-    
-    thsd = Threshold(keyPoints.block_height)        # バウンディングボックスの高さを基準に閾値設定インスタンス
-
-    # 各キーポイントの移動ベクトルの長さと角度を格納するリスト
-    arrow = myResult.arrow_length_angles[Sample_lag]  
-    
-    normR, anglR = arrow[Kn2idx['right_wrist']]                     # 右手首の移動ベクトルの長さと角度
-    normL, _ = arrow[Kn2idx['left_wrist']]                          # 左手首の移動ベクトルの長さと角度
-    normER, _ = arrow[Kn2idx['right_elbow']]                        # 右肘の移動ベクトルの長さと角度
-    normEL, _ = arrow[Kn2idx['left_elbow']]                         # 左肘の移動ベクトルの長さと角度
-    
-    xy_wristR = keyPoints.xy('right_wrist')                         # 右手首の座標
-    xy_wristL = keyPoints.xy('left_wrist')                          # 左手首の座標
-    xy_nose = keyPoints.xy('nose')                                  # 鼻の座標
-
-    lenY, _ = keyPoints.norm('right_eye', 'left_eye')               # 右目と左目のベクトルの長さと角度を計算
-
-    completed = False
-    # 共通の開始条件を取得
-    PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
-    conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
-    
-    if conf < PRM[0]  and (section_no > 1 and section_no < 9):
-        # 右手首の信頼度が低い
-        mylog.log(INFO, f"completed({section_no}): right-wrist-conf={conf:.2f}({PRM[0]:.2f}), "\
-                      + f" skip....")
-        return completed
-
-    mylog.log(INFO, f"completed({section_no}):フレーム={Frame_counter}\n"\
-            + f"    boxid={ibox}, H={int(thsd.block_height)}, wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
-            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, anglRL={int(RL_angle)}°, conf={conf:.2f}, counter={Step_counter}")
-    
-    #
-    # 節の動作完了（次節への移行体制）条件を判定
-    #    
-    # セクションごとの開始条件を取得
-    PRM = CompleteAction_param['param'][section_no]  
-    # 1-Asi-bumi
-    if section_no == 1:  
-        if Step_counter == 0:
-            #conf= keyPoints.conf('left_eye')       
-            #mylog.log(INFO, f">>>   lenY={int(lenY)}({thsd.ratio(lenY):.3f}), conf={conf:.2f}")
-            #mylog.log(INFO, f">>>   [  lenY > {int(thsd(PRM[0]))} and conf > {PRM[1]:.2f} ]")
-            lenS, _ = keyPoints.norm('right_shoulder', 'left_shoulder')    # 右肩と左肩のベクトルの長さと角度を計算
-            conf= keyPoints.conf('left_shoulder')       
-            mylog.log(INFO, f">>>   lenS={int(lenS)}({thsd.ratio(lenS):.3f}), conf={conf:.2f}")
-            mylog.log(INFO, f">>>   [  lenS > {int(thsd(PRM[0]))} and conf > {PRM[1]:.2f} ]")
-            
-            Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-            #if lenY > thsd(PRM[0]) and conf > PRM[1]:
-            if lenS > thsd(PRM[0]) and conf > PRM[1]:
-                # 右目と左目のベクトルの長さが10以上、左目の信頼度が0.5以上の場合（正面を向く）
-                Step_counter = 10
-        else:
-            normN, _ = arrow[Kn2idx['nose']]                        # 鼻の移動ベクトルの長さと角度
-            normHR, _ = arrow[Kn2idx['right_hip']]                  # 左腰の移動ベクトルの長さと角度
-            normHL, _ = arrow[Kn2idx['left_hip']]                   # 左腰の移動ベクトルの長さと角度
-            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), normN={int(normN)}({thsd.ratio(normN):.3f}), "\
-                            + f" normHR={int(normHR)}({thsd.ratio(normHR):.3f}), normHL={int(normHL)}({thsd.ratio(normHL):.3f})") 
-
-            mylog.log(INFO, f">>>   [ (normR <= {int(thsd(PRM[2]))} and normL <= {int(thsd(PRM[3]))}) and"\
-                        + f" (normHR <= {int(thsd(PRM[4]))}) and (normHL <= {int(thsd(PRM[5]))}) and (normN <= {int(thsd(PRM[6]))}) ]")
-            
-            Stkp.push( [(2,PRM[2]), (3,PRM[3]), (4,PRM[4]), (5,PRM[5]), (6,PRM[6])] )  
-            if (normR <= thsd(PRM[2]) and normL <= thsd(PRM[3])) and (normHR <= thsd(PRM[4]) and normHL <= thsd(PRM[5])) and (normN <= thsd(PRM[6])):
-                # 右手首と左手首、右腰骨と左腰骨の移動ベクトルの長さが10未満、鼻の移動ベクトルの長さが10未満、
-                Step_counter += 1
-                if (Step_counter%10) == PRM[7]: completed = True
-                
-        if not completed and CameraPos == 'Front-side':
-            xy_hipL = keyPoints.xy('left_hip')                         # 右腰の座標
-            mylog.log(INFO, f">>>   x_wristR={int(xy_wristR[0])}, x_hipL={int(xy_hipL[0])}")
-            mylog.log(INFO, f">>>   int(x_wristR) > int(x_hipL")
-            if int(xy_wristR[0]) > int(xy_hipL[0]):
-                # 右手首が左腰の右にある（足踏み完了なしで矢番え動作（胴作り）へ）
-                Alart_id = Alart_Asibumi
-                Step_error = True
-           
-    # 2-Dou-zukuri            
-    elif section_no == 2:  
-        if Step_counter == 0: Step_counter = 1  # 初期化（矢番え動作開始）
-        
-        _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの角度を計算
-        _, angSE = keyPoints.norm('right_shoulder', 'right_elbow')  # 右肩から右肘へのベクトルの角度を計算
-        if Step_counter >= 10 and Step_counter < 20:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} ]")
-            
-            Stkp.push( [(5,PRM[5]), (6,PRM[6])] )  
-            if normR > thsd(PRM[5]): 
-                # 右手首の移動ベクトルの長さが大きい場合（取り矢動作開始）
-                Step_counter += 1
-                if (Step_counter%10) == PRM[6]: Step_counter = 20 
-            else:
-                Step_counter = int(Step_counter/10)*10  # 連続回数をリセット    
-        else:
-            mylog.log(INFO, f">>>   angER= {angER:.1f}°, angSE= {angSE:.1f}°, SL_angl= {SL_angle:.1f}")
-            mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and angSE > {PRM[2]:.1f} ]")
-            
-            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
-            if ( (angER > PRM[0] and angER < PRM[1]) and (angSE > PRM[2]) ):
-                # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
-                mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[3]))} ]")
-            
-                Stkp.push( [(3,PRM[3]), (4,PRM[4]), (7,PRM[7])] )  
-                if ( normR <= thsd(PRM[3]) ) : 
-                    if Step_counter < 10:
-                        # 右手首と左手首の移動ベクトルの長さが10未満の場合（矢つがえ動作完了）
-                        Step_counter += 1
-                        if (Step_counter%10) == PRM[4]: Step_counter = 10        #２回保持
-                    elif Step_counter >= 20:
-                        # 右手首と左手首の移動ベクトルの長さが10未満の場合（胴作り完了）
-                        Step_counter += 1
-                        if (Step_counter%10) == PRM[7]: completed = True         #５回保持
-            else:
-                Step_counter = int(Step_counter/10)*10 + 1 # 連続回数をリセット
-        #
-        if not completed and Step_counter >= 10:
-            mylog.log(INFO, f">>>   [ lenY < {int(thsd(PRM[8]))} and angER > {PRM[0]:.1f} ]")            
-            Stkp.push( [(7,PRM[8])] )  
-            if lenY < thsd(PRM[8]) and  angER >PRM[0]:
-                # 目の間隔が狭くなる（箆調べ）
-                completed = True
-                        
-    # 3-Yu-gamae            
-    elif section_no == 3:  
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), normER={int(normER)}({thsd.ratio(normR):.3f}),"\
-                      + f" normEL={int(normEL)}({thsd.ratio(normEL):.3f}), lenY={int(lenY)}({thsd.ratio(lenY):.3f})")
-        if Step_counter < 10:
-            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))})"\
-                            + f" and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
-
-            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
-            if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
-                # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満の場合
-                Step_counter = Step_counter + 1
-                if Step_counter >= PRM[4]: Step_counter = 10
-            else: Step_counter = 0
-        else:            
-            mylog.log(INFO, f">>>   [ lenY < {int(thsd(PRM[5]))} ]")
-            
-            Stkp.push( [(5,PRM[5])] )  
-            if lenY < thsd(PRM[5]):  
-                # 物見を定める
-                Step_counter = Step_counter + 1
-            Stkp.push( [(6,PRM[6])] )  
-            if Step_counter%10 >= PRM[6]: completed = True   # 
-            else:
-                mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[7]))} and normL > {int(thsd(PRM[7]))} ]")
-                Stkp.push( [(7,PRM[7])] )  
-                if normR > thsd(PRM[7]) and normL > thsd(PRM[7]):
-                    # 右手首と左手首の移動ベクトルの長さが大きい（物見なしで打ちおこし）
-                    Alart_id = Alart_Monomi
-                    Step_error = True                
-                
-    # 4-Uti-okosshi        
-    elif section_no == 4:
-        if Step_counter < 10:  
-            mylog.log(INFO, f">>>   xy_nose={int(xy_nose[1])}, xy_wristR={int(xy_wristR[1])}, xy_wristL={int(xy_wristL[1])}")
-            mylog.log(INFO, f">>>   [ (xy_wristR[1] < xy_nose[1] and xy_wristL[1] < xy_nose[1] ]")
-            if (xy_wristR[1] < xy_nose[1] and xy_wristL[1] < xy_nose[1]):
-                # （右手首と左手首が鼻より高い位置（Y軸は下方が正）
-                Step_counter = 10
-        else:
-            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
-                          + f"normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normEL)}({thsd.ratio(normEL):.3f})")
-            mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
-
-            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
-            if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])):
-                # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満
-                Step_counter = Step_counter + 1
-                if (Step_counter%10) == PRM[4]: completed = True   # ３回保持で完了                
-    
-    # 5-Hiki-wake        
-    elif section_no == 5:  
-        xy_shouderR = keyPoints.xy('right_shoulder')                # 右腰の座標
-        mylog.log(INFO, f">>>   y_nose={int(xy_nose[1])}, y_wristR={int(xy_wristR[1])}, y_shoulR={int(xy_shouderR[1])}")
-
-        mylog.log(INFO, f">>>   [ y_wristR < y_nose ]")
-        if  xy_wristR[1] < xy_nose[1]  :
-            # 右手首が鼻より高い位置（Y軸は下方が正）
-            _, anglEL = keyPoints.norm('left_elbow', 'left_wrist')       # 左肘から左手首へのベクトルの角度を計算
-            mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}), anglR={int(anglR)}°, anglEL={int(anglEL)}°")
-            if Step_counter < 10:   # 「打越し」から「大三」への移行
-                mylog.log(INFO, f">>>   [ normL < {int(thsd(PRM[0]))} and anglEL > -80° ]")
-                Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-                if normL < thsd(PRM[0]) and anglEL > -80.0:  Step_counter += 1      # 弓手の静止
-                else: Step_counter = 0
-                              
-                if Step_counter == PRM[1]: Step_counter = 10                        # 6回保持で「大三」へ移行
-                else:
-                    mylog.log(INFO, f">>>   [ normR > {int(thsd(0.025))} and (anglR < -130 or anglR > 130) ]")
-                    if normR > thsd(0.025) and (anglR < -130 or anglR > 130):       # 馬手の引きが大きい場合    
-                        # 「大三」不安定
-                        Step_counter = 31
-            elif Step_counter > 30:
-                    mylog.log(INFO, f">>>   [ normR > {int(thsd(0.025))} and (anglR < -130 or anglR > 130) ]")
-                    if normR > thsd(0.030) and (anglR < -130 or anglR > 130):       # 馬手の引きが大きい場合    
-                        # 「大三」不安定
-                        Step_counter += 1
-                        if (Step_counter%10) == 3:
-                            Step_counter = 10
-                            Alart_id = Alart_Daisan
-                            Step_error = True
-                    else: Step_counter = 0
-                
-            elif PRM[2] > 0.0:  # 「大三」から「引き分け」完了への移行
-                mylog.log(INFO, f">>>   [ normL > {int(thsd(PRM[2]))} ]")
-                Stkp.push( [(2,PRM[2])] )  
-                if normL > thsd(PRM[2]): 
-                    # 「押し」を優先的に判定する
-                    Step_counter = 11         # 「押し」
-                    Push_counter += 1
-                else:
-                    mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} ]")
-                    if normR > thsd(PRM[2]):  
-                        Step_counter = 12     # 「引き」
-                        Pull_counter += 1
-            
-            else: Step_counter = 13
-
-        elif  xy_wristR[1] < xy_shouderR[1] :
-            # （右手首が右肩より高い位置で停止）
-            if Step_counter < 20: Step_counter = 20
-
-            if Step_counter > 90 :  # 離れアラート設定（仮）
-                _, angER = keyPoints.norm('right_elbow', 'right_wrist')     # 右肘から右手首へのベクトルの長さと角度を計算
-                mylog.log(INFO, f">>>   angER={angER:.1f}°")
-                if angER > 145 or angER < -145:             # Yolo8の誤検出防止 
-                    Alart_id = Alart_KaiNasi
-                    Step_error = True
-                else:
-                    Step_counter = 20 + Step_counter%10
-            else:    
-                mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
-                            + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normL)}({thsd.ratio(normEL):.3f})")
-                mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[3]))} and normL < {int(thsd(PRM[4]))}) and (normER < {int(thsd(PRM[5]))} and normEL < {int(thsd(PRM[6]))}) ]")
-
-                Stkp.push( [(3,PRM[3]), (4,PRM[4]), (5,PRM[5]), (6,PRM[6]), (7,PRM[7])] )  
-                if (normR < thsd(PRM[3]) and normL < thsd(PRM[4])) and (normER < thsd(PRM[5]) and normEL < thsd(PRM[6])) :
-                    # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
-                    Step_counter = Step_counter + 1
-                    if (Step_counter%10) == PRM[7]:  completed = True
-                else:
-                    # 右手首の移動ベクトルの長さが大きい（会なしで離れ）
-                    mylog.log(INFO, f">>>   [ (Step_counter%10) > {PRM[8]} and (normR > {int(thsd(PRM[9]))}) ]")
-                    Stkp.push( [(8,PRM[8]), (9,PRM[9])] )  
-                    if (Step_counter%10) > PRM[8] and normR > thsd(PRM[9]):
-                        Step_counter = 90 + Step_counter%10         # 離れアラート設定（仮）
-    # 6-Kai            
-    elif section_no == 6:  
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f}),"\
-                      + f" normER={int(normER)}({thsd.ratio(normER):.3f}), normEL={int(normEL)}({thsd.ratio(normEL):.3f}) ")
-        mylog.log(INFO, f">>>   [ (normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))}) and (normER < {int(thsd(PRM[2]))} and normEL < {int(thsd(PRM[3]))}) ]")
-
-        if Step_counter == 0: Step_counter = 1  # 初期化（口割）
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
-        if (normR < thsd(PRM[0]) and normL < thsd(PRM[1])) and (normER < thsd(PRM[2]) and normEL < thsd(PRM[3])) :
-            # 右手首と左手首の移動ベクトルの長さが10未満、右肘と左肘の移動ベクトルの長さが10未満（姿勢の保持で完了）
-            Step_counter = Step_counter + 1
-            if Step_counter == PRM[4]:  completed = True
-        else:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and normL > {int(thsd(PRM[6]))} ]")
-
-            Stkp.push( [(5,PRM[5]), (6,PRM[6])] )  
-            if normR > thsd(PRM[5]) and normL > thsd(PRM[6]):
-                # 右手首の移動ベクトルの長さが大きい（会不十分で離れ）
-                Alart_id = Alart_KaiFusoku
-                Step_error = True
-            #else:
-            #    Step_counter = 1  # 連続回数をリセット
-    
-    # 7-Hanare        
-    elif section_no == 7:          
-        Step_counter = Step_counter + 1
-        Stkp.push( [(0,PRM[0])] )  
-        if Step_counter > PRM[0]: completed = True
-    
-    # 8-Zan-shin    
-    elif section_no == 8:  
-        mylog.log(INFO, f">>>   normL={int(normL)}({thsd.ratio(normL):.3f})")
-        mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} and normL < {int(thsd(PRM[1]))} ]")
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
-        if normR < thsd(PRM[0]) and normL < thsd(PRM[1]):
-            # 右手首と左手首の移動ベクトルの長さが50以下の場合（姿勢の保持で完了）
-            Step_counter = Step_counter + 1
-            if Step_counter == PRM[2]:  completed = True
-    
-    # 8-Zan-shin(弓倒し)        
-    elif section_no == 9:  
-        xy_hipR = keyPoints.xy('right_hip')                                 # 右腰の座標
-        xy_hipL = keyPoints.xy('left_hip')                                  # 左腰の座標
-        _, angER = keyPoints.norm('right_elbow', 'right_wrist')             # 右肘から右手首へのベクトルの長さと角度を計算
-        normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
-        mylog.log(INFO, f">>>   angER= {angER:.1f}°, normS={int(normS)}({thsd.ratio(normS):.3f})")
-        mylog.log(INFO, f">>>   x_wristR= {int(xy_wristR[0])}, x_hipR= {int(xy_hipR[0])}")
-        
-        if Step_counter == 30:
-            mylog.log(INFO, f">>>   [ x_wristR < x_hipR ]")
-            if ( int(xy_wristR[0]) < int(xy_hipR[0]) ):  Step_counter += 1
-        else:
-            if Step_counter == 0: Step_counter = 1
-            mylog.log(INFO, f">>>   [ (angER > {PRM[0]:.1f} and angER < {PRM[1]:.1f}) and x_wristR < x_hipR ]")
-            
-            Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-            if ( (angER > PRM[0] and angER < PRM[1]) and int(xy_wristR[0]) < int(xy_hipR[0]) ):
-                # 右手首と右肘を結ぶベクトルの角度が65度から95度の範囲内の場合
-                mylog.log(INFO, f">>>   [ normR <= {int(thsd(PRM[2]))} ]")
-
-                Stkp.push( [(2,PRM[2]), (3,PRM[3])] )  
-                if normR <= thsd(PRM[2]) : 
-                    Step_counter += 1
-                    if (Step_counter%10) == PRM[3]:
-                        Step_counter = 0 
-                        completed = True
-            if not completed : 
-                mylog.log(INFO, f">>>  [ x_wristR > x_hipR ]")
-                if int(xy_wristR[0]) > int(xy_hipR[0]):
-                    if Step_counter > 30: 
-                        # 右手首が右腰の右に戻る（取り消した完了を復帰）
-                        completed = True
-                    else:
-                        # （完了なしで矢番え動作（胴作り）へ）
-                        Alart_id = Alart_Asibumi
-                        Step_error = True
-        if not completed:    
-            mylog.log(INFO, f">>>   [ normS > {int(thsd(PRM[4]))} ]")
-            Stkp.push( [(4,PRM[4])] )  
-            if normS > thsd(PRM[4]):
-                # 右肩の移動ベクトルの長さが大きい場合（退場）
-                Step_counter = -1
-                completed = True            
-    else:
-        mylog.log(ERROR, f">>>  section_no={section_no}は未定義のセクションです")
-        completed = False
-    #
-    mylog.log(INFO, f">>>   completed({section_no}): completed={completed}")
-    return completed
-#
-#
-def section_started_L9(section_no, myResult:MyResult):
-    global Step_counter, Step_error, Alart_id
-    started = False
-    return started
-
-def section_completed_L9(section_no, myResult:MyResult):
-    global Step_counter, Step_error, Alart_id
-    global Pull_counter, Push_counter
-    completed = False
-    return completed
-#
-# ハイブリッドモデルの場合、動作予測結果を補正
-def correct_action_by_rules(action, section, completed):
-    global Step_counter
-    r_action = action
-    if completed == True and action == 1:
-        # 「動作完了」で「動作完了」が認識された場合、
-        r_action = 0
-    elif completed == False and action == 2:
-        # 「動作未完了」で「動作開始」が認識された場合、
-        r_action = 0
-    elif Hybrid_model == True:
-        # 動作解析ステップに応じた補正ルール
-        if section == 1:        # 「足踏み」
-            if action == 1 and Step_counter < 13:   # 動作完了が早すぎる
-                r_action = 0
-        if section == 2:        # 「胴づくり」
-            if action == 1 and Step_counter < 21:   # 動作完了が早すぎる（一回目の腰）
-                r_action = 0
-            if action == 1 and RSE_angle < 120.0:   # 動作完了が早すぎる（肩肘の角度が不十分）
-                r_action = 0
-            if action == 1 and ER_angle < 0.0:      # 動作完了が早すぎる（肘手首の角度が不十分）
-                r_action = 0
-            if action == 1 and SL_angle > 70.0:     # 動作完了が早すぎる（左腕の角度が不十分）
-                r_action = 0
-            if action == 2 and Step_counter < 50:   # 動作開始が早すぎる
-                r_action = 0
-        elif section == 3:      # 「弓構え」
-            if action == 2 and Step_counter < 12:   # 動作開始が早すぎる
-                r_action = 0
-        elif section == 4:      # 「打起し」
-            if action == 1 and Step_counter < 11:   # 動作完了が早すぎる
-                r_action = 0
-            if action == 2 and Step_counter < 1:    # 動作開始が早すぎる
-                r_action = 0
-        elif section == 5:      # 「引き分け」
-            if action == 2 and Step_counter < 2:    # 動作開始が早すぎる
-                r_action = 0
-        elif section == 6:      # 「会」
-            if action == 2 and ER_angle > -90.0:    # 動作開始が早すぎる
-                r_action = 0
-        elif section == 8:      # 「残心」
-            if action == 2 and Step_counter < 1:    # 動作開始が早すぎる
-                r_action = 0
-        elif section == 9:      # 「弓倒し」
-            #if action == 1 and Step_counter < 2:    # 動作完了が早すぎる
-            #    r_action = 0
-            if action == 2 and Step_counter < 11:   # 動作開始が早すぎる
-                r_action = 0
-            if action == 2 and HR_angle > -90.0:    # 動作開始が早すぎる
-                r_action = 0
-    #
-    if r_action != action:
-        mylog.log(INFO, f"[correct_by_rules]: action corrected {action} to {r_action}")
-        print(f"[correct_by_rules]: action corrected {action} to {r_action}")
-    return r_action
-            
-#
-# GRUモデルによる動作予測関数
-def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
-    global Split_start, Split_sec, Split_last, Lap_start, Action_start, Step_counter
-    
-    mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
-    mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
-    
-    x = input_pdf.to_numpy(dtype=np.float32)
-    s_frames = len(input_pdf)
-    
-    # GRUモデルによる動作解析
-    y = predict_Kyudo( model, x, s_frames, log_print=False )
-    mylog.log(DEBUG, f"[gru_analize]: y.shape={y.shape}")
-    action = y[0]
-    if action != 0:
-        if Hybrid_model == True:
-            mylog.log(INFO, f"[gru_analize]: not zero action={action} ( section={section}, completed={completed}, counter={Step_counter} )")
-        # ハイブリッドモデルの場合、動作認識結果を補正
-        action = correct_action_by_rules(action, section, completed)
-    # タイマー情報の更新
-    if action == 2:
-        Action_start = Lap_sec
-        Split_start = Frame_counter                         # スプリット開始時間を記録
-        if section == 6: Split_last = Split_sec             # 「会」スプリット秒を記録
-        Split_sec = 0.0
-    elif action == 1:
-        Action_start = Lap_sec
-        #if section != 6 and section != 8:                   # 「会」、「残身」はスプリットを計測
-        #    Split_start = 0                                 # スプリット開始時間をリセット
-        Split_start = Frame_counter                         # スプリット開始時間を記録
-        if section == 9 and Step_counter == 0:              # 退場動作の場合、解析終了 
-            Lap_start = 0
-    #
-    ival = 1 if completed == True else 0
-    rslt = update_section_completed(action, section, ival, output_size=Num_classes)
-    if action != 0:
-        mylog.log(INFO, f"[gru_analize]: フレーム={Frame_counter}")
-        if action == 1:
-            mylog.log(INFO, f"[gru_analize]: section({section}), completed=True")
-            print(f"[gru_analize]: section({section}), completed=True")
-        else:
-            mylog.log(INFO, f"[gru_analize]: section({section}), strated=True")
-            print(f"[gru_analize]: section({section}), strated=True")
-        mylog.log(INFO, f"[gru_analize]: section={rslt[0]}, completed={rslt[1]}")
-        #
-        if section == 9 and action == 2: Step_counter = 30
-        else: Step_counter = 0
-    #
-    return rslt[0], (True if rslt[1] == 1 else False), action
-#
-# 動作の開始を判定する関数
-#  
-def manual_analize_start(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
-    global Completed, Step_counter, Nop_counter, Pull_counter, Push_counter
-    global Step_error, Alart_section, Alart_id
-    
-    # 動作の開始を判定
-    if section_started(section_no, myResult):
-        print(f"[man_analize]: section({section_no}), strated=True")
-        Action_start = Lap_sec
-        Split_start = Frame_counter                         # スプリット開始時間を記録
-        if Section_no == 6: Split_last = Split_sec          # 「会」スプリット秒を記録
-        Split_sec = 0.0
-        Completed = False                                   # セクションが開始されたら完了フラグをリセット    
-        Nop_counter = 0                                     # セクション内の動作が完了しない場合のカウンター
-        if Section_no < 5: Pull_counter,Push_counter = 0,0  # 「引き分け」引き・押しのカウンターリセット
-        if Section_no != 9: 
-            Section_no = Section_no + 1                     # セクション番号をインクリメント
-            Step_counter = 0                                # セクション内の動作カウンター
-        else:
-            #早矢弓倒し完了からの動作開始
-            counter = int(Step_counter/10)      
-            mylog.log(INFO, f"[man_analize]: Step_counter={Step_counter}") 
-            if counter == 2: 
-                Lap_start = 0                               # 退場動作開始の場合、解析終了
-                Split_sec = 0.0
-                Split_start = 0
-            elif counter == 3:                              # 乙矢の持ち直し動作開始
-                Completed = False                           # 完了フラグをリセット
-                print(f"[man_analize]: section({section_no}), Reset completed=False")
-                #Step_counter = 0
-            else:                                           # 乙矢の矢つがえ動作開始
-                # セクション番号を2にリセット、動作カウンターを30に設定
-                Section_no = 2
-                Step_counter = 30
-                mylog.log(INFO, f"[man_analize]: Next {Section_names[Section_no]} Sction_no={Section_no}, Step_counter={Step_counter}") 
-        #
-    else:
-        Nop_counter += 1
-        if Step_error:
-            # セクション内の動作が不正な場合
-            Alart_section = Section_no
-            mylog.log(INFO, f"[man_analizestart]: Step_error={Step_error}, Alart_id={Alart_id}")
-            if Alart_id == Alart_Hanare:   # 弓手押しタイミングの遅れ
-                Section_no += 1                             # セクション番号をインクリメント
-            if Alart_id == Alart_KaiNasi: Section_no += 1   # 会なしで離れた場合
-            Step_counter = 0
-            Nop_counter = 0                                 # セクション内の動作が完了しない場合のカウンター
-        #
-    return Section_no, Completed  
-#
-# 動作の完了を判定する関数
-#
-def manual_analize_completed(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
-    global Completed, Step_counter, Nop_counter
-    global Step_error, Alart_section, Alart_id
-    
-    # 動作の完了を判定
-    if section_completed(section_no, myResult):
-        print(f"[man_analize]: section({section_no}), completed=True")
-        Action_start = Lap_sec
-        Completed = True 
-        Split_start = Frame_counter                         # スプリット開始時間を記録
-        if Section_no == 9 and Step_counter == -1:
-            # 退場動作の場合、解析終了 
-            Lap_start = 0
-        if not (Section_no == 9 and Step_counter > 30):
-            Step_counter = 0
-        Nop_counter = 0
-    else:
-        Nop_counter += 1
-        if Step_error:
-            # セクション内の動作が不正な場合
-            Alart_section = Section_no
-            mylog.log(INFO, f"[man_analize_completed]: Step_error={Step_error}, Alart_id={Alart_id}")
-            if Alart_id == Alart_Asibumi: Section_no = 2        # 足踏み不完全で矢番えの場合
-            if Alart_id == Alart_Monomi: Section_no = 4         # 物見なしで打ちおこしの場合
-            if Alart_id == Alart_KaiNasi: Section_no = 7        # 会なしで離れた場合
-            if Alart_id == Alart_KaiFusoku: Section_no = 7      # 会不十分で離れた場合
-            if Alart_id != Alart_Daisan:                        # 大三不安定の場合、リセットしない
-                Step_counter = 0
-                Nop_counter = 0
-        #
-    return Section_no, Completed  
-#
-def manual_analize_start_L9(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
-    global Completed, Step_counter, Nop_counter, Pull_counter, Push_counter
-    global Step_error, Alart_section, Alart_id
-    
-    if section_started_L9(section_no, myResult):
-        print(f"[man_analize]: section({section_no}), strated=True")
-    else:
-        pass
-    return Section_no, Completed  
-    
-def manual_analize_completed_L9(section_no, myResult:MyResult):
-    global Section_no, Split_start, Split_sec, Split_last, Lap_start, Lap_sec, Action_start
-    global Completed, Step_counter, Nop_counter
-    global Step_error, Alart_section, Alart_id
-    if section_completed_L9(section_no, myResult):
-        print(f"[man_analize]: section({section_no}), completed=True")
-    else:
-        pass
-    return Section_no, Completed  
-#
 # 特徴量データフレームのインスタンス
 InputPdf:FeaturePdf = None
 #
@@ -1137,20 +312,20 @@ def edit_section_name(no, counter):
         #print(f"stepKey={stepKey}")
         if stepKey in Step_names:
             name += f"（{Step_names[stepKey]}）"            # 大三 etc.
-            if stepKey == 511: name += f" {Push_counter:2d}"
-            elif stepKey == 512: name += f" {Pull_counter:2d}"
+            if stepKey == 511: name += f" {g.Push_counter:2d}"
+            elif stepKey == 512: name += f" {g.Pull_counter:2d}"
         else :
             if Debug_opt > 1 : name += f"（{counter}）"     # その他
             else : pass   
     # セクションの色を設定    
-    if Step_error or Section_color == RED: 
-        if Section_no > (Alart_section + 1) or Section_no == 0 or Section_no == 9:
+    if g.Step_error or Section_color == RED: 
+        if g.Section_no > (g.Alart_section + 1) or g.Section_no == 0 or g.Section_no == 9:
             # セクション番号がアラートセクション番号より2以上大きい場合、アラート表示をクリア
             color = YELLOW
         else:  color = RED                      # 不正な動作のセクションの色（赤色）BGR
     else:
         color =  YELLOW                         # セクションの色（黄色）BGR
-        if Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
+        if g.Completed: color = GREEN             # 完了したセクションの色（緑色）BGR
 
     return name, color
 # キー入力の現在モード('PWR','PWT'）を編集する関数
@@ -1382,9 +557,8 @@ def clip_process( frame , rotate = False):
 # 検出結果をフレームに描画する関数
 #
 def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, model=None, evalModel=None, evalInput_dim=None):
-    global Section_no, Completed, Action, Step_counter, CameraPos, Nop_counter
-    global Split_start, Split_sec, Split_last, Lap_start, Lap_sec,Pull_counter, Push_counter
-    global Step_error, Alart_section, Alart_id, Section_color, Alart_message, Eval
+    global Action
+    global Section_color, Alart_message, Eval
     
     result = myResult.result
     mylog.log(DEBUG, f"Tracking_enabled={Tracking_enabled}")
@@ -1398,27 +572,27 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     # 対象ボックスのキーポイントの接続ラインを描画
     myResult.plot(annotated_frame)   
 
-    if Section_no < 2: 
+    if g.Section_no < 2: 
         # カメラの位置取得（足踏み完了まで）
-        CameraPos = get_camera_pos(myResult)                
+        g.CameraPos = get_camera_pos(myResult)                
 
     # セクション情報を更新
     arrows = myResult.arrow_length_angles       # キーポイントの移動ベクトルの長さと角度を取得
     
-    if CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
+    if g.CameraPos in ['Right-side', 'Front-side'] and arrows[Sample_lag] is not None:
         if Tracking_enabled or nn_gru:
             # 姿勢解析入力データリストを作成、保存しておく
             tracking_result(myResult, InputPdf, output_dim, csvout=False)
         # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
-        if Lap_start > 0:    
+        if g.Lap_start > 0:    
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
-            Step_error = False
-            Alart_id = 0
-            p_section = Section_no
+            g.Step_error = False
+            g.Alart_id = 0
+            p_section = g.Section_no
             if nn_gru:
                 # GRUモデルによる姿勢解析
                 # カレントのデータフレームを作成、保存
-                n = InputPdf.set_current_pdf(Section_no, Completed)
+                n = InputPdf.set_current_pdf(g.Section_no, g.Completed)
                 if n == 0:
                     mylog.log(DEBUG, f"[plot]: curPdf.shape={InputPdf.curPdf.shape}")
                     mylog.log(DEBUG, f"[plot]: {InputPdf.curPdf.tail()}")
@@ -1431,29 +605,30 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                         # 入力データフレームを取得
                         input_pdf = InputPdf.get_input_pdf()
                         # GRUモデルによる動作解析
-                        Section_no, Completed, Action = gru_analize(Section_no, Completed, model, input_pdf)
+                        g.Section_no, g.Completed, Action = gru_analize(g.Section_no, g.Completed, model, input_pdf)
+                        mylog.log(INFO, f"[gru_analize_o]: Section={g.Section_no}, g.Completed={g.Completed}, Action={Action}")
                         InputPdf.update_previous_pdf()
                 else:
                     mylog.log(INFO, f"[plot]: set_current_pdf returned n={n}")
                 
             # ハイブリッドモデルの場合、プログラムロジックによる姿勢解析も行う
-            if not nn_gru or Hybrid_model:
+            if not nn_gru or g.Hybrid_model:
                 # プログラムロジックによる姿勢解析
-                if Section_no == 0 or Completed:
+                if g.Section_no == 0 or g.Completed:
                     # 動作の開始を判定
-                    Section_no, Completed = manual_analize_start(Section_no, myResult) if Level != 9 \
-                                            else manual_analize_start_L9(Section_no, myResult)
+                    g.Section_no, g.Completed = manual_analize_start(g.Section_no, myResult) if Level != 9 \
+                                            else manual_analize_start_L9(g.Section_no, myResult)
                 else:
                     # 動作の完了を判定
-                    Section_no, Completed = manual_analize_completed(Section_no, myResult) if Level != 9 \
-                                            else manual_analize_completed_L9(Section_no, myResult)
+                    g.Section_no, g.Completed = manual_analize_completed(g.Section_no, myResult) if Level != 9 \
+                                            else manual_analize_completed_L9(g.Section_no, myResult)
             #
-            if Section_no != p_section and Section_no == 5: 
-                Pull_counter,Push_counter = 0,0     # 「引き分け」引き・押しのカウンターリセット
+            if g.Section_no != p_section and g.Section_no == 5: 
+                g.Pull_counter,g.Push_counter = 0,0     # 「引き分け」引き・押しのカウンターリセット
                 
-            Db.section = Section_no                 # トラッキングデータのセクション番号を設定 
-            Db.step_counter = Step_counter          # トラッキングデータのセクション内の動作カウンターを設定             
-            Db.completed = 1 if Completed else 0
+            Db.section = g.Section_no                 # トラッキングデータのセクション番号を設定 
+            Db.step_counter = g.Step_counter          # トラッキングデータのセクション内の動作カウンターを設定             
+            Db.completed = 1 if g.Completed else 0
 
             if Tracking_enabled:
                 # 解析結果のデータをCSVに出力する
@@ -1461,19 +636,19 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             if Update_enabled:
                 # トラッキングデータのテーブル（'section'/'completed'）を更新する
                 Db.update_tracking_section()  
-                if Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
+                if g.Step_error: Db.update_tracking_tag( 'tag1', 9 ) # 不正動作を登録
     #
     # セクション情報をフレームに描画
-    if Lap_start > 0:   Lap_sec = (Frame_counter - Lap_start)/Fps         # ラップ秒を計算
-    if Split_start > 0: Split_sec = (Frame_counter - Split_start)/Fps     # スプリット秒を計算
-    if Section_no < 7:  Split_last = 0.0
+    if g.Lap_start > 0:   g.Lap_sec = (g.Frame_counter - g.Lap_start)/Fps         # ラップ秒を計算
+    if g.Split_start > 0: g.Split_sec = (g.Frame_counter - g.Split_start)/Fps     # スプリット秒を計算
+    if g.Section_no < 7:  g.Split_last = 0.0
     #
     # 評価用のデータ保存、採点
     if Eval_enabled:
-        bSectionChanged = Eval(Frame_counter, Section_no, 1 if Completed else 0, \
-            Step_counter, Split_sec, \
-            RL_angle, ER_angle, SL_angle, SR_angle,\
-            RSE_angle, EYE_ratio, Alart_id)
+        bSectionChanged = Eval(g.Frame_counter, g.Section_no, 1 if g.Completed else 0, \
+            g.Step_counter, g.Split_sec, \
+            g.RL_angle, g.ER_angle, g.SL_angle, g.SR_angle,\
+            g.RSE_angle, g.EYE_ratio, g.Alart_id)
         
         if bSectionChanged and evalModel is not None: 
             # 予測実行(predict)
@@ -1489,35 +664,35 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             Eval.free_eval_pdf()
     
     # セクション名を編集
-    section_name, Section_color = edit_section_name(Section_no, Step_counter)   
+    section_name, Section_color = edit_section_name(g.Section_no, g.Step_counter)   
     others_color =  WHITE                       # その他の色（白）
 
-    if Alart_id > 0: 
+    if g.Alart_id > 0: 
         #　警告メッセージ（全角文字）取得
-        Alart_message = Alart_msg[Alart_id*10]
-        print(f"フレーム({Frame_counter}):{Alart_msg[Alart_id*10]}")
-        mylog.log(INFO, f">>> {Alart_msg[Alart_id*10]}")
+        Alart_message = Alart_msg[g.Alart_id*10]
+        print(f"フレーム({g.Frame_counter}):{Alart_msg[g.Alart_id*10]}")
+        mylog.log(INFO, f">>> {Alart_msg[g.Alart_id*10]}")
         
     # テキストの描画 （カメラ位置、セクション名、スプリット秒、ラップ秒、角度）          
-    cv2.putText(annotated_frame, f"camera: {CameraPos}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    cv2.putText(annotated_frame, f"camera: {g.CameraPos }", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
-    # 節(Section_no)、ステップ(Step_counter)情報の描画
+    # 節(g.Section_no)、ステップ(g.Step_counter)情報の描画
     annotated_frame = draw_text(annotated_frame, f"Section : {section_name}", (10, 40),  Section_color)
     
     # 保持時間(split)の描画
-    if Split_last == 0.0:
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if g.Split_last == 0.0:
+        cv2.putText(annotated_frame, f"split   : {g.Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     else:
-        cv2.putText(annotated_frame, f"split   : {Split_sec:6.2f}sec. {Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        cv2.putText(annotated_frame, f"split   : {g.Split_sec:6.2f}sec. {g.Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 経過時間(lap)の描画
-    cv2.putText(annotated_frame, f"lap    : {Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    cv2.putText(annotated_frame, f"lap    : {g.Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 角度情報(XX_angle)の描画
-    if Section_no == 4 or Section_no == 5 or Section_no == 6:
-        cv2.putText(annotated_frame, f"angle  : {-1*RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    if Section_no == 7 or Section_no == 8:
-        cv2.putText(annotated_frame, f"angle  : {-1*ER_angle:6.1f}  {-1*SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if g.Section_no == 4 or g.Section_no == 5 or g.Section_no == 6:
+        cv2.putText(annotated_frame, f"angle  : {-1*g.RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if g.Section_no == 7 or g.Section_no == 8:
+        cv2.putText(annotated_frame, f"angle  : {-1*g.ER_angle:6.1f}  {-1*g.SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
@@ -1535,36 +710,35 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
 # 節の移行処理
 #
 def transition_to(section_no, ctl):
-    global Section_no, Completed, Split_sec, Split_start, Lap_sec, Lap_start
-    global Step_counter, Nop_counter, Step_error, Section_color, Alart_message
-    Completed = False
-    Split_sec = 0
-    Split_start = 0
-    Step_counter = 0                    # セクション内の動作カウンターをリセット
-    Nop_counter = 0                     # セクション内の動作カウンターをリセット
-    Step_error = False                  # 不正な動作フラグ
+    global Section_color, Alart_message
+    
+    g.Completed = False
+    g.Split_sec = 0
+    g.Split_start = 0
+    g.Step_counter = 0                    # セクション内の動作カウンターをリセット
+    g.Nop_counter = 0                     # セクション内の動作カウンターをリセット
+    g.Step_error = False                  # 不正な動作フラグ
     Section_color =  YELLOW             # セクションの色（黄色）BGR
     Alart_message = ''                  # アラートメッセージをリセット
-    ctl['tag1_section'] = Section_no
-    ctl['tag2_section'] = Section_no
-    if Section_no == 0:
-        Lap_start = Frame_counter       # ラップ開始時間を記録
-        Lap_sec = 0.0
+    ctl['tag1_section'] = g.Section_no
+    ctl['tag2_section'] = g.Section_no
+    if g.Section_no == 0:
+        g.Lap_start = g.Frame_counter       # ラップ開始時間を記録
+        g.Lap_sec = 0.0
         ctl['tag1_section'] = 0         # tag登録用セクション番号
         ctl['tag2_section'] = 0         # tag登録用セクション番号
     else: 
-        Split_start = Frame_counter
-        if Lap_start > 0: Lap_start = Frame_counter
-        if Section_no == 2 and ctl['key_inter'] != 0: 
+        g.Split_start = g.Frame_counter
+        if g.Lap_start > 0: g.Lap_start = g.Frame_counter
+        if g.Section_no == 2 and ctl['key_inter'] != 0: 
             # セクション2の連打は動作カウンターを20に設定
-            Step_counter = 20
+            g.Step_counter = 20
     return
 #
 # キー入力操作関数
 #
 def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
-    global Frame_counter, Section_no, Completed, Split_sec, Split_start, Lap_sec, Lap_start
-    global Step_counter, Nop_counter, Step_error, Section_color, Alart_message, Eval
+    global Section_color, Alart_message, Eval
     global Tracking_enabled, Update_enabled, Tracking_onece
     global Cv2Video
     
@@ -1608,12 +782,12 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if Tracking_enabled: 
             print(f"トラッキングを開始します: {Db.csvpath1}")
             if not Tracking_onece:
-                Db.update_frame_info('start_frame', Frame_counter)  # 開始フレーム番号
+                Db.update_frame_info('start_frame', g.Frame_counter)  # 開始フレーム番号
                 Tracking_onece = True
             mylog.log(INFO, f">> Trucking start: {Db.csvpath1}")
         else: 
             print("トラッキングを停止します")
-            Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
+            Db.update_frame_info('stop_frame', g.Frame_counter)   # 停止フレーム番号
             mylog.log(INFO, ">> Trucking pause")
 
     elif key == ord('u') and Update_tracking:
@@ -1653,8 +827,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 
     elif key == ord('r') and (raw_video and not clip_video):
         if ctl['key_inter'] > 0:
-            if not ctl['repeat'] : ctl['start_frame'] = Frame_counter       # 繰り返し再生の開始フレームを設定
-            else: ctl['stop_frame'] = Frame_counter                         # 繰り返し再生の終了フレームを設定
+            if not ctl['repeat'] : ctl['start_frame'] = g.Frame_counter       # 繰り返し再生の開始フレームを設定
+            else: ctl['stop_frame'] = g.Frame_counter                         # 繰り返し再生の終了フレームを設定
             print(f"繰り返し再生範囲を設定しました: {ctl['start_frame']} - {ctl['stop_frame']}")
         else:
             # 'r'キーで一開始／停止
@@ -1670,8 +844,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 
     elif key == ord('R') and (raw_video and not clip_video):
             if ctl['start_frame'] > 0:# 'R'キーで再生開始フレームに戻る
-                Frame_counter = ctl['start_frame']
-                cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+                g.Frame_counter = ctl['start_frame']
+                cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
                 print(f"再生開始フレームに戻りました: {ctl['start_frame']}")
                 
     elif key == ord('g'):
@@ -1704,57 +878,57 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
     elif key >= ord('0') and key <= ord('8') \
         and (len(ctl['key_data']) == 0 and len(ctl['para_data']) == 0):
         # セクション番号を設定  
-        Section_no = key - ord('0')
-        if Section_no == 0:
+        g.Section_no = key - ord('0')
+        if g.Section_no == 0:
             if Eval_enabled: Eval(section = 0)  # 評価用のデータをリセット 
             print(f"姿勢解析を開始します")
-        else:  print(f"セクション番号を設定: {Section_no}")
+        else:  print(f"セクション番号を設定: {g.Section_no}")
 
         #  動作開始（節の移行）
-        transition_to(Section_no, ctl)
+        transition_to(g.Section_no, ctl)
         #
         if ctl['key_inter'] == 0: ctl['key_inter'] = int(time.time())  
 
     elif key == ord('9') and (len(ctl['key_data']) == 0 and len(ctl['para_data']) == 0):
         print(f"姿勢解析を停止します。")
-        Lap_start = 0                       # ラップ開始時間をリセット 
-        Split_start = 0                     # スプリット開始時間をリセット 
-        Step_counter = 0                    # セクション内の動作カウンターをリセット              
+        g.Lap_start = 0                       # ラップ開始時間をリセット 
+        g.Split_start = 0                     # スプリット開始時間をリセット 
+        g.Step_counter = 0                    # セクション内の動作カウンターをリセット              
 
     elif key == ord(' '):
-        if Completed == False:
+        if g.Completed == False:
             #  動作完了
             print(f"動作完了を設定")
-            Completed = True
-            if Section_no != 6 and Section_no != 8: # 「会」、「残身」はスプリットを計測
-                Split_start = 0                     # スプリット開始時間をリセット
+            g.Completed = True
+            if g.Section_no != 6 and g.Section_no != 8: # 「会」、「残身」はスプリットを計測
+                g.Split_start = 0                     # スプリット開始時間をリセット
         else:
             #  動作開始（節の移行）
-            Section_no = (Section_no + 1) if Section_no < 9 else 2
-            print(f"節の移行: Section_no={Section_no}")
-            transition_to(Section_no, ctl)
+            g.Section_no = (g.Section_no + 1) if g.Section_no < 9 else 2
+            print(f"節の移行: g.Section_no={g.Section_no}")
+            transition_to(g.Section_no, ctl)
 
     elif key == ord('.') and len(ctl['para_data']) == 0: 
                                             # (.) フレームカウンターを2秒進める
-        Frame_counter += int(Fps)*2     
-        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
-        print(f"フレーム={Frame_counter}")
+        g.Frame_counter += int(Fps)*2     
+        cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
+        print(f"フレーム={g.Frame_counter}")
         
     elif key == ord('>'):                   # (>) nフレーム進める
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
             # キー入力データの2文字目以降をフレーム数として設定
             ctl['skipf_frames'] = int(ctl['key_data'][1:])
             ctl['key_data'] = ''            # キー入力データをクリア
-        Frame_counter += ctl['skipf_frames'] 
-        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
-        print(f"フレーム={Frame_counter}")
+        g.Frame_counter += ctl['skipf_frames'] 
+        cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
+        print(f"フレーム={g.Frame_counter}")
     
     elif key == ord(',') and len(ctl['para_data']) == 0:                   
         # (,) フレームカウンターを2秒戻す
-        if Frame_counter > int(Fps)*2 :Frame_counter -= int(Fps)*2  
-        else: Frame_counter = 1
-        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
-        print(f"フレーム={Frame_counter}")
+        if g.Frame_counter > int(Fps)*2 :g.Frame_counter -= int(Fps)*2  
+        else: g.Frame_counter = 1
+        cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
+        print(f"フレーム={g.Frame_counter}")
     
     elif key == ord('<'):                   
         # (<) nフレーム戻す
@@ -1762,10 +936,10 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             # キー入力データの2文字目以降をフレーム数として設定
             ctl['skipb_frames'] = int(ctl['key_data'][1:])
             ctl['key_data'] = ''            # キー入力データをクリア
-        if Frame_counter > ctl['skipb_frames'] :Frame_counter -= ctl['skipb_frames']  
-        else: Frame_counter = 1
-        cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
-        print(f"フレーム={Frame_counter}")
+        if g.Frame_counter > ctl['skipb_frames'] :g.Frame_counter -= ctl['skipb_frames']  
+        else: g.Frame_counter = 1
+        cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
+        print(f"フレーム={g.Frame_counter}")
 
     elif key == ord('j'):
         # 指定フレームへジャンプ                   
@@ -1773,19 +947,19 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             frame = int(ctl['key_data'][1:])
             if frame < 1: frame = 1
             if frame > ctl['frame_count']: frame = ctl['frame_count']
-            Frame_counter = frame 
-            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            g.Frame_counter = frame 
+            cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
             ctl['key_data'] = ''            # キー入力データをクリア
-            print(f"フレーム={Frame_counter}")
+            print(f"フレーム={g.Frame_counter}")
 
     elif key == ord('\t') and ctl['at_case'] is not None:
         # 次セクション完了フレームへジャンプ 
         frame = Db.get_frame_no_at(ctl['at_case'], ctl['at_section'] + 1, 0)
         if frame is not None:
-            Frame_counter = min(frame, ctl['frame_count']) 
-            cap.set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            g.Frame_counter = min(frame, ctl['frame_count']) 
+            cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
             ctl['at_section'] += 1
-            print(f"フレーム={Frame_counter} at ({ctl['at_section']})")
+            print(f"フレーム={g.Frame_counter} at ({ctl['at_section']})")
             
             if ctl['at_section'] == 9: ctl['at_section'] =  11
             
@@ -1806,8 +980,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         
     elif key == ord('a'):
         ctl['attention'] += 1
-        mylog.log(INFO, f"!!Attention({ctl['attention']}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
-        print(f"アテンション({ctl['attention']}):Section({Section_no:2d}), Frame_counter={Frame_counter}")
+        mylog.log(INFO, f"!!Attention({ctl['attention']}):Section({g.Section_no:2d}), g.Frame_counter={g.Frame_counter}")
+        print(f"アテンション({ctl['attention']}):Section({g.Section_no:2d}), g.Frame_counter={g.Frame_counter}")
 
     elif key == ord('I'):
         tbl = CompleteAction_param
@@ -1850,8 +1024,8 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 
     elif key == ord('m') and len(ctl['para_data']) > 1:    # 現在使用中の解析パラメータを更新する
         # key_data='i[<val0>],[<val1>],[<val2>]...[,<valN>]'
-        row = Section_no        
-        tbl = CompleteAction_param if not Completed else StartAction_param  
+        row = g.Section_no        
+        tbl = CompleteAction_param if not g.Completed else StartAction_param  
         vals = ctl['para_data'][1:].split(',')
         for i in range(Stkp.len()):
             idx, _ = Stkp.get(i)
@@ -1935,10 +1109,9 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
 # Main process to play video with form-analize by YOLOv8
 #
 def main(): 
-    global Frame_counter, Section_no, Split_sec, Split_start, Lap_sec, Lap_start, Completed, Step_counter, Nop_counter
-    global Step_error, Section_color, Alart_message
+    global Section_color, Alart_message
     global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled, Eval_sframes
-    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Hybrid_model, Level
+    global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Level
     global StartAction_param, CompleteAction_param
     global Rect_area
     global InputPdf
@@ -2239,7 +1412,7 @@ def main():
         if len(opt_val[0]) > 2 and opt_val[0][2:].isnumeric():
             step_no = int(opt_val[0][2:])
             if nn_gru:
-                Hybrid_model = True
+                g.Hybrid_model = True
     Level = step_no
     #
     if '-I' in opts:            # 動作開始解析パラメータの初期登録
@@ -2420,7 +1593,9 @@ def main():
         Db.open_csv()
         Eval.open_csv(case_name, step_no, Db.csvpath1)
         # トラッキングデータの情報テーブルに登録 
-        Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1] )     
+        img_file = os.path.basename(file_name[0])        # 'memo'に初期設定する画像ファイル名を取得
+        memo = f"{img_file}: {param_nm}:s{step_no})"
+        Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1, memo] )     
     #---------------------------------------------------------------------  
     # クリッピング領域指定
     #---------------------------------------------------------------------  
@@ -2596,7 +1771,7 @@ def main():
         print(f"[main]:出力クラス区分数: {output_dim}")
     #   
     # フレームカウンターの初期化
-    Frame_counter = 1 if not multi_frames else multi_fstart[0]
+    g.Frame_counter = 1 if not multi_frames else multi_fstart[0]
     #
     # コマンドライン引数でフレームカウンターを指定するオプションの処理
     if '-at' in opts:
@@ -2617,11 +1792,11 @@ def main():
             print(f"[main]:無効なフレーム番号が指定されました.")
             return
         max_frame = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
-        Frame_counter = max(1, min(frame_no, max_frame))  # フレームカウンターを1以上、最大フレーム数以下に制限
-        print(f"[main]:開始フレームを{Frame_counter}に設定しました")
-        Frame_counter -= 1  
+        g.Frame_counter = max(1, min(frame_no, max_frame))  # フレームカウンターを1以上、最大フレーム数以下に制限
+        print(f"[main]:開始フレームを{g.Frame_counter}に設定しました")
+        g.Frame_counter -= 1  
         # フレームカウンターを指定されたフレームに設定 
-        cap[0].set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+        cap[0].set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
     #
     # ウィンドウの更新間隔とキー入力待ち時間の初期値を設定
     if raw_video is True:
@@ -2658,12 +1833,12 @@ def main():
             if keyCtl['repeat']:
                 cap[0].release()
                 cap[0] = cv2.VideoCapture(file_name[0])  # 動画ファイルのパスを指定
-                Frame_counter = 0
+                g.Frame_counter = 0
                 continue
-            print(f"[main]: #end of video data. frame={Frame_counter}")
+            print(f"[main]: #end of video data. frame={g.Frame_counter}")
             break
         #
-        Frame_counter += 1  # フレームカウンターをインクリメント
+        g.Frame_counter += 1  # フレームカウンターをインクリメント
         if raw_video is True:
             if rotate_video:
                 frame = cv2.resize(frame, dsize=None, fx=ratio, fy=ratio, interpolation=cv2.INTER_NEAREST)
@@ -2705,13 +1880,14 @@ def main():
             # 面積最大のボックスを取得、信頼度の低いキーポイント座標データは前回採用データで置き換える
             result = results[0]
             try:
-                myResult = MyResult(result, Frame_counter, manual_plot)
+                myResult = MyResult(result, g.Frame_counter, manual_plot)
             except BoundaryBoxError as e:
-                print(f"フレーム({Frame_counter}):{e}")
-                mylog.log(INFO, f"[main]:フレーム({Frame_counter}):検出結果の描画をスキップ")
+                print(f"フレーム({g.Frame_counter}):{e}")
+                mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):検出結果の描画をスキップ")
                 preResult.clear()
                 annotated_frame = frame
             else:
+                myResult.draw_line = draw_kpt_no
                 # 検出結果をフレームに描画
                 if manual_plot:
                     # 補正用の直近リングバッファに保存
@@ -2721,16 +1897,16 @@ def main():
                     myResult.calc_arrow_length_angles(prePointsBuffer)
 
                     # {Sample_frames}フレーム毎に検出結果を保存
-                    if (Frame_counter%Sample_frames) == 0 or Frame_counter < Sample_frames:
+                    if (g.Frame_counter%Sample_frames) == 0 or g.Frame_counter < Sample_frames:
                         # 検出結果（補正済）を保存 
                         prePointsBuffer.append( myResult )                        
                         mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
-                                    + f"フレーム={Frame_counter}, buffer_length={prePointsBuffer.length}")
+                                    + f"フレーム={g.Frame_counter}, buffer_length={prePointsBuffer.length}")
 
                     # 生画像に手動（OpenCV）で描画
                     # 射法八節の姿勢解析を実行
                     if Tracking_only or Update_tracking: 
-                        Db.frame_no = Frame_counter     # トラッキングデータのフレーム番号を設定  
+                        Db.frame_no = g.Frame_counter     # トラッキングデータのフレーム番号を設定  
                     
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
@@ -2746,9 +1922,8 @@ def main():
                             for rect in areas:
                                 annotated_frame = mosaic_area( annotated_frame, rect[0], rect[1], rect[2], rect[3] )
                 else:
-                    if draw_kpt_no == 1:   annotated_frame = myResult.plot1(frame)
-                    elif draw_kpt_no == 2: annotated_frame = myResult.plot2(frame)
-                    elif draw_kpt_no == 3: annotated_frame = myResult.plot(frame)
+                    if draw_kpt_no != 0:
+                        annotated_frame = myResult.plot(frame)
                     else:
                         # YOLOv8のplot関数を使用してフレームに描画  
                         # 　kpt_line=False： キーポイントのマークのみを描画）
@@ -2791,14 +1966,14 @@ def main():
             # フレームカウンター、インターバル情報
             if guid_option > 1:
                 pos = (x, y - 20)
-                str = f"frame :{Frame_counter:4d}   interval : {keyCtl['iwait']}ms."
+                str = f"frame :{g.Frame_counter:4d}   interval : {keyCtl['iwait']}ms."
                 cv2.putText(annotated_frame, str, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)            
             
             # パラメータ情報       
             if manual_plot and guid_option > 2:
                 pos = (x, y - 45)
-                comp = 1 if Completed else 0
-                str = f"param({Section_no}-{comp}-{Step_counter:2d}) : "
+                comp = 1 if g.Completed else 0
+                str = f"param({g.Section_no}-{comp}-{g.Step_counter:2d}) : "
                 for i in  range( Stkp.len() ):
                     no, val = Stkp.get(i)
                     if i > 0: str += ", "
@@ -2809,13 +1984,13 @@ def main():
             if nn_gru:
                 pos = (x, y - 70)
                 if Action != 0: 
-                    actStr = f"action :{Section_no}"
+                    actStr = f"action :{g.Section_no}"
                     actStr +=  "c" if Action == 1 else "s"
                 cv2.putText(annotated_frame, actStr, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)            
         #    
         # ウィンドウに表示する   
         cv2.imshow('YOLO Pose Detection', annotated_frame)
-        #print(f"({Frame_counter})")
+        #print(f"({g.Frame_counter})")
         #キー入力をチェックするする
         key = cv2.waitKey(keyCtl['iwait']) & 0xFF
         if key == -1: 
@@ -2834,13 +2009,13 @@ def main():
             print(f"Normalized value: {val:.4f}")
         #
         # 繰り返し再生の処理
-        if keyCtl['repeat'] and keyCtl['stop_frame'] != 0 and Frame_counter >= keyCtl['stop_frame']:
+        if keyCtl['repeat'] and keyCtl['stop_frame'] != 0 and g.Frame_counter >= keyCtl['stop_frame']:
             # 繰り返し再生の開始フレームに戻す
-            Frame_counter = keyCtl['start_frame'] - 1           
-            cap[0].set(cv2.CAP_PROP_POS_FRAMES, Frame_counter)
+            g.Frame_counter = keyCtl['start_frame'] - 1           
+            cap[0].set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
     #
     if Tracking_enabled:
-        Db.update_frame_info('stop_frame', Frame_counter)   # 停止フレーム番号
+        Db.update_frame_info('stop_frame', g.Frame_counter)   # 停止フレーム番号
     # リソースの解放
     if Tracking_only: 
         Db.csvfile1.close()
