@@ -32,6 +32,7 @@ def section_started_L9(section_no, myResult:MyResult):
     # 共通の開始条件を取得
     PRM = StartAction_param['param'][10]                                # 10は共通の開始条件     
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
+    confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
     
     if conf < PRM[0] and (section_no > 0 and section_no < 8):
         # 右手首の信頼度が低い
@@ -72,23 +73,36 @@ def section_started_L9(section_no, myResult:MyResult):
 
     # 2-Dou-zukuri  ->  3-Yu-gamae        
     elif section_no == 2:  
+        if g.Step_counter == 0:
+            # 初期値設定（弦調べ）
+            g.Step_counter = 30
+        if g.Step_counter >= 30:
+            #mylog.log(INFO, f">>>   [ confRY < {(PRM[0]):.2f} ]")
+            #Stkp.push( [(3,PRM[3])] )  
+            if confRY < PRM[3]:  
+                # 箆調べ
+                g.Step_counter = 40
+            
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglR < {int(PRM[1])} ]")
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,int(PRM[2]))] )  
         if normR > thsd(PRM[0]) and int(anglR) < int(PRM[1]):
             # 右手首の移動ベクトルの長さが大きい場合（取りかけ動作開始）
             g.Step_counter += 1
-            if g.Step_counter == PRM[2]: started = True
+            if (g.Step_counter%10) == PRM[2]: started = True
 
     # 3-Yu-gamae  ->  4-Uti-okosshi        
     elif section_no == 3:  
+        if g.Step_counter == 0:
+            # 初期値設定（物見）
+            g.Step_counter = 11
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglR < {int(PRM[1])} ]")
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,int(PRM[2]))] )  
         if normR > thsd(PRM[0]) and int(anglR) < int(PRM[1]):
             # 右手首の移動ベクトルの長さが大きい場合（打ちお越し動作開始）
             g.Step_counter += 1
-            if g.Step_counter == PRM[2]: started = True
+            if (g.Step_counter%10) == PRM[2] + 1: started = True
 
     # 4-Uti-okosshi  ->  5-Hiki-wake        
     elif section_no == 4:  
@@ -137,18 +151,6 @@ def section_started_L9(section_no, myResult:MyResult):
         if g.Step_counter == PRM[0]: 
             #  N回の遅延後、次節に移行
             started = True             
-        '''
-        
-        mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} ]")
-
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if normR < thsd(PRM[0]) :
-            g.Step_counter = g.Step_counter + 1
-            mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
-            
-            if g.Step_counter == PRM[1]: 
-                started = True    #  停止状態のN回保持で完了
-        '''
 
     # 8-Zan-shin  ->  9-''(弓倒し)
     elif section_no == 8:  
@@ -165,16 +167,29 @@ def section_started_L9(section_no, myResult:MyResult):
 
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
-        mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if normR > thsd(PRM[0]):
-            # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
-            g.Step_counter += 1
-            mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
+        mylog.log(INFO, f">>>   normH={int(normS)}({thsd.ratio(normS):.3f})")
+        mylog.log(INFO, f">>>   [ normH > {int(thsd(PRM[2]))} ]")
 
-            if g.Step_counter%10 == PRM[1]:
-                g.Step_counter = 30 
+        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
+        if normS > thsd(PRM[2]):
+            # 右腰の移動ベクトルの長さが大きい場合（退場開始）
+            g.Step_counter += 1
+            mylog.log(INFO, f">>>   [ counter == {int(PRM[3])} ]")
+
+            if (g.Step_counter%10) == PRM[3]:
+                g.Step_counter = 22
                 started = True
+        else:
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
+            if normR > thsd(PRM[0]):
+                # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
+                g.Step_counter += 1
+                mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
+
+                if (g.Step_counter%10) == PRM[1]:
+                    g.Step_counter = 30 
+                    started = True
+
     #        
     # other section_no
     else:
@@ -287,6 +302,10 @@ def section_completed_L9(section_no, myResult:MyResult):
                         
     # 3-Yu-gamae            
     elif section_no == 3:  
+        if g.Step_counter == 0:
+            # 初期値設定（取掛け・手の内）
+            g.Step_counter = 10
+            
         mylog.log(INFO, f">>>   [ confRY < {(PRM[0]):.2f} ]")
         
         Stkp.push( [(0,PRM[0]), (0,PRM[1]), (2,PRM[2])] )  
@@ -389,16 +408,21 @@ def section_completed_L9(section_no, myResult:MyResult):
                 completed = True
 
     elif section_no == 9:  
-        mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} ]")
+        if g.Step_counter == 0:
+            # 初期値に１を設定 
+            g.Step_counter = 1
+        if g.Step_counter != 22:    # 22：「退場」
+            # 「弓倒し」の完了判定 
+            mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} ]")
 
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-        if normR < thsd(PRM[0]) : 
-            g.Step_counter += 1
-            mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
+            Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
+            if normR < thsd(PRM[0]) : 
+                g.Step_counter += 1
+                mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
 
-            if (g.Step_counter%10) == PRM[1]:
-                g.Step_counter = 20
-                completed = True
+                if (g.Step_counter%10) == PRM[1] + 1:
+                    g.Step_counter = 20
+                    completed = True
     #
     # other section_no            
     else:
@@ -422,10 +446,10 @@ def manual_analize_start_L9(section_no, myResult:MyResult):
         g.Nop_counter = 0                                   # セクション内の動作が完了しない場合のカウンター
         g.Completed = False                                 # セクションが開始されたら完了フラグをリセット    
         if g.Section_no == 9:
-            g.Section_no = 2
+            g.Section_no = 2 if g.Step_counter == 30 else 9
         else:
             g.Step_counter = 0                              # セクション内の動作カウンター
-            g.Section_no = g.Section_no + 1                 # セクション番号をインクリメント
+            g.Section_no += 1                               # セクション番号をインクリメント
 
     return g.Section_no, g.Completed  
 #    
@@ -436,9 +460,9 @@ def manual_analize_completed_L9(section_no, myResult:MyResult):
     if section_completed_L9(section_no, myResult):
         print(f"[man_analize]: section({section_no}), completed=True")
         g.Action_start = g.Lap_sec
-        g.Split_start = g.Frame_counter                         # スプリット開始時間を記録
+        g.Split_start = g.Frame_counter                      # スプリット開始時間を記録
         g.Completed = True 
-        g.Step_counter = 0                                    # セクション内の動作カウンター
+        g.Step_counter = 0                                   # セクション内の動作カウンター
 
     return g.Section_no, g.Completed  
 
