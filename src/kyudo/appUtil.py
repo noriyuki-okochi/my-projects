@@ -378,6 +378,8 @@ class MyResult(Keypoint):
         # キーポイントの接続ラインを描画
         draw_kpt_line(annotated_frame, self.points, MyResult.ArmR_line,  color=(0, 255, 0), weight=2, radius=3)     # 右手首ー＞右肩 
         draw_kpt_line(annotated_frame, self.points, MyResult.BodyR_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
+        x1, y1 = map(int, self.points[Kn2idx['right_eye']])  # 右目の座標を取得
+        cv2.circle(annotated_frame, (x1, y1), radius=3, color=(255, 0, 0), thickness=-1)
         return annotated_frame
     
     # draw_lineの設定値に応じてキーポイントの接続ラインを描画する関数
