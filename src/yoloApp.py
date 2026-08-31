@@ -293,9 +293,8 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                     sl_norm, sl_angle,\
                     rew_angle, rse_angle,\
                     lew_angle, lse_angle,\
-                    eyes_norm, eye_conf,\
-                    hips_norm,\
-                    face_front, body_front]
+                    eyes_norm, hips_norm,\
+                    face_front, body_front, eye_conf]
                 #   face_front, act_sec]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  
