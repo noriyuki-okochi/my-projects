@@ -67,7 +67,7 @@ def main():
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     log_write( f'<< evalApp start at {timestamp} >>')
     log_write( f"[evalApp]:{cmdline}")
-    mylog.info(f"[evalApp]:{cmdline}")
+    mlog.info(f"[evalApp]:{cmdline}")
     #print(db)
     # コマンドライン引数を辞書に変換
     args_dict = {arg: idx for idx, arg in enumerate(args)}
@@ -96,7 +96,7 @@ def main():
     #
     if '-d' in opts:        #debug write
         verbose = True   
-        mylog.setLevel(INFO)  
+        mlog.setLevel(INFO)  
 
     if '-inputkey' in cmds:
         # 入力データキー一覧を表示して終了
@@ -246,9 +246,9 @@ def main():
         params = num_opts[0].split('=')
         if len(params) == 2 and params[1].isnumeric():
             augment_level = int(params[1])
-    print(f"[evalApp]info:Augment_level = {augment_level}, Data_augment={Data_augment}")
+    print(f"[evalApp]info:Augment_level = {augment_level}, Augment_param={Augment_param}")
     
-    augment_params = get_augment_parameters( Data_augment, augment_level )
+    augment_params = get_augment_parameters( Augment_param, augment_level )
     log_write( f"[evalApp]:augment_params={augment_params}")
     
     #

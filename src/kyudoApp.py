@@ -276,16 +276,16 @@ def main():
             Learning_rate = float(params[1])
     print(f"[kyudoApp]info:Learning_rate = {Learning_rate}")
 
-    # データ拡張レベルの指定(augment=<level>)
+    # データ拡張レベルの指定(augment=<level>)   
     augment_level:int = Augment_level
     num_opts = [opt for opt in args if opt.startswith('augment')]
     if len(num_opts) > 0:
         params = num_opts[0].split('=')
         if len(params) == 2 and params[1].isnumeric():
             augment_level = int(params[1])
-    print(f"[kyudoApp]info:Augment_level = {augment_level}, Data_augment={Data_augment}")
+    print(f"[kyudoApp]info:Augment_level = {augment_level}, Augment_param={Augment_param}")
     
-    augment_params = get_augment_parameters( Data_augment, augment_level )
+    augment_params = get_augment_parameters( Augment_param, augment_level )
     log_write( f"[kyudoApp]info:augment_params={augment_params}")
     #
     # <<< GRUモデルの学習、または予測の実行 >>>

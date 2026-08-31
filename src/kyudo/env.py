@@ -1,5 +1,19 @@
 import os
 import numpy as np
+import kyudo.globals as g
+
+# アプリ専用のロガー設定
+import logging
+#formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')  # ログフォーマットの設定
+formatter = logging.Formatter('%(message)s')  # ログフォーマットの設定
+
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+ERROR = logging.ERROR
+
+LOG_FILE_MODE = 'w'
+CSV_FILE_MODE = 'a'
+LOSS_FILE_MODE = 'w'
 
 ##############################
 # 共通定数
@@ -26,7 +40,7 @@ V8_models_l = ['V8n', 'V8s', 'V8m', 'V26s', 'V26m' ]  # YOLOv8,26モデルのリ
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
-Step_names = { 201: '矢番え', 221: '取矢', 222: '取矢', 230: '弦調べ', 240:'箆調べ',\
+Step_names = { 201: '矢番え', 221: '取矢', 222: '取矢', 231: '矢番え', 230: '弦調べ', 240:'箆調べ',\
                310: '取掛け・手の内', 311: '物見',\
                510: '大三', 511: '押し', 512: '引き', 601: '口割',\
                901: '弓倒し', 922: '退場'}          # ステップ名
@@ -103,11 +117,11 @@ Features_list_80 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 Features_list_81 = ['rw_norm/box_h as rw_ratio',\
-                'lw_norm/box_h as lw_ratio',\
-                'eyes_norm/box_w as eyes_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
-                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -117,6 +131,16 @@ Features_list_90 = ['rw_norm/box_h as rw_ratio',\
                 'rl_norm/box_h as rl_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
+                'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_91 = ['rw_norm/box_h as rw_ratio',\
+                'rl_norm/box_h as rl_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'tag2 as body',\
                 'tag1 as face',\
                 'section','completed'
                 ]
@@ -130,7 +154,8 @@ Features_lists = {
     72: Features_list_72,
     80: Features_list_80,
     81: Features_list_81,
-    90: Features_list_90
+    90: Features_list_90,
+    91: Features_list_91
     }
 #
 # EvalNNで使用する特徴量リスト
@@ -243,41 +268,16 @@ if early_stop != None:
     Early_stop = int(early_stop)
 
 # Data augmentationのパラメータ（シフト、伸縮、ノイズ）
-Data_augment= (3, 0.1, 0.02)         
-augment_para = os.getenv('AUGMENT_PARAM')
-if augment_para != None:
-    Data_augment = tuple(map(float, augment_para.split(' ')))
+Augment_param= (3, 0.1, 0.02)         
+augment_param = os.getenv('AUGMENT_PARAM')
+if augment_param != None:
+    Augment_param = tuple(map(float, augment_param.split(' ')))
 Augment_level:int = 0
 #
 # 移動平均のウィンドウサイズと重みの設定
 Window_size = 8   # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
 Param_max = 10    # パラメータの最大個数
-#
-# アラートID、メッセージの定義
-#
-Alart_Asibumi= 10     # 「正対不完全」のアラートID
-Alart_Monomi = 30     # 「物見を定まらず」のアラートID
-Alart_Daisan = 40     # 「大三移行不安定」のアラートID
-Alart_KaiNasi = 50    # 「会なし離れ」のアラートID
-Alart_KaiFusoku = 60  # 「会不十分な離れ」のアラートID
-Alart_Hanare = 70     # 「離れタイミングずれ」のアラートID
-#
-Alart_msg = {
-   0:'',
-   10:'Warning:Detected illegal action in section-1.(SEITAI fukanzen)',
-   100:'<警告>：「正対不完全」を検知しました。',
-   30:'Warning:Detected illegal action in section-3.(MONOMI sadamarazu)',
-   300:'<警告>：「物見定まらず」を検知しました。',
-   40:'Warning:Detected illegal action in section-5.(DAISAN fumeikaku)',
-   400:'<警告>：「大三移行不安定」を検知しました。',
-   50:'Warning:Detected illegal action in section-5.(KAI nasi)',
-   500:'<警告>：「会なし離れ」を検知しました。',
-   60:'Warning:Detected illegal action in section-6.(KAI fusoku)',
-   600:'<警告>：「会不十分な離れ」を検知しました。',
-   70:'Warning:Detected illegal action in section-7.(Timing un-match)',
-   700:'<警告>：「弓手押しタイミングの遅れ」を検知しました。'
-}
 # 
 # テキスト属性
 #
@@ -304,13 +304,13 @@ BG_PURPLE = '45'
 BG_CYAN = '46'
 BG_WHITE = '4f'
 #　カラー(B,G,R)
-YELLOW = (0, 255, 255)  # 黄色
-GREEN = (0, 255, 0)    # 緑色
-RED = (0, 0, 255)      # 赤色
-BLUE = (255, 0, 0)     # 青色  
-WHITE = (255, 255, 255)  # 白色
-BLACK = (0, 0, 0)      # 黒色
-CYAN = (255, 255, 0)   # シアン
-PURPLE= (255, 0, 255)  # 紫色
-GRAY = (128, 128, 128)  # グレー
+YELLOW = (0, 255, 255)      # 黄色
+GREEN = (0, 255, 0)         # 緑色
+RED = (0, 0, 255)           # 赤色
+BLUE = (255, 0, 0)          # 青色  
+WHITE = (255, 255, 255)     # 白色
+BLACK = (0, 0, 0)           # 黒色
+CYAN = (255, 255, 0)        # シアン
+PURPLE= (255, 0, 255)       # 紫色
+GRAY = (128, 128, 128)      # グレー
 # eof

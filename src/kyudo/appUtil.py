@@ -16,19 +16,14 @@ from  kyudo.env import *
 from  kyudo.param import * 
 from  mysqlite3.mysqlite3 import MyDb
 
-# アプリ専用のロガー設定
 import logging
-DEBUG = logging.DEBUG
-INFO = logging.INFO
-ERROR = logging.ERROR
-mylog = logging.getLogger(__name__)
+mlog = logging.getLogger(__name__)
 filehandler = logging.FileHandler('./log/appUtil.log', mode='w')    # ログファイルの設定
-formatter = logging.Formatter('%(message)s')                        # ログフォーマットの設定
 filehandler.setFormatter(formatter)                                 # フォーマッタをハンドラに設定
-mylog.addHandler(filehandler)                                       # ログハンドラを追加
+mlog.addHandler(filehandler)                                       # ログハンドラを追加
 
 # ログレベルをDEBUGに設定（必要に応じて変更）
-mylog.setLevel(INFO)  
+mlog.setLevel(INFO)  
 
 #
 # リングバッファのクラス定義
@@ -88,6 +83,9 @@ class StackActParam:
         self.pars = []
     def len(self):
         return len(self.pars)
+    
+# 動作解析パラメータ設定用のスタック   
+Stkp = StackActParam()  
 #
 #    閾値の計算を行うクラス    
 #   
@@ -124,7 +122,7 @@ class Keypoint:
         if pnt_name in Kn2idx: 
             return self.keypoints.xy[self.boxid][Kn2idx[pnt_name]]  # キーポイント名が定義されている場合、座標を返す
         else:
-            mylog.log(ERROR, f"Keypoint.xy: キーポイント名 {pnt_name} は定義されていません")
+            mlog.log(ERROR, f"Keypoint.xy: キーポイント名 {pnt_name} は定義されていません")
             return None
         
     def conf(self, pnt_name):
@@ -135,7 +133,7 @@ class Keypoint:
         if pnt_name in Kn2idx:
             return self.keypoints.conf[self.boxid][Kn2idx[pnt_name]].item()  # キーポイント名が定義されている場合、信頼度を返す
         else:
-            mylog.log(ERROR, f"Keypoint.conf: キーポイント名 {pnt_name} は定義されていません")
+            mlog.log(ERROR, f"Keypoint.conf: キーポイント名 {pnt_name} は定義されていません")
             return None
     
     def norm(self, pnt1_name, pnt2_name):
@@ -152,7 +150,7 @@ class Keypoint:
             norm, angl = vector_length_angle(vect.numpy())
             return norm, angl  # キーポイント名が定義されている場合、移動ベクトルの長さと角度を返す
         else:
-            mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
+            mlog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
 #
 #
@@ -208,11 +206,12 @@ class MyResult(Keypoint):
         self.confs = result.keypoints.conf[boxid].numpy()   # 対象ボックスのキーポイントの信頼度リスト
         self.points = result.keypoints.xy[boxid].numpy()    # 対象ボックスのキーポイントの座標リスト
         self.xywh = result.boxes.xywh[boxid].numpy()        # バウンディングボックスの座標リスト [x, y, w, h]
-
+        self.draw_line = 3                                  # 描画するライン番号(1:upper 2:right-side, 3:front)
+        
         if manual:        
             # 対象ボックスの合理性検証
             if boxid != MyResult.MaxBox_id or MyResult.Skip == True:
-                mylog.log(DEBUG, f"[MyResult]:frame={frame}, "\
+                mlog.log(DEBUG, f"[MyResult]:frame={frame}, "\
                                 f" MaxBox_id changed.[{MyResult.MaxBox_id} -> {boxid}], xywh={self.xywh}") 
                 if MyResult.MaxBox_id != None and abs(int(self.xywh[0]) - int(MyResult.XYWH[0])) > int(MyResult.XYWH[2]):
                     # 前のボックスと現在のボックスの位置が大きくずれている場合、スキップ
@@ -241,13 +240,13 @@ class MyResult(Keypoint):
         
         boxes = result.boxes    # 検出されたバウンディングボックスの取得
         max_box_no = 0          # ボックスの番号
-        mylog.log(DEBUG, f"[get_max_box]: {type(boxes)},{boxes.shape}:{len(boxes)}個のボックス")
+        mlog.log(DEBUG, f"[get_max_box]: {type(boxes)},{boxes.shape}:{len(boxes)}個のボックス")
         
         # 最前面の物体を決定（面積が最も大きいものを選択）
         area = np.array([])
         for i in range(len(boxes)):        #バウンディングボックスの面積をareaに格納
             if result.boxes.conf[i].item() < 0.3: 
-                mylog.log(DEBUG, f"[get_max_box]: boxid={i}, conf={result.boxes.conf[i].item():.3f}  skip....")
+                mlog.log(DEBUG, f"[get_max_box]: boxid={i}, conf={result.boxes.conf[i].item():.3f}  skip....")
                 continue  # 信頼度が低いボックスは無視
             _, _, w, h = map(int, boxes.xywh[i])
             area = np.append(area, w * h)                   # 面積を計算して追加
@@ -258,7 +257,7 @@ class MyResult(Keypoint):
             # インデックスは0から始まるため、1を加算
             conf = result.boxes.conf[max_box_no].item()  # 最大ボックスの信頼度を取得    
             max_box_no += 1  
-            mylog.log(DEBUG, f"[get_max_box]: max_box_no={max_box_no}, conf={conf:.3f}, area:{area}, xywh:{boxes.xywh[max_box_no-1]}")             
+            mlog.log(DEBUG, f"[get_max_box]: max_box_no={max_box_no}, conf={conf:.3f}, area:{area}, xywh:{boxes.xywh[max_box_no-1]}")             
         return max_box_no
 
     #　指定キーポイントの移動ベクトルの長さ（加重平均値）と角度をタプルで返す
@@ -280,7 +279,7 @@ class MyResult(Keypoint):
             length, _ = vector_length_angle( (points[i + 1] - points[i]) )    
             arrow_length.append(length)         # 移動ベクトルの長さを追加
             
-        mylog.log(DEBUG, f"[vector_length]: idx={idx}, points={points}, arrow_length={arrow_length}")
+        mlog.log(DEBUG, f"[vector_length]: idx={idx}, points={points}, arrow_length={arrow_length}")
         return arrow_length  # 移動ベクトルの長さのリストを返す            
                 
     # 移動ベクトルの長さの移動平均を計算する    
@@ -291,7 +290,7 @@ class MyResult(Keypoint):
         """
         window = len(weights)  # ウィンドウサイズを取得
         if prePointsBuffer.len() < window:
-            mylog.log(INFO, f"[calc_moving_average]:バッファ数={prePointsBuffer.len()}, prePointsBuffer is insufficient.")
+            mlog.log(INFO, f"[calc_moving_average]:バッファ数={prePointsBuffer.len()}, prePointsBuffer is insufficient.")
             return
         
         # リングバッファからキーポイントの時系列データを取得して、各点の移動ベクトルの長さの加重平均を計算
@@ -313,7 +312,7 @@ class MyResult(Keypoint):
             arrow_points = self.points - preResult.points       # 過去のキーポイントと現在位置の差分ベクトルを計算
             # 各ベクトルの長さと角度を計算してリストにタプルとして格納
             self.arrow_length_angles[i] = [vector_length_angle(vect) for vect in arrow_points]   
-            mylog.log(DEBUG, f"arrow_length_angles[{i}]: {self.arrow_length_angles[i]}") 
+            mlog.log(DEBUG, f"arrow_length_angles[{i}]: {self.arrow_length_angles[i]}") 
                      
                      
     def xy(self, pnt_name):
@@ -324,7 +323,7 @@ class MyResult(Keypoint):
         if pnt_name in Kn2idx: 
             return self.points[Kn2idx[pnt_name]]  # キーポイント名が定義されている場合、座標を返す
         else:
-            mylog.log(ERROR, f"Keypoint.xy: キーポイント名 {pnt_name} は定義されていません")
+            mlog.log(ERROR, f"Keypoint.xy: キーポイント名 {pnt_name} は定義されていません")
             return None
         
     def conf(self, pnt_name):
@@ -335,7 +334,7 @@ class MyResult(Keypoint):
         if pnt_name in Kn2idx:
             return self.confs[Kn2idx[pnt_name]]  # キーポイント名が定義されている場合、信頼度を返す
         else:
-            mylog.log(ERROR, f"Keypoint.conf: キーポイント名 {pnt_name} は定義されていません")
+            mlog.log(ERROR, f"Keypoint.conf: キーポイント名 {pnt_name} は定義されていません")
             return None
     
     def norm(self, pnt1_name, pnt2_name):
@@ -352,11 +351,16 @@ class MyResult(Keypoint):
             norm, angl = vector_length_angle(vect)
             return norm, angl  # キーポイント名が定義されている場合、移動ベクトルの長さと角度を返す
         else:
-            mylog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
+            mlog.log(ERROR, f"Keypoint.norm: キーポイント名 {pnt1_name} または {pnt2_name} は定義されていません")
             return None
+        
+    # キーポイント間の距離を正規化して値を返す関数    
+    def get_normalized_value(self, key1, key2):
+        norm, _ = self.norm(key1, key2)     # 指定されたキーポイント間の距離
+        return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
 
     # キーポイントの接続ライン（腕、胴、目）を描画する関数
-    def plot(self, annotated_frame):        
+    def plot3(self, annotated_frame):        
         # キーポイントの接続ラインを描画
         draw_kpt_line(annotated_frame, self.points, MyResult.Arm_line,  color=(0, 255, 0), weight=2, radius=3)      # 右手首ー＞左手首 
         draw_kpt_line(annotated_frame, self.points, MyResult.Body_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
@@ -374,7 +378,15 @@ class MyResult(Keypoint):
         # キーポイントの接続ラインを描画
         draw_kpt_line(annotated_frame, self.points, MyResult.ArmR_line,  color=(0, 255, 0), weight=2, radius=3)     # 右手首ー＞右肩 
         draw_kpt_line(annotated_frame, self.points, MyResult.BodyR_line, color=(0, 255, 0), weight=2, radius=3)      # 胴体
+        x1, y1 = map(int, self.points[Kn2idx['right_eye']])  # 右目の座標を取得
+        cv2.circle(annotated_frame, (x1, y1), radius=3, color=(255, 0, 0), thickness=-1)
         return annotated_frame
+    
+    # draw_lineの設定値に応じてキーポイントの接続ラインを描画する関数
+    def plot(self, annotated_frame):
+        return self.plot3(annotated_frame) if self.draw_line == 3 \
+                else self.plot2(annotated_frame) if self.draw_line == 2 \
+                else self.plot1(annotated_frame)
 
 ##    特徴量のデータフレームクラス
 class FeaturePdf:
@@ -383,45 +395,47 @@ class FeaturePdf:
     Features_list_60 = [ 'rw_ratio', 'rl_ratio', 'eyes_ratio',\
                         'hr_ratio',\
                         'section','completed' ]
+    # 正規化の種類を指定する辞書（<Kyudo_data_namesのインデクス>:<正規化の種類>）
+    # （h:height, w:width, d:degree, '':no normalization）
     Kyudo_index_60   = { 4:'h', 8:'h', 20:'w',\
                         10:'h'}
+    # 61
     Features_list_61 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'face',\
                         'section','completed' ]
     Kyudo_index_61   = { 4:'h', 8:'h', 10:'h',\
                         22:''}
-
+    # 70
     Features_list_70 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
                         'section','completed' ]
     Kyudo_index_70   = { 4:'h', 6:'h', 20:'w',\
                         10:'h', 11:'d'}
-
+    # 71
     Features_list_71 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'hr_deg', 'face',\
                         'section','completed' ]
     Kyudo_index_71   = { 4:'h', 8:'h', 10:'h',\
                         11:'d', 22:''}
-
+    # 72
     Features_list_72 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'body', 'face',\
                         'section','completed' ]
     Kyudo_index_72   = { 4:'h', 8:'h', 10:'h',\
                         23:'', 22:''}
-
-
+    # 80
     Features_list_80 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'hr_deg', 'body', 'face',\
                         'section','completed' ]
     Kyudo_index_80   = { 4:'h', 8:'h', 10:'h',\
                         11:'d', 23:'', 22:'' }
-
-    Features_list_81 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
-                        'rl_ratio', 'hr_ratio', 'hr_deg',\
+    # 81
+    Features_list_81 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'ew_deg', 'body', 'face',\
                         'section','completed' ]
-    Kyudo_index_81   = { 4:'h', 6:'h', 20:'w',\
-                         8:'h', 10:'h', 11:'d' }
-
+    Kyudo_index_81   = { 4:'h', 8:'h', 10:'w',\
+                         16:'d', 23:'', 22:'' }
+    # 90
     Features_list_90 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'rl_ratio', 'hr_ratio', 'hr_deg', \
                         'face', \
@@ -429,6 +443,12 @@ class FeaturePdf:
     Kyudo_index_90   = { 4:'h', 6:'h', 20:'w',\
                          8:'h', 10:'h', 11:'d',\
                          22:'' }
+    # 91
+    Features_list_91 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
+                        'hr_deg', 'ew_deg', 'body', 'face',\
+                        'section','completed' ]
+    Kyudo_index_91   = { 4:'h', 8:'h', 10:'h',\
+                        11:'d', 16:'d',23:'', 22:'' }
     
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
@@ -437,7 +457,8 @@ class FeaturePdf:
                        72: (Features_list_72, Kyudo_index_72), 
                        80: (Features_list_80, Kyudo_index_80), 
                        81: (Features_list_81, Kyudo_index_81), 
-                       90: (Features_list_90, Kyudo_index_90) 
+                       90: (Features_list_90, Kyudo_index_90), 
+                       91: (Features_list_91, Kyudo_index_91)
                        }
     
     def __init__(self, input_key:int=Current_feature_key, seq_frames:int=Input_dim):
@@ -485,7 +506,7 @@ class FeaturePdf:
                     # 直前の特徴量データも不正な場合、エラーコード（リスト番号）を返す
                     return (i + 1)   
                 else:
-                    mylog.log(INFO, f"[set_current_pdf]: "\
+                    mlog.log(INFO, f"[set_current_pdf]: "\
                         + f"invalid_value({i}) {self.features_list[i]:.4f} replaced by {pre_features_list[i]:.4f}")
                     # 直前の特徴量データを採用する
                     self.features_list[i] = pre_features_list[i]                     
@@ -495,7 +516,7 @@ class FeaturePdf:
         i += 1
         self.features_list[i] = 1 if completed else 0               # completed 
           
-        mylog.log(DEBUG, f"[set_current_pdf]: {self.features_list}")
+        mlog.log(DEBUG, f"[set_current_pdf]: {self.features_list}")
         
         narray = np.array(self.features_list).reshape(1, -1)
         self.curPdf = pd.DataFrame(narray, columns=column_names)
@@ -686,7 +707,7 @@ class MyEval:
         if self.eval['alart_cnt'] > 0:
             # 警告の有無をチェックして減点する
             deduction += Eval_alart_deduction
-            mylog.log(INFO, f"[check_deduction]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
+            mlog.log(INFO, f"[check_deduction]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
         #
         # セクションごとの減点条件をチェックして減点数を計算する        
         bRet = False
@@ -697,7 +718,7 @@ class MyEval:
             if sect_no == section:
                 # セクションに対応する減点条件をチェックして減点する
                 (ope, value, score), msg = data
-                mylog.log(INFO, f"[check_deduction]: section({section})  {key} {ope} {value}")
+                mlog.log(INFO, f"[check_deduction]: section({section})  {key} {ope} {value}")
                 if ope == '<'   : bRet = True if self.eval[key] < value else False
                 elif ope == '>' : bRet = True if self.eval[key] > value else False
                 else: continue
@@ -710,7 +731,7 @@ class MyEval:
             value = self.eval[c_key]*(-1) if mess[1] == '度' else self.eval[c_key]  # 値を正負反転するかどうかを判断
             value = self.eval[c_key]*100 if mess[1] == '%' else self.eval[c_key]    # %は100を掛けて表示
             self.deduct_msgs.append(f"{mess[0]}({value:.2f}{mess[1]})")
-            mylog.log(INFO, f"[check_deduction]:section({section}) {c_key}={value:.2f} {c_ope} {c_value} deduction={deduction}")   
+            mlog.log(INFO, f"[check_deduction]:section({section}) {c_key}={value:.2f} {c_ope} {c_value} deduction={deduction}")   
         #
         # その他のセクションの減点条件をチェックして減点数を計算する
         #
@@ -729,7 +750,7 @@ class MyEval:
             score_str = score_str[1:]   # 先頭のカンマを削除                    
             self.score_text = f"total score:{score}({score_str}), alart:{len(self.alarts)}"
             print(f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
-            mylog.log(INFO, f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
+            mlog.log(INFO, f"[my_evaluate]: {self.score_text}, alarts={self.alarts}")
         return 
     #
     # 評価データの更新
@@ -764,7 +785,7 @@ class MyEval:
                 self.eval['score'] -= deduction if deduction <= self.eval['score'] else 0 
                 
                 print(f"[my_evaluate]: section({self.section})  evaluated.(deduction={deduction})") 
-                mylog.log(INFO, f"[my_evaluate]:section={self.section} score={self.eval['score']} alart={self.eval['alart_cnt']}"\
+                mlog.log(INFO, f"[my_evaluate]:section={self.section} score={self.eval['score']} alart={self.eval['alart_cnt']}"\
                                 f" split={self.eval['split_tm']:.2f}"\
                                 f" rl={self.eval['rl_angle']:.2f} er={self.eval['er_angle']:.2f} sl={self.eval['sl_angle']:.2f}"\
                                 f" push={self.eval['push_cnt']} pull={self.eval['pull_cnt']} pull_rate={self.eval['pull_rate']:.2f}")
@@ -836,7 +857,7 @@ class MyEval:
                     # 2節のステップ40（箆調べ）は2点加算
                     self.eval['eyes_ratio'] = eyes_ratio
                     self.eval['score'] += 2     
-                    mylog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 2 points.")
+                    mlog.log(INFO, f"[my_evaluate]: section({section})  step({step})  score up 2 points.")
                     print( f"[my_evaluate]: section({section})  step({step}) score up 2 points.score={self.eval['score']}")
 
                     if self.csvfd is not None:
@@ -1106,7 +1127,7 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>   <se(°)/pull(%)>",
+                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <er(°)/pull(%)>",
                 "",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <split(sec.)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
@@ -1117,8 +1138,8 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), eyes",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), (-1*se)",
-                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*er), pull*100/(push+pull) as pull_ratio",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), (-1*er)",
+                "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), pull*100/(push+pull) as pull_ratio",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se), split",
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
