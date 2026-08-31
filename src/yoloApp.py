@@ -252,6 +252,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
         _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
+        eye_conf = keyPoints.conf('right_eye')                              # 右目の座標の信頼度
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
         
@@ -292,7 +293,8 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                     sl_norm, sl_angle,\
                     rew_angle, rse_angle,\
                     lew_angle, lse_angle,\
-                    eyes_norm, hips_norm,\
+                    eyes_norm, eye_conf,\
+                    hips_norm,\
                     face_front, body_front]
                 #   face_front, act_sec]
         # データリストをセット

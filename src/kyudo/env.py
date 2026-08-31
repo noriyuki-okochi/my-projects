@@ -62,7 +62,8 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'sl_norm', 'sl_angle',\
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
-                'eyes_norm', 'hips_norm'\
+                'eyes_norm', 'eye_conf',\
+                'hips_norm'\
                 'tag1', 'tag2'
                 ]
 
