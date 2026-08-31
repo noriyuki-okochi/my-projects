@@ -449,6 +449,16 @@ class FeaturePdf:
                         'section','completed' ]
     Kyudo_index_91   = { 4:'h', 8:'h', 10:'h',\
                         11:'d', 16:'d',23:'', 22:'' }
+    # 910
+    Features_list_911 = [ 'rw_ratio', 'rw_deg',\
+                         'hr_ratio', 'hr_deg',\
+                         'ew_deg', 'se_deg', 'sw_deg',\
+                         'body', 'face',\
+                         'section','completed' ]
+    Kyudo_index_911   = { 4:'h', 5:'d',\
+                         10:'h', 11:'d',\
+                         16:'d', 17:'d', 13:'d',\
+                         23:'', 24:'' }
     
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
@@ -458,7 +468,8 @@ class FeaturePdf:
                        80: (Features_list_80, Kyudo_index_80), 
                        81: (Features_list_81, Kyudo_index_81), 
                        90: (Features_list_90, Kyudo_index_90), 
-                       91: (Features_list_91, Kyudo_index_91)
+                       91: (Features_list_91, Kyudo_index_91),
+                       911: (Features_list_911, Kyudo_index_911)
                        }
     
     def __init__(self, input_key:int=Current_feature_key, seq_frames:int=Input_dim):

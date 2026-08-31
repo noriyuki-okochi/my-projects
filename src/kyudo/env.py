@@ -53,7 +53,7 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
 
 # Kyudo_dataテーブルの登録データ項目名リスト
 # ・tracking_result()関数でセットするデータ項目名リスト(data_listの順序)
-Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
+Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',
                 'rw_norm', 'rw_angle',\
                 'lw_norm', 'lw_angle',\
                 'rl_norm', 'rl_angle',\
@@ -62,9 +62,8 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'sl_norm', 'sl_angle',\
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
-                'eyes_norm', 'eye_conf',\
-                'hips_norm'\
-                'tag1', 'tag2'
+                'eyes_norm', 'hips_norm',\
+                'tag1', 'tag2' ,'eye_conf'
                 ]
 
 # 学習用データの読み込みリスト
@@ -145,6 +144,18 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
                 'tag1 as face',\
                 'section','completed'
                 ]
+
+Features_list_911 = ['rw_norm/box_h as rw_ratio',\
+                'rw_angle/180.0 as rw_deg',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'rse_angle/180.0 as se_deg',\
+                'sr_angle/180.0 as sw_deg',\
+                'tag2 as body',\
+                'eye_conf as face',\
+                'section','completed'
+                ]
 #
 Features_lists = {
     50: Features_list_50,       # プロット専用特徴量リスト
@@ -156,7 +167,8 @@ Features_lists = {
     80: Features_list_80,
     81: Features_list_81,
     90: Features_list_90,
-    91: Features_list_91
+    91: Features_list_91,
+    911: Features_list_911
     }
 #
 # EvalNNで使用する特徴量リスト
