@@ -339,7 +339,8 @@ StartAction_params = [
 #
 Body_front_threshold:float = 0.180      # 体の向きの閾値(tag2=1:正面,0:横)
 #Face_front_threshold:float = 0.055     # 顔の向きの閾値(tag1=1:正面,2:横)
-Face_front_threshold:float = 0.060      # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)
+Face_front_threshold:float = 0.060      # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)眉間
+Face_front_threshold9:float = 0.75      # 顔の向きの閾値(tag1=0:不定,1:正面,2:横)目の検出精度
 Eyes_ratio_threshold:float = 0.0        # 目幅比率の閾値（補正しない場合は0.0に設定）
 Eyes_ratio_max:float = 0.1              # 目幅比率の最大値
 Eyes_ratio_min:float = 0.01             # 目幅比率の最小値

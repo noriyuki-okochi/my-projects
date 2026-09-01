@@ -458,7 +458,7 @@ class FeaturePdf:
     Kyudo_index_911   = { 4:'h', 5:'d',\
                          10:'h', 11:'d',\
                          16:'d', 17:'d', 13:'d',\
-                         23:'', 24:'' }
+                         23:'', 22:'' }
     
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 

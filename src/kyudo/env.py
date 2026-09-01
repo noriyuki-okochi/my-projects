@@ -153,7 +153,7 @@ Features_list_911 = ['rw_norm/box_h as rw_ratio',\
                 'rse_angle/180.0 as se_deg',\
                 'sr_angle/180.0 as sw_deg',\
                 'tag2 as body',\
-                'eye_conf as face',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 #

@@ -252,7 +252,6 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
         _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
-        eye_conf = keyPoints.conf('right_eye')                              # 右目の座標の信頼度
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
         
@@ -275,13 +274,18 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
             body_front = 1
 
         # 顔の向き（0/1/2=不定／正面／横）
+        eye_conf = keyPoints.conf('right_eye')                              # 右目の座標の信頼度
         eyes_ratio = eyes_norm/box_w
         g.EYE_ratio = eyes_ratio
-        face_front:int = 0 if eyes_ratio > 0.5 else \
-                    (1 if eyes_ratio > Face_front_threshold else 2)    
-        if g.Section_no >= 4 and g.Section_no <= 8:
-            # 打ちお越しー＞残身は顔の向きを横に固定
-            face_front = 2
+        face_front:int = 0
+        if Level == 9: # Right-side
+            face_front = 2 if eye_conf > Face_front_threshold9 else 1
+        else:          # Front-side
+            face_front = 0 if eyes_ratio > 0.5 else \
+                        (1 if eyes_ratio > Face_front_threshold else 2)    
+            if g.Section_no >= 4 and g.Section_no <= 8:
+                # 打ちお越しー＞残身は顔の向きを横に固定
+                face_front = 2
             
         # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\
@@ -294,7 +298,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                     rew_angle, rse_angle,\
                     lew_angle, lse_angle,\
                     eyes_norm, hips_norm,\
-                    face_front, body_front, eye_conf]
+                    face_front, body_front]
                 #   face_front, act_sec]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  
