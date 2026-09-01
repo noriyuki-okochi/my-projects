@@ -22,7 +22,7 @@ def section_started_L9(section_no, myResult:MyResult):
     xy_elbow = keyPoints.xy('right_elbow')                  # 右肘の座標
 
     normR, anglR = arrow[Kn2idx['right_wrist']]                         # 右手首の移動ベクトルの長さと角度
-    normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
+    normK, _ = arrow[Kn2idx['right_knee']]                              # 右膝の移動ベクトルの長さと角度
     normR, anglR = arrow[Kn2idx['right_wrist']]                         # 右手首の移動ベクトルの長さと角度
     lenSW, anglSW = keyPoints.norm('right_shoulder', 'right_wrist')     # 右肩と右手首のベクトルの長さと角度を計算
     _, anglSE_ = keyPoints.norm('right_shoulder', 'right_elbow')        # 右肩と右肘のベクトルの長さと角度を計算
@@ -167,18 +167,14 @@ def section_started_L9(section_no, myResult:MyResult):
 
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
-        mylog.log(INFO, f">>>   normH={int(normS)}({thsd.ratio(normS):.3f})")
-        mylog.log(INFO, f">>>   [ normH > {int(thsd(PRM[2]))} ]")
+        mylog.log(INFO, f">>>   normK={int(normK)}({thsd.ratio(normK):.3f})")
+        mylog.log(INFO, f">>>   [ normK > {int(thsd(PRM[2]))} ]")
 
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
-        if normS > thsd(PRM[2]):
-            # 右腰の移動ベクトルの長さが大きい場合（退場開始）
-            g.Step_counter += 1
-            mylog.log(INFO, f">>>   [ counter == {int(PRM[3])} ]")
-
-            if (g.Step_counter%10) == PRM[3]:
-                g.Step_counter = 22
-                started = True
+        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
+        if normK > thsd(PRM[2]):
+            # 右膝の移動ベクトルの長さが大きい場合（退場開始）
+            g.Step_counter = 22
+            started = True
         else:
             mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
             if normR > thsd(PRM[0]):
@@ -463,7 +459,20 @@ def manual_analize_completed_L9(section_no, myResult:MyResult):
         g.Split_start = g.Frame_counter                      # スプリット開始時間を記録
         g.Completed = True 
         g.Step_counter = 0                                   # セクション内の動作カウンター
-
+    else:
+        g.Nop_counter += 1
+        if g.Step_error:
+            # セクション内の動作が不正な場合
+            g.Alart_section = g.Section_no
+            mylog.log(INFO, f"[man_analize_completed]: g.Step_error={g.Step_error}, g.Alart_id={g.Alart_id}")
+            if g.Alart_id == Alart_Asibumi: g.Section_no = 2        # 足踏み不完全で矢番えの場合
+            if g.Alart_id == Alart_Monomi: g.Section_no = 4         # 物見なしで打ちおこしの場合
+            if g.Alart_id == Alart_KaiNasi: g.Section_no = 7        # 会なしで離れた場合
+            if g.Alart_id == Alart_KaiFusoku: g.Section_no = 7      # 会不十分で離れた場合
+            if g.Alart_id != Alart_Daisan:                        # 大三不安定の場合、リセットしない
+                g.Step_counter = 0
+                g.Nop_counter = 0
+         
     return g.Section_no, g.Completed  
 
 # eof

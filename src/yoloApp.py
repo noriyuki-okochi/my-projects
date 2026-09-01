@@ -267,6 +267,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         # 体の向き（0/1=的方向／正面向き）
         shouls_ratio = shouls_norm/box_h
         xy_conf = keyPoints.conf('left_shoulder')                  # キーポイントの信頼度(Numpy)
+        
         body_front:int = 0 if xy_conf < 0.9 else \
                     (1 if shouls_ratio > Body_front_threshold else 0)    
         if g.Section_no >= 2 and g.Section_no <= 9:
@@ -274,13 +275,15 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
             body_front = 1
 
         # 顔の向き（0/1/2=不定／正面／横）
-        eye_conf = keyPoints.conf('right_eye')                              # 右目の座標の信頼度
         eyes_ratio = eyes_norm/box_w
         g.EYE_ratio = eyes_ratio
+        
         face_front:int = 0
         if Level == 9: # Right-side
+            eye_conf = keyPoints.conf('right_eye')                 # 右目の座標の信頼度
             face_front = 2 if eye_conf > Face_front_threshold9 else 1
         else:          # Front-side
+            eye_conf = keyPoints.conf('left_eye')                  # 左目の座標の信頼度
             face_front = 0 if eyes_ratio > 0.5 else \
                         (1 if eyes_ratio > Face_front_threshold else 2)    
             if g.Section_no >= 4 and g.Section_no <= 8:
@@ -1359,8 +1362,8 @@ def main():
     
     if not raw_video and ( '-t' in opts) :
         manual_plot = True
-        Tracking_only = True    # トラッキングのみを行うオプション
-        Eval_enabled = True     # 評価用のデータ作成をセット
+        Tracking_only = True                            # トラッキングのみを行うオプション
+        Eval_enabled = True                             # 評価用のデータ作成をセット
         # トラッキングデータリストのインスタンス作成
         if not nn_gru: 
             InputPdf = FeaturePdf(input_key, seq_frames)
