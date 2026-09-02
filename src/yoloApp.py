@@ -613,8 +613,8 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
                         # 入力データフレームを取得
                         input_pdf = InputPdf.get_input_pdf()
                         # GRUモデルによる動作解析
-                        g.Section_no, g.Completed, Action = gru_analize(g.Section_no, g.Completed, model, input_pdf)
-                        mylog.log(INFO, f"[gru_analize_o]: Section={g.Section_no}, g.Completed={g.Completed}, Action={Action}")
+                        g.Section_no, g.Completed, Action = gru_analize(g.Section_no, g.Completed, model, input_pdf, Level)
+                        mylog.log(DEBUG, f"[gru_analize_o]: Section={g.Section_no}, g.Completed={g.Completed}, Action={Action}")
                         InputPdf.update_previous_pdf()
                 else:
                     mylog.log(INFO, f"[plot]: set_current_pdf returned n={n}")
