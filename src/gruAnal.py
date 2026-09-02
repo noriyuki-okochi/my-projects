@@ -4,7 +4,7 @@ from kyudo.kyudoUtils import *
 
 mylog = logging.getLogger('__main__')
 #
-# ハイブリッドモデルの場合、動作予測結果を補正
+# ハイブリッドモデルの場合、動作予測結果を補正（正面カメラ対応）
 #
 def correct_action_by_rules(action, section, completed):
     
@@ -57,14 +57,58 @@ def correct_action_by_rules(action, section, completed):
                 r_action = 0
     #
     if r_action != action:
-        mylog.log(INFO, f"[correct_by_rules]: action corrected {action} to {r_action}")
-        print(f"[correct_by_rules]: action corrected {action} to {r_action}")
+        mylog.log(INFO, f"[correct_by_rules]: action {action} corrected to {r_action}")
+        print(f"[correct_by_rules]: action {action} corrected to {r_action}")
     return r_action
-            
+#
+#
+# ハイブリッドモデルの場合、動作予測結果を補正（側面カメラ対応）
+#
+def correct_action_by_rules9(action, section, completed):
+    r_action = action
+    if completed == True and action == 1:
+        # 「動作完了」で「動作完了」が認識された場合、
+        r_action = 0
+    elif completed == False and action == 2:
+        # 「動作未完了」で「動作開始」が認識された場合、
+        r_action = 0
+    elif g.Hybrid_model == True:
+        # 動作解析ステップに応じた補正ルール
+        if section == 1:        # 「足踏み」
+            if action == 2 and g.ER_angle > 10:             # 動作開始が早すぎる
+                r_action = 0
+        if section == 2:        # 「胴づくり」
+            if action == 1 and g.Step_counter < 23:         # 動作完了が早すぎる（一回目の腰）
+                r_action = 0
+        elif section == 3:      # 「弓構え」
+            if action == 2 and g.Step_counter < 12:         # 動作開始が早すぎる
+                r_action = 0
+        elif section == 4:      # 「打起し」
+            if action == 1 and g.Step_counter < 11:         # 動作完了が早すぎる
+                r_action = 0
+            if action == 2 and g.Step_counter < 1:          # 動作開始が早すぎる
+                r_action = 0
+        elif section == 5:      # 「引き分け」
+            if action == 1 and g.Step_counter < 20:         # 動作完了が早すぎる
+                r_action = 0
+        elif section == 6:      # 「会」
+            if action == 2 and g.ER_angle < -40.0:          # 動作開始が早すぎる
+                r_action = 0
+        elif section == 8:      # 「残心」
+            if action == 1 and g.Step_counter < 2:         # 動作完了が早すぎる
+                r_action = 0
+        elif section == 9:      # 「弓倒し」
+            if action == 1 and g.Step_counter < 2:          # 動作完了が早すぎる
+                r_action = 0
+    #
+    if r_action != action:
+        mylog.log(INFO, f"[correct_by_rules9]: action {action} corrected to {r_action}")
+        print(f"[correct_by_rules9]: action {action} corrected to {r_action}")
+    return  r_action           
 #
 # GRUモデルによる動作予測関数
 #
-def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
+def gru_analize(section, completed, model, input_pdf:pd.DataFrame, level:int=0):
     
     mylog.log(DEBUG, f"[gru_analize]: input_pdf.shape={input_pdf.shape}")
     mylog.log(DEBUG, f"[gru_analize]: {input_pdf.tail()}")
@@ -80,7 +124,9 @@ def gru_analize(section, completed, model, input_pdf:pd.DataFrame):
         if g.Hybrid_model == True:
             mylog.log(INFO, f"[gru_analize]: not zero action={action} ( section={section}, completed={completed}, counter={g.Step_counter} )")
         # ハイブリッドモデルの場合、動作認識結果を補正
-        action = correct_action_by_rules(action, section, completed)
+        action = correct_action_by_rules(action, section, completed) if level != 9 \
+                else correct_action_by_rules9(action, section, completed)
+                
     # タイマー情報の更新
     if action == 2:
         g.Action_start = g.Lap_sec
