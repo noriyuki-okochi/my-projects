@@ -75,17 +75,20 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list_91a = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
-$cases_list = "iijima_2.0_1,iwata_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,kanoda_2.0_2,h.nakamura_2.0_1"
+#$cases_list = "iijima_2.0_1,iwata_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,kanoda_2.0_2,h.nakamura_2.0_1"
+$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1", "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1" 
 $env:CASE_LIST=$cases_list
 
 # データ拡張レベル設定例（個別ケース毎に指定：0=拡張なし,1=shift,2=warp,4=noize）
 #$augment_list = '0,1,2,3,4,5,6,7'
-$augment_list = '0'
+$augment_list = '0,4'
 $env:AUGMENT_LIST=$augment_list
 #
 $dbg_level = '-d1'
+#$dbg_level = '-d0'
 $dbg_option = '-d'
 #
+$confirm = $true
 function help {
     # プロファイルの表示
     write-output $profile
@@ -402,7 +405,7 @@ function yoloAp {
         write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
-        write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3|9}）'
+        write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3|9:側面}）'
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを生再生する"
@@ -749,25 +752,35 @@ function kyudo {
                 }
                 $i = 1
                 foreach ( $case_name in $cases_list ) {
-                    if ($aug_levels.Length -gt 0) {
-                        # ケース毎のデータ拡張レベルを参照する
-                        if ( $i -le $aug_levels.Length ) {
-                            $aug_level = $aug_levels[$i-1]
+                    $answer = "y"
+                    if ($confirm -eq $true) {
+                        $answer = Read-Host "> ケース['$case_name'] の学習を実行しますか? (Y/y/n):"
+                        if ($answer -eq "Y") {
+                            $answer = "y"
+                            $confirm = $false
+                        }
+                    }
+                    if ($answer -eq "y") {
+                        if ($aug_levels.Length -gt 0) {
+                            # ケース毎のデータ拡張レベルを参照する
+                            if ( $i -le $aug_levels.Length ) {
+                                $aug_level = $aug_levels[$i-1]
+                            }
+                            else {
+                                # デフォルトに再設定
+                                $aug_level = 0
+                            }
+                        }
+                        if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
+                            python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
                         }
                         else {
-                            # デフォルトに再設定
-                            $aug_level = 0
+                            python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
                         }
-                    }
-                    if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
-                        python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
-                    }
-                    else {
-                        python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
-                    }
-                    #Write-Output $LASTEXITCODE
-                    if ( $LASTEXITCODE -ne 0 ) {
-                        break
+                        #Write-Output $LASTEXITCODE
+                        if ( $LASTEXITCODE -ne 0 ) {
+                            break
+                        }
                     }
                     $i++    
                 }
