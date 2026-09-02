@@ -80,6 +80,8 @@ def correct_action_by_rules9(action, section, completed):
         if section == 2:        # 「胴づくり」
             if action == 1 and g.Step_counter < 23:         # 動作完了が早すぎる（一回目の腰）
                 r_action = 0
+            if action == 1 and g.Step_counter == 31:        # 動作完了が早すぎる（乙矢の腰）
+                r_action = 0
         elif section == 3:      # 「弓構え」
             if action == 2 and g.Step_counter < 12:         # 動作開始が早すぎる
                 r_action = 0
