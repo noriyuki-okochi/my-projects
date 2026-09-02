@@ -104,7 +104,7 @@ CompleteAction_params = [
         [0.015, 0.015, 3, 0.035, 0.0, None, None, None],                # 6.会
         [3, None, None, None, None, None, None, None],                  # 7.離れ
         [0.015, 2, None, None, None, None, None, None],                 # 8.残心
-        [0.015, 2, None, None, None, None, None, None],                 # 9.弓倒し
+        [0.015, 40.0, 2, None, None, None, None, None],                 # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]               #10.共通
      ]
     },
@@ -172,7 +172,7 @@ CompleteAction_params = [
         [0.015, 0.015, 3, 0.035, 0.0, None, None, None],                # 6.会
         [3, None, None, None, None, None, None, None],                  # 7.離れ
         [0.015, 2, None, None, None, None, None, None],                 # 8.残心
-        [0.015, 2, None, None, None, None, None, None],                 # 9.弓倒し
+        [0.015, 40.0, 2, None, None, None, None, None],                 # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]               #10.共通
      ]
     }
