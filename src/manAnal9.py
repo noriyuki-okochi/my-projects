@@ -216,8 +216,8 @@ def section_completed_L9(section_no, myResult:MyResult):
     normE, _ = arrow[Kn2idx['right_elbow']]                             # 右肘の移動ベクトルの長さと角度
     normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
     lenSW, anglSW = keyPoints.norm('right_shoulder', 'right_wrist')     # 右肩と右手首のベクトルの長さと角度を計算
-    _, anglSE_ = keyPoints.norm('right_shoulder', 'right_elbow')        # 右肩と右肘のベクトルの長さと角度を計算
-    _, anglEW_ = keyPoints.norm('right_elbow', 'right_wrist')           # 右肘と右手首のベクトルの長さと角度を計算
+    _, anglSE = keyPoints.norm('right_shoulder', 'right_elbow')        # 右肩と右肘のベクトルの長さと角度を計算
+    _, anglEW = keyPoints.norm('right_elbow', 'right_wrist')           # 右肘と右手首のベクトルの長さと角度を計算
 
     completed = False
     # 共通の開始条件を取得
@@ -235,8 +235,8 @@ def section_completed_L9(section_no, myResult:MyResult):
             + f"    boxid={ibox}, H={int(thsd.block_height)}, wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
             + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, conf={conf:.2f}")
     mylog.log(INFO, f"    lenSW={int(lenSW)}({thsd.ratio(lenSW):.3f}), anglSW={int(anglSW)}°,"\
-                  + f" anglSE={int(anglSE_)}°, anglEW={int(anglEW_)}°,"\
-                  + f" anglSE={int(anglSE_)}°, anglEW={int(anglEW_)}°\n"\
+                  + f" anglSE={int(anglSE)}°, anglEW={int(anglEW)}°,"\
+                  + f" anglSE={int(anglSE)}°, anglEW={int(anglEW)}°\n"\
                   + f"    xy_elbow=[{int(xy_elbow[0])}, {int(xy_elbow[1])}], confRY={confRY:.2f}")
     
     #
@@ -409,14 +409,14 @@ def section_completed_L9(section_no, myResult:MyResult):
             g.Step_counter = 1
         if g.Step_counter != 22:    # 22：「退場」
             # 「弓倒し」の完了判定 
-            mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} ]")
+            mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} and anglEW > {int(PRM[1])} ]")
 
-            Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
-            if normR < thsd(PRM[0]) : 
+            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
+            if normR < thsd(PRM[0]) and int(anglEW) > int(PRM[1]):
                 g.Step_counter += 1
-                mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
+                mylog.log(INFO, f">>>   [ counter == {int(PRM[2])} ]")
 
-                if (g.Step_counter%10) == PRM[1] + 1:
+                if (g.Step_counter%10) == PRM[2] + 1:
                     g.Step_counter = 20
                     completed = True
     #
