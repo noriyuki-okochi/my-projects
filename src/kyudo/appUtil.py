@@ -162,6 +162,7 @@ class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
     Skip:bool = False
+    RW_norm:float = None
     # キーポイントの接続ラインを定義
     Arm_line = [Kn2idx['right_wrist'], 
                 Kn2idx['right_elbow'], 
@@ -358,6 +359,13 @@ class MyResult(Keypoint):
     def get_normalized_value(self, key1, key2):
         norm, _ = self.norm(key1, key2)     # 指定されたキーポイント間の距離
         return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
+    
+    def get_rw_grad(self, now_norm):
+        grad = None
+        if MyResult.RW_norm != None:
+            grad = (now_norm - MyResult.RW_norm) / MyResult.RW_norm
+        MyResult.RW_norm = now_norm 
+        return grad
 
     # キーポイントの接続ライン（腕、胴、目）を描画する関数
     def plot3(self, annotated_frame):        
