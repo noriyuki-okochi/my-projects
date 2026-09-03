@@ -28,6 +28,7 @@ SR_angle:float = 0.0            # 右腕の角度(mainのみで使用)
 SL_angle:float = 0.0            # 左腕の角度
 ER_angle:float = 0.0            # 右肘ー＞右手首の角度
 HR_angle:float = 0.0            # 右腰ー＞右手首の角度
+KS_angle:float = 0.0            # 右膝ー＞右肩の角度
 RSE_angle:float = 0.0           # 右肩ー＞右肘の角度
 EYE_ratio:float = 0.0           # 眼の間隔比率(mainのみで使用)
 # eof

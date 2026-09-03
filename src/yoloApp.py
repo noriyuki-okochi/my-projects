@@ -251,6 +251,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         _, lew_angle = keyPoints.norm('left_elbow','left_wrist')            # 左肘から左手首のベクトルの長さと角度を計算
         _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
         _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
+        _, ks_angle = keyPoints.norm('right_knee','right_shoulder')         # 右膝から右肩のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
@@ -261,9 +262,9 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         g.SR_angle = sr_angle
         g.SL_angle = sl_angle
         g.ER_angle = rew_angle
+        g.KS_angle = ks_angle
         g.RSE_angle = rse_angle
-        # アクション発生後の経過時間（x10秒）
-        # act_sec = int( (g.Lap_sec - g.Action_start)*10 ) if g.Action_start > 0.0 else 0
+
         # 体の向き（0/1=的方向／正面向き）
         shouls_ratio = shouls_norm/box_h
         xy_conf = keyPoints.conf('left_shoulder')                  # キーポイントの信頼度(Numpy)
@@ -289,7 +290,10 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
             if g.Section_no >= 4 and g.Section_no <= 8:
                 # 打ちお越しー＞残身は顔の向きを横に固定
                 face_front = 2
-            
+
+        # 右手首移動量の勾配を計算する
+        #rw_grad = keyPoints.get_rw_grad(rw_norm)
+
         # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\
                     rw_norm, rw_angle,\
@@ -302,7 +306,6 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                     lew_angle, lse_angle,\
                     eyes_norm, hips_norm,\
                     face_front, body_front]
-                #   face_front, act_sec]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  
     
@@ -697,10 +700,13 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     cv2.putText(annotated_frame, f"lap    : {g.Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 角度情報(XX_angle)の描画
-    if g.Section_no == 4 or g.Section_no == 5 or g.Section_no == 6:
-        cv2.putText(annotated_frame, f"angle  : {-1*g.RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
-    if g.Section_no == 7 or g.Section_no == 8:
-        cv2.putText(annotated_frame, f"angle  : {-1*g.ER_angle:6.1f}  {-1*g.SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    if Level == 9:  # Right-side
+        cv2.putText(annotated_frame, f"angle  : {-1*g.KS_angle:6.1f}  {-1*g.SR_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+    else:           # Front-side
+        if g.Section_no == 4 or g.Section_no == 5 or g.Section_no == 6:
+            cv2.putText(annotated_frame, f"angle  : {-1*g.RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        if g.Section_no == 7 or g.Section_no == 8:
+            cv2.putText(annotated_frame, f"angle  : {-1*g.ER_angle:6.1f}  {-1*g.SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
@@ -890,6 +896,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if g.Section_no == 0:
             if Eval_enabled: Eval(section = 0)  # 評価用のデータをリセット 
             print(f"姿勢解析を開始します")
+            MyResult.RW_norm = None             # 姿勢解析用のデータをリセット
         else:  print(f"セクション番号を設定: {g.Section_no}")
 
         #  動作開始（節の移行）
