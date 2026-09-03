@@ -63,7 +63,7 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
                 'eyes_norm', 'hips_norm',\
-                'tag1', 'tag2' ,'eye_conf'
+                'tag1', 'tag2'
                 ]
 
 # 学習用データの読み込みリスト
@@ -177,7 +177,7 @@ Eval_Features_list_90 = ['(rl+180)/360.0 as rl_deg',
                 '(sl+180)/360.0 as sl_deg',
                 '(se+180)/360.0 as se_deg',
                 'eyes as eyes_ratio',
-                'IIF((pull+push)=0,0.0,cast(pull as reat)/cast((pull+push) as real)) as pull_rate',
+                'IIF((pull+push)=0,0.0,cast(pull as real)/cast((pull+push) as real)) as pull_rate',
                 'split/60.0 as split_m',
                 'completed','section'
                 ]
@@ -186,7 +186,7 @@ Eval_Features_list_170 = ['(rl+180)/360.0 as rl_deg',
                 '(sl+180)/360.0 as sl_deg',
                 '(se+180)/360.0 as se_deg',
                 'eyes as eyes_ratio',
-                'IIF((pull+push)=0,0.0,cast(pull as reat)/cast((pull+push) as real)) as pull_rate',
+                'IIF((pull+push)=0,0.0,cast(pull as real)/cast((pull+push) as real)) as pull_rate',
                 'split/60.0 as split_m',
                 'IIF(section=1,1,0) as sec_0',
                 'IIF(section=2,1,0) as sec_1',
