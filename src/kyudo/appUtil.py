@@ -360,6 +360,7 @@ class MyResult(Keypoint):
         norm, _ = self.norm(key1, key2)     # 指定されたキーポイント間の距離
         return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
     
+    # 直前の移動量との勾配を計算する関数
     def get_rw_grad(self, now_norm):
         grad = None
         if MyResult.RW_norm != None:
