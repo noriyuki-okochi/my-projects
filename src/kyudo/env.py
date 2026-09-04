@@ -149,8 +149,8 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
 Features_list_907 = ['rw_norm/box_h as rw_ratio',\
                 'rw_grad as rw_acc',\
                 'tag2 as body',\
-                'tag1 as face',\
                 'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -159,8 +159,8 @@ Features_list_909 = ['rw_norm/box_h as rw_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
-                'tag1 as face',\
                 'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -170,8 +170,8 @@ Features_list_910 = ['rw_norm/box_h as rw_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
-                'tag1 as face',\
                 'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 
@@ -195,8 +195,8 @@ Features_list_912 = ['rw_norm/box_h as rw_ratio',\
                 'rse_angle/180.0 as se_deg',\
                 'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
-                'tag1 as face',\
                 'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'tag1 as face',\
                 'section','completed'
                 ]
 #
