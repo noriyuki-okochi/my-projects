@@ -162,7 +162,8 @@ class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
     Skip:bool = False
-    RW_norm:float = None
+    #RW_norm:float = None
+    RW_norm:float = 0.0
     # キーポイントの接続ラインを定義
     Arm_line = [Kn2idx['right_wrist'], 
                 Kn2idx['right_elbow'], 
@@ -362,8 +363,9 @@ class MyResult(Keypoint):
     
     # 直前の移動量との勾配を計算する関数
     def get_rw_grad(self, now_norm):
-        grad = None
-        if MyResult.RW_norm != None:
+        grad = 0.0
+        #if MyResult.RW_norm != None:
+        if MyResult.RW_norm != 0.0:
             grad = (now_norm - MyResult.RW_norm) / MyResult.RW_norm
         MyResult.RW_norm = now_norm 
         return grad
@@ -413,7 +415,7 @@ class FeaturePdf:
                         'face',\
                         'section','completed' ]
     Kyudo_index_61   = { 4:'h', 8:'h', 10:'h',\
-                        22:''}
+                        23:''}
     # 70
     Features_list_70 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'hr_ratio', 'hr_deg',\
@@ -425,25 +427,25 @@ class FeaturePdf:
                         'hr_deg', 'face',\
                         'section','completed' ]
     Kyudo_index_71   = { 4:'h', 8:'h', 10:'h',\
-                        11:'d', 22:''}
+                        11:'d', 23:''}
     # 72
     Features_list_72 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'body', 'face',\
                         'section','completed' ]
     Kyudo_index_72   = { 4:'h', 8:'h', 10:'h',\
-                        23:'', 22:''}
+                        24:'', 23:''}
     # 80
     Features_list_80 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'hr_deg', 'body', 'face',\
                         'section','completed' ]
     Kyudo_index_80   = { 4:'h', 8:'h', 10:'h',\
-                        11:'d', 23:'', 22:'' }
+                        11:'d', 24:'', 23:'' }
     # 81
     Features_list_81 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'ew_deg', 'body', 'face',\
                         'section','completed' ]
     Kyudo_index_81   = { 4:'h', 8:'h', 10:'w',\
-                         16:'d', 23:'', 22:'' }
+                         16:'d', 24:'', 23:'' }
     # 90
     Features_list_90 = [ 'rw_ratio', 'lw_ratio', 'eyes_ratio',\
                         'rl_ratio', 'hr_ratio', 'hr_deg', \
@@ -451,14 +453,14 @@ class FeaturePdf:
                         'section','completed' ]
     Kyudo_index_90   = { 4:'h', 6:'h', 20:'w',\
                          8:'h', 10:'h', 11:'d',\
-                         22:'' }
+                         23:'' }
     # 91
     Features_list_91 = [ 'rw_ratio', 'rl_ratio', 'hr_ratio',\
                         'hr_deg', 'ew_deg', 'body', 'face',\
                         'section','completed' ]
     Kyudo_index_91   = { 4:'h', 8:'h', 10:'h',\
-                        11:'d', 16:'d',23:'', 22:'' }
-    # 910
+                        11:'d', 16:'d',24:'', 23:'' }
+    # 911
     Features_list_911 = [ 'rw_ratio', 'rw_deg',\
                          'hr_ratio', 'hr_deg',\
                          'ew_deg', 'se_deg', 'sw_deg',\
@@ -467,8 +469,18 @@ class FeaturePdf:
     Kyudo_index_911   = { 4:'h', 5:'d',\
                          10:'h', 11:'d',\
                          16:'d', 17:'d', 13:'d',\
-                         23:'', 22:'' }
-    
+                         24:'', 23:'' }
+    # 912
+    Features_list_912 = [ 'rw_ratio', 'rw_deg',\
+                         'hr_ratio', 'hr_deg',\
+                         'ew_deg', 'se_deg', 'sw_deg',\
+                         'body', 'face', 'grad',\
+                         'section','completed' ]
+    Kyudo_index_912   = { 4:'h', 5:'d',\
+                         10:'h', 11:'d',\
+                         16:'d', 17:'d', 13:'d',\
+                         24:'', 23:'', 22:'g' }
+
     Features_index = { 60: (Features_list_60, Kyudo_index_60),
                        61: (Features_list_61, Kyudo_index_61), 
                        70: (Features_list_70, Kyudo_index_70), 
@@ -478,7 +490,8 @@ class FeaturePdf:
                        81: (Features_list_81, Kyudo_index_81), 
                        90: (Features_list_90, Kyudo_index_90), 
                        91: (Features_list_91, Kyudo_index_91),
-                       911: (Features_list_911, Kyudo_index_911)
+                       911: (Features_list_911, Kyudo_index_911),
+                       912: (Features_list_912, Kyudo_index_912)
                        }
     
     def __init__(self, input_key:int=Current_feature_key, seq_frames:int=Input_dim):
@@ -516,6 +529,9 @@ class FeaturePdf:
                                             else Eyes_ratio_max
             elif c == 'd': # degreeで正規化
                 self.features_list[i] = self.kyudo_data_list[idx]/180.0
+            elif c == 'g': # 勾配を数値化
+                self.features_list[i] = 2 if self.kyudo_data_list[idx] < -0.15 \
+                                        else (1 if self.kyudo_data_list[idx] > 0.15 else 0)
             else:          # 正規化なし
                 self.features_list[i] = self.kyudo_data_list[idx]
                 
@@ -1017,7 +1033,8 @@ def import_csv_to_db(csvfile:str, db:MyDb, tbl_name:str, case_name:str):
     elif tbl_name == 'eval_data': db.delete_eval_data()
           
     # DBへデータ登録
-    df.to_sql(tbl_name, db.conn, if_exists='append', index=None, method='multi', chunksize=1024)
+    #df.to_sql(tbl_name, db.conn, if_exists='append', index=None, method='multi', chunksize=4096)
+    df.to_sql(tbl_name, db.conn, if_exists='append', index=None,  chunksize=4096)
     print(f"[import_csv_to_db]info:import '{csvfile}' to '{tbl_name}'{df.shape}.")
     return df.shape[0]
 #

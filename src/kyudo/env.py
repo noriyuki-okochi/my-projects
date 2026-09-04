@@ -63,6 +63,7 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
                 'eyes_norm', 'hips_norm',\
+                'rw_grad',\
                 'tag1', 'tag2'
                 ]
 
@@ -145,15 +146,57 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 
+Features_list_907 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'section','completed'
+                ]
+
+Features_list_909 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'hr_norm/box_h as hr_ratio',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'section','completed'
+                ]
+
+Features_list_910 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                'section','completed'
+                ]
+
 Features_list_911 = ['rw_norm/box_h as rw_ratio',\
                 'rw_angle/180.0 as rw_deg',\
                 'hr_norm/box_h as hr_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'rew_angle/180.0 as ew_deg',\
                 'rse_angle/180.0 as se_deg',\
-                'sr_angle/180.0 as sw_deg',\
+                'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
                 'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_912 = ['rw_norm/box_h as rw_ratio',\
+                'rw_angle/180.0 as rw_deg',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'rse_angle/180.0 as se_deg',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
                 'section','completed'
                 ]
 #
@@ -168,7 +211,11 @@ Features_lists = {
     81: Features_list_81,
     90: Features_list_90,
     91: Features_list_91,
-    911: Features_list_911
+    907: Features_list_907,     # プロット専用特徴量リスト
+    909: Features_list_909,     # プロット専用特徴量リスト
+    910: Features_list_910,     # プロット専用特徴量リスト
+    911: Features_list_911,
+    912: Features_list_912
     }
 #
 # EvalNNで使用する特徴量リスト

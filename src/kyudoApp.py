@@ -649,7 +649,7 @@ def main():
             #
             # 'kyudo-data'テーブルからのデータ読み込み
             # (-lossオプション指定時はCSVファイルから読み込み)
-            cols:list = []
+            col_names:list = []
             db.case_name = case_name
             if plot_loss:
                 # CSVファイル読み込みのlossデータ
@@ -685,7 +685,7 @@ def main():
             elif predict:
                 # 予測結果データフレームの読み込み
                 features = Features_lists[input_key]
-                cols = get_feature_colnames( features )
+                col_names = get_feature_colnames( features )
                 dfk = df_p  
                 dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
                 mdfk = dfk
@@ -702,7 +702,7 @@ def main():
                     features.append('label')
                     features.append('tag1')
                     features.append('tag2')
-                    cols = get_feature_colnames( features )
+                    col_names = get_feature_colnames( features )
                     if section is None:
                         dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
                     else:
@@ -717,22 +717,22 @@ def main():
                 if not input_key_opt:
                     # データの正規化
                     dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"]
-                    cols.append('rw_ratio') 
+                    col_names.append('rw_ratio') 
                     dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"]
-                    cols.append('eyes_ratio') 
+                    col_names.append('eyes_ratio') 
                     dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
-                    cols.append('rl_ratio')
+                    col_names.append('rl_ratio')
                     dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
-                    cols.append('hr_ratio')
+                    col_names.append('hr_ratio')
                     dfk['hr_deg'] = dfk["hr_angle"]/180.0
-                    cols.append('hr_deg')
+                    col_names.append('hr_deg')
                     '''
                     dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"]
-                    cols.append('lw_ratio') 
+                    col_names.append('lw_ratio') 
                     dfk['sr_deg'] = dfk["sr_angle"]/180.0
-                    cols.append('sr_deg')
+                    col_names.append('sr_deg')
                     dfk['se_deg'] = dfk["rse_angle"]/180.0
-                    cols.append('se_deg')
+                    col_names.append('se_deg')
                     '''
                 # 特異値の補正
                 for col in dfk.columns:
@@ -773,10 +773,11 @@ def main():
             # データのプロット
             #
             if key == 'all':        # 学習データの入力項目プロット
-                for name in cols:
-                    if name == 'face' or name == 'body': 
+                for name in col_names:
+                    if name == 'face' or name == 'body' or name == 'grad': 
                         continue    # faceは除外
-                    secondary:bool = True if 'deg' in name else False
+                    secondary:bool = True if 'deg' in name or 'acc' in name \
+                                          else False
                     try :
                         fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                                     name = name,
@@ -869,6 +870,16 @@ def main():
                                     col = 1,   
                                     secondary_y = False
                             )
+                # < grad:gradient >
+                if 'grad' in mdf.columns:
+                    fig = fig.add_trace( go.Bar(x=mdf.index, 
+                                                name = "grad",
+                                                y = mdf["grad"], 
+                                                marker_color = "yellow"),
+                                        row = irow, 
+                                        col = 1,   
+                                        secondary_y = False
+                                )
                 # < section >
                 fig = fig.add_trace( go.Bar(x=mdf.index, 
                                         name="section",

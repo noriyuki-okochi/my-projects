@@ -59,6 +59,7 @@ class MyDb:
             +  "rew_angle,rse_angle,"\
             +  "lew_angle,lse_angle,"\
             +  "eyes_norm,hips_norm,"\
+            +  "rw_grad,"\
             +  "tag1,tag2,"\
             +  "section,completed,label,inserted_at,time_epoch\n"
         self.csvfile2.write(names)

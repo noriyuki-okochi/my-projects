@@ -292,7 +292,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                 face_front = 2
 
         # 右手首移動量の勾配を計算する
-        #rw_grad = keyPoints.get_rw_grad(rw_norm)
+        rw_grad = keyPoints.get_rw_grad(rw_norm)
 
         # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\
@@ -305,6 +305,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                     rew_angle, rse_angle,\
                     lew_angle, lse_angle,\
                     eyes_norm, hips_norm,\
+                    rw_grad,\
                     face_front, body_front]
         # データリストをセット
         inputPdf.set_kyudo_data_list( data_list )  
@@ -896,7 +897,7 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         if g.Section_no == 0:
             if Eval_enabled: Eval(section = 0)  # 評価用のデータをリセット 
             print(f"姿勢解析を開始します")
-            MyResult.RW_norm = None             # 姿勢解析用のデータをリセット
+            MyResult.RW_norm = 0.0              # 姿勢解析用のデータをリセット
         else:  print(f"セクション番号を設定: {g.Section_no}")
 
         #  動作開始（節の移行）

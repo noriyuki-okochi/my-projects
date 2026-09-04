@@ -33,6 +33,7 @@ def section_started_L9(section_no, myResult:MyResult):
     PRM = StartAction_param['param'][10]                                # 10は共通の開始条件     
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
+    gradR = keyPoints.get_rw_grad(normR)                                # 右手首の移動量の勾配を計算
     
     if conf < PRM[0] and (section_no > 0 and section_no < 8):
         # 右手首の信頼度が低い
@@ -42,7 +43,7 @@ def section_started_L9(section_no, myResult:MyResult):
 
     mylog.log(INFO, f"started ({section_no}):フレーム={g.Frame_counter}:    counter={g.Step_counter}\n"\
             + f"    boxid={ibox}, H={int(thsd.block_height)}:  wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
-            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°,  conf={conf:.2f}")
+            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°,  gradR={gradR:.3f}, conf={conf:.2f}")
     mylog.log(INFO, f"    lenSW={int(lenSW)}({thsd.ratio(lenSW):.3f}), anglSW={int(anglSW)}°,"\
                     f" anglSE={int(anglSE_)}°, anglEW={int(anglEW_)}°, xy_elbow=[{int(xy_elbow[0])}, {int(xy_elbow[1])}]")
     #
@@ -224,6 +225,7 @@ def section_completed_L9(section_no, myResult:MyResult):
     PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
+    gradR = keyPoints.get_rw_grad(normR)                                # 右手首の移動量の勾配を計算
 
     if conf < PRM[0]  and (section_no > 1 and section_no < 9):
         # 右手首の信頼度が低い
@@ -233,7 +235,7 @@ def section_completed_L9(section_no, myResult:MyResult):
 
     mylog.log(INFO, f"completed({section_no}):フレーム={g.Frame_counter}:   counter={g.Step_counter}\n"\
             + f"    boxid={ibox}, H={int(thsd.block_height)}, wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
-            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, conf={conf:.2f}")
+            + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°, gradR={gradR:.3f}, conf={conf:.2f}")
     mylog.log(INFO, f"    lenSW={int(lenSW)}({thsd.ratio(lenSW):.3f}), anglSW={int(anglSW)}°,"\
                   + f" anglSE={int(anglSE)}°, anglEW={int(anglEW)}°,"\
                   + f" anglSE={int(anglSE)}°, anglEW={int(anglEW)}°\n"\
