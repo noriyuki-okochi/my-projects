@@ -33,9 +33,11 @@ class KyudoRNN(nn.Module):
 #
 class KyudoGRU(nn.Module):
   def __init__(self, input_size, hidden_size, n_layers,
+               grad_vocab_size=3,
                face_vocab_size=3,
                section_vocab_size=10,
                completed_vocab_size=3,
+               grad_embed_dim=4,
                face_embed_dim=4,
                section_embed_dim=8,
                completed_embed_dim=4):
@@ -53,6 +55,7 @@ class KyudoGRU(nn.Module):
     if section_embed_dim is not None:
         self.embed = True
         self.face_embed = None
+        self.grad_embed = None
         self.section_embed = nn.Embedding(section_vocab_size, section_embed_dim)
         self.completed_embed = nn.Embedding(completed_vocab_size, completed_embed_dim)
         # GRU入力サイズ：YOLO解析ベクトル + section埋め込み + completed埋め込み
@@ -60,6 +63,9 @@ class KyudoGRU(nn.Module):
         if face_embed_dim is not None:
             self.face_embed = nn.Embedding(face_vocab_size, face_embed_dim)
             self.gru_input_size = (self.gru_input_size - 1) + face_embed_dim
+        if grad_embed_dim is not None:
+            self.grad_embed = nn.Embedding(grad_vocab_size, grad_embed_dim)
+            self.gru_input_size = (self.gru_input_size - 1) + grad_embed_dim
     else:
         self.gru_input_size = input_size
     #    
@@ -133,12 +139,14 @@ class KyudoGRU(nn.Module):
 #
 class KyudoGRUs(KyudoGRU):
   def __init__(self, input_size=7, hidden_size=64, output_size=3, n_layers=1,
-                face_vocab_size=3, section_vocab_size=10, completed_vocab_size=3,
-                face_embed_dim=4, section_embed_dim=8, completed_embed_dim=4):
+                grad_vocab_size=3, face_vocab_size=3, section_vocab_size=10, completed_vocab_size=3,
+                grad_embed_dim=4, face_embed_dim=4, section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUs, self).__init__(input_size, hidden_size, n_layers,
+                                    grad_vocab_size=grad_vocab_size,
                                     face_vocab_size=face_vocab_size,
                                     section_vocab_size=section_vocab_size,
                                     completed_vocab_size=completed_vocab_size,
+                                    grad_embed_dim=grad_embed_dim,
                                     face_embed_dim=face_embed_dim,
                                     section_embed_dim=section_embed_dim,
                                     completed_embed_dim=completed_embed_dim) 
@@ -172,11 +180,22 @@ class KyudoGRUs(KyudoGRU):
             face_ids = x[:, -1, -3].long()               # [batch]
             face_emb = self.face_embed(face_ids)         # [batch, face_embed_dim]
             face_emb_expanded = face_emb.unsqueeze(1).repeat(1, seq_len, 1)
-            # YOLO解析ベクトルのみ抽出
-            featues_size -= 3
-            yolo_features = x[:, :, :featues_size]       # [batch, seq_len, 4]
-            # 結合してGRUへ
-            x_concat = torch.cat([yolo_features, face_emb_expanded, \
+            if self.grad_embed is not None:
+                grad_ids = x[:, -1, -4].long()               # [batch]
+                grad_emb = self.grad_embed(grad_ids)         # [batch, grad_embed_dim]
+                grad_emb_expanded = grad_emb.unsqueeze(1).repeat(1, seq_len, 1)
+                # YOLO解析ベクトルのみ抽出
+                featues_size -= 4
+                yolo_features = x[:, :, :featues_size]       # [batch, seq_len, 4]
+                # 結合してGRUへ
+                x_concat = torch.cat([yolo_features, grad_emb_expanded, face_emb_expanded, \
+                                  section_emb_expanded, completed_emb_expanded], dim=-1)
+            else:
+                # YOLO解析ベクトルのみ抽出
+                featues_size -= 3
+                yolo_features = x[:, :, :featues_size]       # [batch, seq_len, 4]
+                # 結合してGRUへ
+                x_concat = torch.cat([yolo_features, face_emb_expanded, \
                                   section_emb_expanded, completed_emb_expanded], dim=-1)
         else:
             # YOLO解析ベクトルのみ抽出
@@ -201,9 +220,11 @@ class KyudoGRUm(KyudoGRU):
                face_vocab_size=3, section_vocab_size=10, completed_vocab_size=3,
                face_embed_dim=4, section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers,
+                                    grad_vocab_size=None,
                                     face_vocab_size=face_vocab_size, 
                                     section_vocab_size=section_vocab_size, 
                                     completed_vocab_size=completed_vocab_size,
+                                    grad_embed_dim=0,
                                     face_embed_dim=face_embed_dim, 
                                     section_embed_dim=section_embed_dim, 
                                     completed_embed_dim=completed_embed_dim) 
