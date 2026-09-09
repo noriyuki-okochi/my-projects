@@ -773,12 +773,12 @@ function kyudo {
                             }
                         }
                         if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
-                            #python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
-                            Write-Output $confirm
+                            python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                            #Write-Output $confirm
                         }
                         else {
-                            #python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
-                            Write-Output $confirm
+                            python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                            #Write-Output $confirm
                         }
                         #Write-Output $LASTEXITCODE
                         if ( $LASTEXITCODE -ne 0 ) {
