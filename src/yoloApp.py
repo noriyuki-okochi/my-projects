@@ -1307,6 +1307,7 @@ def main():
     model_pth = None
     input_key = Input_key
     face_embed = False
+    grad_embed = False
     input_dim = Num_input
     output_dim = Num_classes
     seq_frames = Num_frames
@@ -1349,8 +1350,9 @@ def main():
                     print("入力データキーは60～99範囲で指定してください")
                     return
         face_embed = True if 'face' in get_feature_colnames(Features_lists[input_key]) else False
-        print(f"[main]:Input_feature_key = {input_key}, face_embed={face_embed}")
-        
+        grad_embed = True if 'grad' in get_feature_colnames(Features_lists[input_key]) else False
+        print(f"[main]:Input_feature_key = {input_key}, face_embed={face_embed}, grad_embed={grad_embed}")
+
         # 特徴量データフレームのインスタンス作成
         InputPdf = FeaturePdf(input_key, seq_frames)
         input_dim = InputPdf.input_dim
@@ -1702,6 +1704,7 @@ def main():
             parts = model_pth.split('_') 
             if 'modelse' in parts:
                 gruModel = KyudoGRUs( input_size = input_dim, output_size = output_dim,
+                                grad_embed_dim = Grad_dim if grad_embed else None,
                                 face_embed_dim = Face_dim if face_embed else None,
                                 section_embed_dim = section_dim,
                                 completed_embed_dim = completed_dim )

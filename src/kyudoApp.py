@@ -303,7 +303,8 @@ def main():
         features = Features_lists[input_key]
         input_dim = len(features)
         face_embed:bool = True if 'face' in get_feature_colnames(features) else False
-        log_write(f"[kyudoApp]:input_dim={input_dim}, face_embed={face_embed}")
+        grad_embed:bool = True if 'grad' in get_feature_colnames(features) else False
+        log_write(f"[kyudoApp]:input_dim={input_dim}, face_embed={face_embed}, grad_embed={grad_embed}")
         log_write(f"[kyudoApp]:features:{features}")
         if section is None:
             # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
@@ -376,6 +377,7 @@ def main():
             log_write(f"[kyudoApp]:hidden_size={HiddenS_size}")
             model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
                             hidden_size = HiddenS_size,
+                            grad_embed_dim = Grad_dim if grad_embed else None,
                             face_embed_dim = Face_dim if face_embed else None,
                             section_embed_dim = section_dim,
                             completed_embed_dim = completed_dim )

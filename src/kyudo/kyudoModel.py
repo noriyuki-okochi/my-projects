@@ -220,11 +220,10 @@ class KyudoGRUm(KyudoGRU):
                face_vocab_size=3, section_vocab_size=10, completed_vocab_size=3,
                face_embed_dim=4, section_embed_dim=8, completed_embed_dim=4):
     super(KyudoGRUm, self).__init__(input_size, hidden_size, n_layers,
-                                    grad_vocab_size=None,
                                     face_vocab_size=face_vocab_size, 
                                     section_vocab_size=section_vocab_size, 
                                     completed_vocab_size=completed_vocab_size,
-                                    grad_embed_dim=0,
+                                    grad_embed_dim=None,
                                     face_embed_dim=face_embed_dim, 
                                     section_embed_dim=section_embed_dim, 
                                     completed_embed_dim=completed_embed_dim) 

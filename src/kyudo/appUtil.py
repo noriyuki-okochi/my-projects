@@ -530,8 +530,8 @@ class FeaturePdf:
             elif c == 'd': # degreeで正規化
                 self.features_list[i] = self.kyudo_data_list[idx]/180.0
             elif c == 'g': # 勾配を数値化
-                self.features_list[i] = 2 if self.kyudo_data_list[idx] < -0.15 \
-                                        else (1 if self.kyudo_data_list[idx] > 0.15 else 0)
+                self.features_list[i] = 2 if self.kyudo_data_list[idx] < -1*Grad_threshold \
+                                        else (1 if self.kyudo_data_list[idx] > Grad_threshold else 0)
             else:          # 正規化なし
                 self.features_list[i] = self.kyudo_data_list[idx]
                 

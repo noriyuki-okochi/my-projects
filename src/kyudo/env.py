@@ -146,10 +146,14 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 
+Grad_threshold:float = 0.20        # 勾配の閾値
+Grad_item = f'CASE WHEN rw_grad < -{Grad_threshold:.2f} THEN 2 \
+                WHEN rw_grad > {Grad_threshold:.2f} THEN 1 \
+                ELSE 0 END as grad'
 Features_list_907 = ['rw_norm/box_h as rw_ratio',\
                 'rw_grad as rw_acc',\
                 'tag2 as body',\
-                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                Grad_item,\
                 'tag1 as face',\
                 'section','completed'
                 ]
@@ -159,7 +163,7 @@ Features_list_909 = ['rw_norm/box_h as rw_ratio',\
                 'hr_norm/box_h as hr_ratio',\
                 'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
-                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                Grad_item,\
                 'tag1 as face',\
                 'section','completed'
                 ]
@@ -170,7 +174,7 @@ Features_list_910 = ['rw_norm/box_h as rw_ratio',\
                 'hr_angle/180.0 as hr_deg',\
                 'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
-                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                Grad_item,\
                 'tag1 as face',\
                 'section','completed'
                 ]
@@ -186,7 +190,7 @@ Features_list_911 = ['rw_norm/box_h as rw_ratio',\
                 'tag1 as face',\
                 'section','completed'
                 ]
-
+# （※）右手の移動量勾配を特徴量に追加するリスト（有効な改善は見られなかった）
 Features_list_912 = ['rw_norm/box_h as rw_ratio',\
                 'rw_angle/180.0 as rw_deg',\
                 'hr_norm/box_h as hr_ratio',\
@@ -195,7 +199,7 @@ Features_list_912 = ['rw_norm/box_h as rw_ratio',\
                 'rse_angle/180.0 as se_deg',\
                 'sr_angle/180.0 as sr_deg',\
                 'tag2 as body',\
-                'CASE WHEN rw_grad < -0.15 THEN 2 WHEN rw_grad > 0.15 THEN 1 ELSE 0 END as grad',\
+                Grad_item,\
                 'tag1 as face',\
                 'section','completed'
                 ]
@@ -307,11 +311,12 @@ l2_lambda = os.getenv('L2_LAMBDA')
 if l2_lambda != None:
     L2_lambda = float(l2_lambda)
 
-Sequence_frames:int = 96                        # GRU用入力シーケンスのフレーム数
+Sequence_frames:int = 96    # GRU用入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
-R_factor:float = 1.0   # 学習率減衰の係数
-Face_dim:int = 4       # 顔向き埋め込みベクトルの次元数
+R_factor:float = 1.0        # 学習率減衰の係数
+Face_dim:int = 4            # 顔向き埋め込みベクトルの次元数
+Grad_dim:int = 4            # 右手首の移動量勾配埋め込みベクトルの次元数
 Section_dim:int = 8
 Completed_dim:int = 4
 Hyper_parameters = (Sequence_frames, \
@@ -322,7 +327,7 @@ HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイ�
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
 
 # 学習の早期終了条件の設定
-Early_stop = 0         # Early stoppingの基準
+Early_stop = 0              # Early stoppingの基準
 early_stop = os.getenv('EARLY_STOP')
 if early_stop != None:
     Early_stop = int(early_stop)
@@ -335,9 +340,9 @@ if augment_param != None:
 Augment_level:int = 0
 #
 # 移動平均のウィンドウサイズと重みの設定
-Window_size = 8   # ウィンドウサイズを設定
+Window_size = 8             # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
-Param_max = 10    # パラメータの最大個数
+Param_max = 10              # パラメータの最大個数
 # 
 # テキスト属性
 #
