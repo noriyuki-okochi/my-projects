@@ -109,6 +109,13 @@ def get_device():
     print(f"[get_device]:device={device}")
     return device
 #
+# 移動量勾配のエンコーディング
+# 
+def encode_acc( acc ,   threshold=Grad_threshold):
+    if acc < -threshold: return 3
+    elif acc > threshold: return 2
+    else: return 1
+#
 # セクションと完了状態の更新関数
 # action: モデルの出力アクション  
 # section: 現在のセクション

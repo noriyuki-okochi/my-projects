@@ -267,8 +267,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 
         # 体の向き（0/1=的方向／正面向き）
         shouls_ratio = shouls_norm/box_h
-        xy_conf = keyPoints.conf('left_shoulder')                  # キーポイントの信頼度(Numpy)
-        
+        xy_conf = keyPoints.conf('left_shoulder')                  # キーポイントの信頼度(Numpy)        
         body_front:int = 0 if xy_conf < 0.9 else \
                     (1 if shouls_ratio > Body_front_threshold else 0)    
         if g.Section_no >= 2 and g.Section_no <= 9:
@@ -277,8 +276,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
 
         # 顔の向き（0/1/2=不定／正面／横）
         eyes_ratio = eyes_norm/box_w
-        g.EYE_ratio = eyes_ratio
-        
+        g.EYE_ratio = eyes_ratio       
         face_front:int = 0
         if Level == 9: # Right-side
             eye_conf = keyPoints.conf('right_eye')                 # 右目の座標の信頼度
@@ -291,8 +289,8 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                 # 打ちお越しー＞残身は顔の向きを横に固定
                 face_front = 2
 
-        # 右手首移動量の勾配を計算する
-        rw_grad = keyPoints.get_rw_grad(rw_norm)
+        # 右手首移動量の勾配（指数平滑移動平均）を計算する
+        _, rw_grad = keyPoints.get_grad(rw_norm)
 
         # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\

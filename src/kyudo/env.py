@@ -66,9 +66,10 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',
                 'rw_grad',\
                 'tag1', 'tag2'
                 ]
-
-# 学習用データの読み込みリスト
+#
+# 学習用データの読み込みリスト（Front-Side）
 # ・データベースから読み込むSQL文のデータ項目名と別名
+#
 Features_list_50 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'hr_norm/box_h as hr_ratio',\
@@ -145,12 +146,25 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
                 'tag1 as face',\
                 'section','completed'
                 ]
-
-Grad_threshold:float = 0.20        # 勾配の閾値
-Grad_item = f'CASE WHEN rw_grad < -{Grad_threshold:.2f} THEN 2 \
-                WHEN rw_grad > {Grad_threshold:.2f} THEN 1 \
-                ELSE 0 END as grad'
+#
+# 学習用データの読み込みリスト（Right-Side）
+# ・データベースから読み込むSQL文のデータ項目名と別名
+#
+Ema_size:int = 16                   # 指数平滑移動平均のウィンドウサイズ
+Grad_threshold:float = 1.2          # 勾配の閾値
+Grad_item = f'CASE WHEN rw_grad < -{Grad_threshold:.2f} THEN 3 \
+                WHEN rw_grad > {Grad_threshold:.2f} THEN 2 \
+                ELSE 1 END as grad'
 Features_list_907 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'tag2 as body',\
+                Grad_item,\
+                'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_908 = ['rw_norm/box_h as rw_ratio',\
+                'hr_norm/box_h as hr_ratio',\
                 'rw_grad as rw_acc',\
                 'tag2 as body',\
                 Grad_item,\
@@ -205,6 +219,7 @@ Features_list_912 = ['rw_norm/box_h as rw_ratio',\
                 ]
 #
 Features_lists = {
+    # Front-Sideの特徴量リスト
     50: Features_list_50,       # プロット専用特徴量リスト
     60: Features_list_60,
     61: Features_list_61,
@@ -215,7 +230,9 @@ Features_lists = {
     81: Features_list_81,
     90: Features_list_90,
     91: Features_list_91,
+    # Right-Sideの特徴量リスト
     907: Features_list_907,     # プロット専用特徴量リスト
+    908: Features_list_908,     # プロット専用特徴量リスト
     909: Features_list_909,     # プロット専用特徴量リスト
     910: Features_list_910,     # プロット専用特徴量リスト
     911: Features_list_911,

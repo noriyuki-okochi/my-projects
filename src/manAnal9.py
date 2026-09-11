@@ -33,7 +33,7 @@ def section_started_L9(section_no, myResult:MyResult):
     PRM = StartAction_param['param'][10]                                # 10は共通の開始条件     
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
-    gradR = keyPoints.get_rw_grad(normR)                                # 右手首の移動量の勾配を計算
+    gradR, _ = keyPoints.get_grad(normR)                             # 右手首の移動量の勾配を計算
     
     if conf < PRM[0] and (section_no > 0 and section_no < 8):
         # 右手首の信頼度が低い
@@ -217,15 +217,15 @@ def section_completed_L9(section_no, myResult:MyResult):
     normE, _ = arrow[Kn2idx['right_elbow']]                             # 右肘の移動ベクトルの長さと角度
     normS, _ = arrow[Kn2idx['right_shoulder']]                          # 右肩の移動ベクトルの長さと角度
     lenSW, anglSW = keyPoints.norm('right_shoulder', 'right_wrist')     # 右肩と右手首のベクトルの長さと角度を計算
-    _, anglSE = keyPoints.norm('right_shoulder', 'right_elbow')        # 右肩と右肘のベクトルの長さと角度を計算
-    _, anglEW = keyPoints.norm('right_elbow', 'right_wrist')           # 右肘と右手首のベクトルの長さと角度を計算
+    _, anglSE = keyPoints.norm('right_shoulder', 'right_elbow')         # 右肩と右肘のベクトルの長さと角度を計算
+    _, anglEW = keyPoints.norm('right_elbow', 'right_wrist')            # 右肘と右手首のベクトルの長さと角度を計算
 
     completed = False
     # 共通の開始条件を取得
     PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
-    gradR = keyPoints.get_rw_grad(normR)                                # 右手首の移動量の勾配を計算
+    gradR, _ = keyPoints.get_grad(normR)                                # 右手首の移動量の勾配を計算
 
     if conf < PRM[0]  and (section_no > 1 and section_no < 9):
         # 右手首の信頼度が低い

@@ -671,8 +671,8 @@ def main():
                     act = act_np[i]
                     if act == 1: completed = 1  # 動作完了
                     if act == 2:                # 次セクションの動作開始
-                        if section == 9:    # 最終セクション
-                            section = 2     # 胴づくり
+                        if section == 9:        # 最終セクション
+                            section = 2         # 胴づくり
                         else: section += 1
                         completed = 0
                     sect_np[i] = section
@@ -705,6 +705,7 @@ def main():
                     features.append('tag1')
                     features.append('tag2')
                     col_names = get_feature_colnames( features )
+                    print(f"[kyudoApp]col_names: {col_names}")
                     if section is None:
                         dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
                     else:
@@ -774,10 +775,20 @@ def main():
             #
             # データのプロット
             #
+            test_flag = False
+            if test_flag and 'rw_acc' in mdfk.columns:
+                # 指数平滑移動平均の計算
+                mdfk["ema16_acc"] = mdfk["rw_acc"].ewm(span=16,adjust=False).mean()
+                col_names.append("ema16_acc")
+                #mdfk["grad"] = mdfk["ema16_acc"].apply(lambda x: 3 if x < -Grad_threshold else 2 if x > Grad_threshold else 1)
+                mdf["grad"] = mdfk["ema16_acc"].apply( lambda x: encode_acc(x, Grad_threshold) )
+                # 単純移動平均の計算
+                #mdfk["sma16_acc"] = mdfk["rw_acc"].rolling(window=16).mean()
+                #col_names.append("sma16_acc")
+            
             if key == 'all':        # 学習データの入力項目プロット
                 for name in col_names:
-                    if name == 'face' or name == 'body' or name == 'grad': 
-                        continue    # faceは除外
+                    if name in ['face', 'body', 'grad']: continue    # 除外
                     secondary:bool = True if 'deg' in name or 'acc' in name \
                                           else False
                     try :
@@ -874,10 +885,11 @@ def main():
                             )
                 # < grad:gradient >
                 if 'grad' in mdf.columns:
+                    
                     fig = fig.add_trace( go.Bar(x=mdf.index, 
                                                 name = "grad",
                                                 y = mdf["grad"], 
-                                                marker_color = "yellow"),
+                                                marker_color = "red"),
                                         row = irow, 
                                         col = 1,   
                                         secondary_y = False
@@ -985,14 +997,14 @@ def main():
             if len(second_names) > 0:
                 fig.update_yaxes(title_text=second_names[0], secondary_y=True, showgrid=False,
                                 row=2, col=1)
-            fig.update_yaxes(title_text="label/face/body", range=(0, 3), secondary_y=False,
+            fig.update_yaxes(title_text="label/face/body", range=(-1, 3), secondary_y=False,
                                 row=2, col=1)
             fig.update_yaxes(title_text="section-no/completed", range=(0, 10), secondary_y=True, showgrid=True, 
                                 row=2, col=1)
             fig.update_traces(dict(showlegend = False), 
                                 row=2, col=1)
             if m_compare:
-                fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
+                fig.update_yaxes(title_text="label/face", range=(-1, 3), secondary_y=False,
                                     row=1, col=1)
                 fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                                     row=1, col=1)

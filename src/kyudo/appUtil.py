@@ -61,6 +61,10 @@ class RingBuffer:
         
     def len(self):
         return self.length
+    
+    def to_pdf(self):
+        # リングバッファの内容をデータフレームに変換して返す
+        return pd.DataFrame( {'buffer': self.buffer} )
 #    
 # 動作解析パラメータ設定用スタッククラス
 #
@@ -162,8 +166,8 @@ class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
     Skip:bool = False
-    #RW_norm:float = None
-    RW_norm:float = 0.0
+    Pre_norm:float = 0.0                            # 右手首の移動量（直前の値）
+    Ring_grad:RingBuffer = RingBuffer(Ema_size)     # 右手首の移動量勾配のリングバッファ
     # キーポイントの接続ラインを定義
     Arm_line = [Kn2idx['right_wrist'], 
                 Kn2idx['right_elbow'], 
@@ -361,14 +365,17 @@ class MyResult(Keypoint):
         norm, _ = self.norm(key1, key2)     # 指定されたキーポイント間の距離
         return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
     
-    # 直前の移動量との勾配を計算する関数
-    def get_rw_grad(self, now_norm):
-        grad = 0.0
-        #if MyResult.RW_norm != None:
-        if MyResult.RW_norm != 0.0:
-            grad = (now_norm - MyResult.RW_norm) / MyResult.RW_norm
-        MyResult.RW_norm = now_norm 
-        return grad
+    # 直前の移動量との勾配、指数平滑移動平均を計算する関数
+    def get_grad(self, now_norm):
+        # 直前の移動量との差分を計算
+        grad = now_norm - MyResult.Pre_norm
+        MyResult.Pre_norm = now_norm 
+        
+        # 指数平滑移動平均を計算
+        MyResult.Ring_grad.append(grad)
+        pdf = MyResult.Ring_grad.to_pdf()
+        pdf['ema'] = pdf['buffer'].ewm(span=Ema_size, adjust=False).mean()  
+        return grad, pdf['ema'].iloc[-1]
 
     # キーポイントの接続ライン（腕、胴、目）を描画する関数
     def plot3(self, annotated_frame):        
