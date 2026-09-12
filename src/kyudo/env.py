@@ -152,9 +152,9 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
 #
 Ema_size:int = 16                   # 指数平滑移動平均のウィンドウサイズ
 Grad_threshold:float = 1.2          # 勾配の閾値
-Grad_item = f'CASE WHEN rw_grad < -{Grad_threshold:.2f} THEN 3 \
-                WHEN rw_grad > {Grad_threshold:.2f} THEN 2 \
-                ELSE 1 END as grad'
+Grad_item = f'CASE WHEN rw_grad < -{Grad_threshold:.2f} THEN 2 \
+                WHEN rw_grad > {Grad_threshold:.2f} THEN 1 \
+                ELSE 0 END as grad'
 Features_list_907 = ['rw_norm/box_h as rw_ratio',\
                 'rw_grad as rw_acc',\
                 'tag2 as body',\
