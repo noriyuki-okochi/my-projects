@@ -98,7 +98,7 @@ def help():
     print(" -r(aw-video)")
     print(" -clip(:raw-video)")
     print(" -rotate(:90°clockwise): enabled only '-r' or '-clip'")
-    print(" -multi(-video-layer display)")
+    print(" -multi(-video-layer display):<framex_no>::frame-counter or <section-no>.<step-counter>")
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
     print(" -f(rame-count) and lag for sampling data: default=1.7")
