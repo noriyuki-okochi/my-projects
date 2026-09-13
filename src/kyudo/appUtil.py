@@ -1165,8 +1165,10 @@ def rename_frame_info(db:MyDb, from_name, to_name):
 def print_eval_data(db:MyDb, case_names:list):
     # 解析対象セクション番号リストと表示ヘッダー、取得項目リストの定義
     # 解析対象節番号('<section>.<step>')リスト
-    eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0','7.0', '8.0' ]  
-    headers = [
+    F_eval_sections = ['1.0','2.0','3.0', '4.0', '5.10','5.0', '6.0','7.0', '8.0' ]   
+    #
+    # セクションごとの表示ヘッダー
+    F_headers = [
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
                 "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
@@ -1177,7 +1179,20 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
-    items_l = [ 
+    R_headers = [
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <sk(°)>     <sr(°)>     <reye(-)>     <split>" 
+            ]
+    #
+    # セクションごとの取得項目リストの定義
+    F_items_l = [ 
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
                 "section, case_name, frame_no, (-1*rl), (-1*se), (-1*er), eyes",
@@ -1188,12 +1203,28 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*sl), (-1*rl), (-1*se)",
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
             ]
-    legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
-        + " sl:left Shoulder->wrist, rl:Right wrist->Left wrist\n"\
-        + " se:right Shoulder->Elbow, er:Right Elbow->wrist, sr:Right Shoulder->wrist\n"\
+    R_items_l = [ 
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split",
+                "section, case_name, frame_no, (0.0), (-1*sr), 0.0, split"
+            ]
+    # セクションごとの凡例の定義
+    F_legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
+        + " sl:Left Shoulder->Left Wrist, rl:Right Wrist->Left Wrist\n"\
+        + " se:Right Shoulder->Elbow, er:Right Elbow->Wrist, sr:Right Shoulder->Wrist\n"\
         + " split:完了状態の保持時間\n"\
         + " pull:大三からの引き分け’押／引'の'引'検知率（率が大きいほど、弓手の押しが弱い）\n"\
         + " eyes:眉間長さの尺度（section=2.0で正面向きの目安：ほぼ0.06以下で顔向け良）"
+    R_legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態\n"\
+        + " sk:Right Shoulder->Right Knee, se:Right Shoulder->Elbow, sr:Right Shoulder->Wrist\n"\
+        + " split:完了状態の保持時間\n"\
+        + " reye:右目の検出信頼度（0.70以下で顔向け良）"
     
     # 対象のケース名を抽出する
     case_names_l = []
@@ -1214,15 +1245,26 @@ def print_eval_data(db:MyDb, case_names:list):
                 case_names_l.append(sdf.iloc[i]['case_name'])
             
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
-    for i, section_str in enumerate(eval_sections):
+    for i, section_str in enumerate(F_eval_sections):
         nums = section_str.split('.')
         section = int(nums[0])
         step = int(nums[1])
-        if headers[i] != '':
-            print(f"\n{headers[i]}")
+        c_side = ''
         for case_name in case_names_l:
+            side = 'F' if '_3.9' not in case_name else 'R'
+            headers = F_headers if side == 'F' else R_headers
+            items_l = F_items_l if side == 'F' else R_items_l
+            if items_l[i] == "": continue 
+                        
+            if (side != c_side) and headers[i] != '':
+                # セクションごとのヘッダーを表示
+                print(f"\n{headers[i]}")
+                c_side = side
+            # 評価データを取得して表示
             eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
+    # 凡例の表示
+    legend = F_legend if '_3.9' not in case_name else R_legend
     print(f"\n[legend]\n {legend}")
 #eof
