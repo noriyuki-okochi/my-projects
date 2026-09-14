@@ -240,6 +240,7 @@ Features_lists = {
     }
 #
 # EvalNNで使用する特徴量リスト
+# Front-Sideの特徴量リスト
 Eval_Features_list_90 = ['(rl+180)/360.0 as rl_deg',
                 '(er+180)/360.0 as er_deg',
                 '(sl+180)/360.0 as sl_deg',
@@ -268,9 +269,18 @@ Eval_Features_list_170 = ['(rl+180)/360.0 as rl_deg',
                 'section'
                 ]
 #
+# Right-Sideの特徴量リスト
+Eval_Features_list_906 = ['(ks+180)/360.0 as ks_deg',
+                '(er+180)/360.0 as er_deg',
+                'reye as eye_conf',
+                'split/60.0 as split_m',
+                'completed','section'
+                ]
+#
 Eval_Features_lists = {
     90: Eval_Features_list_90,                   # 評価用特徴量リスト
-    170: Eval_Features_list_170
+    170: Eval_Features_list_170,
+    906: Eval_Features_list_906
 }
 # プロット用の特徴量キー番号リスト
 Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']

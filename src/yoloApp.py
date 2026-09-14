@@ -280,6 +280,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         face_front:int = 0
         if Level == 9: # Right-side
             eye_conf = keyPoints.conf('right_eye')                 # 右目の座標の信頼度
+            g.EYE_conf = eye_conf
             face_front = 2 if eye_conf > Face_front_threshold9 else 1
         else:          # Front-side
             eye_conf = keyPoints.conf('left_eye')                  # 左目の座標の信頼度
@@ -655,15 +656,16 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     #
     # 評価用のデータ保存、採点
     if Eval_enabled:
-        bSectionChanged = Eval(g.Frame_counter, g.Section_no, 1 if g.Completed else 0, \
+        bSectionChanged = Eval( g.Frame_counter, g.Section_no, 1 if g.Completed else 0, \
             g.Step_counter, g.Split_sec, \
             g.RL_angle, g.ER_angle, g.SL_angle, g.SR_angle,\
-            g.RSE_angle, g.EYE_ratio, g.Alart_id)
+            g.RSE_angle, g.EYE_ratio, g.Alart_id, \
+            g.EYE_conf, g.KS_angle if Level == 9 else 0.0 )
         
         if bSectionChanged and evalModel is not None: 
             # 予測実行(predict)
-            df_x = Eval.get_eval_pdf(evalInput_dim)     # 評価用の特徴量データフレームを取得
-            Eval.df_to_csv()
+            Eval.df_to_csv()    # 評価データフレームをCSVに保存(DEBUG用)
+            df_x = Eval.get_eval_pdf()                  # 評価用の特徴量データフレームを取得
             df_x = df_x.astype({'section': 'Int64'})    # 整数型に変換する   
             # numpy配列に変換
             x = df_x.to_numpy(dtype=np.float32)         # (input_frames, input_dim)
@@ -1736,6 +1738,8 @@ def main():
             eval_output_dim = int(params[2]) if len(params) > 2 and params[2].isnumeric() else Eval_output_dim
             Eval_sframes = int(params[1]) if len(params) > 1 and params[1].isnumeric() else Eval_sframes
             print(f"[main]:input_dim={eval_input_dim}, s_frames={Eval_sframes}, output_dim={eval_output_dim}")
+
+            Eval.set_feature_key(Eval_feature_key)
             completed_dim = 0 
             if 'modeln' in parts:
                 

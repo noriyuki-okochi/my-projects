@@ -31,4 +31,5 @@ HR_angle:float = 0.0            # 右腰ー＞右手首の角度
 KS_angle:float = 0.0            # 右膝ー＞右肩の角度
 RSE_angle:float = 0.0           # 右肩ー＞右肘の角度
 EYE_ratio:float = 0.0           # 眼の間隔比率(mainのみで使用)
+EYE_conf:float = 0.0            # 右眼の予測信頼度(mainのみで使用)
 # eof
