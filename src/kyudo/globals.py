@@ -24,6 +24,7 @@ Lap_start:int = 0               # ラップベースフレームカウント
 Action_start:float = 0.0        # アクションベース時間
 #
 RL_angle:float = 0.0            # 右手首ー＞左手首の角度
+RW_angle:float = 0.0            # 右手首移動ベクトルの角度
 SR_angle:float = 0.0            # 右腕の角度(mainのみで使用)
 SL_angle:float = 0.0            # 左腕の角度
 ER_angle:float = 0.0            # 右肘ー＞右手首の角度

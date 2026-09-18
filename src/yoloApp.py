@@ -204,7 +204,7 @@ def get_camera_pos(myResult):
     return CameraPos_name[ipos]
 #
 # 解析結果をトラッキングする関数              
-def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True):
+def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True, calc=False):
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -258,6 +258,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         
         # グローバル変数にセット(評価データ参照用)
         g.RL_angle = rl_angle
+        g.RW_angle = rw_angle
         g.HR_angle = hr_angle
         g.SR_angle = sr_angle
         g.SL_angle = sl_angle
@@ -265,6 +266,10 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         g.KS_angle = ks_angle
         g.RSE_angle = rse_angle
 
+        if calc == True: 
+            # 姿勢解析データのローバル変数への保存のみ行う
+            return
+        
         # 体の向き（0/1=的方向／正面向き）
         shouls_ratio = shouls_norm/box_h
         xy_conf = keyPoints.conf('left_shoulder')                  # キーポイントの信頼度(Numpy)        
@@ -594,6 +599,10 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
         if Tracking_enabled or nn_gru:
             # 姿勢解析入力データリストを作成、保存しておく
             tracking_result(myResult, InputPdf, output_dim, csvout=False)
+        else:
+            # 姿勢解析入力データの計算、グローバル変数への保存のみ行う
+            tracking_result(myResult, None, output_dim, csvout=False, calc=True)
+            
         # 姿勢解析結果のキーポイントの座標変位から、射法八節の動作の開始、完了を判定する
         if g.Lap_start > 0:    
             # 射法八節の動作開始、完了を判定する（キー'0'の押下で判定を開始する）
@@ -660,7 +669,7 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             g.Step_counter, g.Split_sec, \
             g.RL_angle, g.ER_angle, g.SL_angle, g.SR_angle,\
             g.RSE_angle, g.EYE_ratio, g.Alart_id, \
-            g.EYE_conf, g.KS_angle if Level == 9 else 0.0 )
+            g.EYE_conf, g.KS_angle if Level == 9 else 0.0, g.RW_angle if Level == 9 else 0.0)
         
         if bSectionChanged and evalModel is not None: 
             # 予測実行(predict)

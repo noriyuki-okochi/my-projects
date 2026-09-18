@@ -596,7 +596,7 @@ class FeaturePdf:
 #
 class MyEval:
     # CSVファイルのカラムヘッダー（DBカラムと一致させる）
-    Header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,sr,se,ks,eyes,eyec,push,pull,alart,"\
+    Header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,sr,se,ks,rw,eyes,eyec,push,pull,alart,"\
              "label,inserted_at,time_epoch\n"
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
@@ -632,6 +632,7 @@ class MyEval:
                       'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
                       'sr_angle': 0.0, 'se_angle' : 0, 'ks_angle': 0.0, \
+                      'rw_angle' : 0.0, \
                       'eyes_ratio': 0.0, 'eye_conf': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0, \
                       'pull_rate': 0.0, \
@@ -838,7 +839,7 @@ class MyEval:
     def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
                        rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, sr_angle:float=0.0,\
                        se_angle:float=0.0, eyes_ratio:float=0.0, alart:int=0,\
-                       eye_conf:float=0.0, ks_angle:float=0.0):
+                       eye_conf:float=0.0, ks_angle:float=0.0, rw_angle:float=0.0):
         # 
         bool_section_change = False  # セクションが変わったかどうか
         self.frame_no = frame_no
@@ -859,6 +860,7 @@ class MyEval:
                     self.cycle += 1
                 # 評価データの初期化
                 self.reset()
+                
             elif self.section > 0:
                 bool_section_change = True
                 # 評価点数の減算
@@ -882,6 +884,9 @@ class MyEval:
                 self.evals[self.section - 1] = self.eval.copy()
                 # 次のセクションの評価データを初期化
                 self.eval = self.eval_init.copy() 
+                if section == 7:       # 離れのとき、右手首移動ベクトルの角度をcompleted=0に記録
+                    self.eval['rw_angle'] = rw_angle
+                    
                 
         elif completed != self.completed:   # (0 -> 1)
             # 完了移行時の角度データを更新
@@ -1223,14 +1228,14 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     R_headers = [
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
                 "",
+                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
                 "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <rw(°)>",
                 "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>" 
             ]
     #
@@ -1247,14 +1252,14 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
             ]
     R_items_l = [ 
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
+                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
                 "",
+                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
                 "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
+                "section, case_name, frame_no, (-1*ks), (-1*sr), (-1*rw)",
                 "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split"
             ]
     # セクションごとの凡例の定義
