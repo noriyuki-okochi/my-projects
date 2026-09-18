@@ -76,12 +76,13 @@ $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list_91a = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
 #$cases_list = "iijima_2.0_1,iwata_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,kanoda_2.0_2,h.nakamura_2.0_1"
-$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1", "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1" 
+#$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1", "s.iwata_3.9h_1,anbe_3.9h_1" 
+$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1,s.iwata_3.9h_1,anbe_3.9h_1" 
 $env:CASE_LIST=$cases_list
 
 # データ拡張レベル設定例（個別ケース毎に指定：0=拡張なし,1=shift,2=warp,4=noize）
 #$augment_list = '0,1,2,3,4,5,6,7'
-$augment_list = '0,4'
+$augment_list = '0,0'
 $env:AUGMENT_LIST=$augment_list
 #
 $dbg_level = '-d1'
