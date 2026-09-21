@@ -596,7 +596,8 @@ class FeaturePdf:
 #
 class MyEval:
     # CSVファイルのカラムヘッダー（DBカラムと一致させる）
-    Header = "case_name,lv,frame_no,section,completed,step,score,split,rl,er,sl,sr,se,ks,rw,eyes,eyec,push,pull,alart,"\
+    Header = "case_name,lv,frame_no,section,completed,step,score,split,"\
+             "rl,er,sl,sr,se,ks,ah,hs,rw,eyes,eyec,push,pull,alart,"\
              "label,inserted_at,time_epoch\n"
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
@@ -627,11 +628,12 @@ class MyEval:
     debug_file = f"./log/myeval_debug"
     #
     def __init__(self):
-        self.eval_init = { # 評価データ初期値
+        self.eval_init = { # 評価データ初期値（CSV出力順）
                       'completed': 0,'score': Eval_perfect_score ,\
                       'split_tm': 0.0, \
                       'rl_angle' : 0.0, 'er_angle': 0.0, 'sl_angle': 0.0, \
-                      'sr_angle': 0.0, 'se_angle' : 0, 'ks_angle': 0.0, \
+                      'sr_angle': 0.0, 'se_angle' : 0, 
+                      'ks_angle': 0.0, 'ah_angle': 0.0, 'hs_angle': 0.0, \
                       'rw_angle' : 0.0, \
                       'eyes_ratio': 0.0, 'eye_conf': 0.0, \
                       'push_cnt' : 0, 'pull_cnt': 0, 'alart_cnt': 0, \
@@ -839,7 +841,8 @@ class MyEval:
     def __call__(self, frame_no:int=-1,section:int=-1, completed:int=0, step:int=0, split:float=0, \
                        rl_angle:float=0.0, er_angle:float=0.0, sl_angle:float=0.0, sr_angle:float=0.0,\
                        se_angle:float=0.0, eyes_ratio:float=0.0, alart:int=0,\
-                       eye_conf:float=0.0, ks_angle:float=0.0, rw_angle:float=0.0):
+                       eye_conf:float=0.0, \
+                       ks_angle:float=0.0, ah_angle:float=0.0, hs_angle:float=0.0, rw_angle:float=0.0):
         # 
         bool_section_change = False  # セクションが変わったかどうか
         self.frame_no = frame_no
@@ -898,6 +901,8 @@ class MyEval:
             self.eval['eyes_ratio'] = eyes_ratio
             self.eval['eye_conf'] = eye_conf
             self.eval['ks_angle'] = ks_angle
+            self.eval['ah_angle'] = ah_angle
+            self.eval['hs_angle'] = hs_angle
             if self.section == 2:       # 2節は箆調べでプラス2点
                 self.eval['score'] -= 2 
             
@@ -936,6 +941,9 @@ class MyEval:
                 self.eval['eyes_ratio'] = eyes_ratio
                 self.eval['eye_conf'] = eye_conf
                 self.eval['ks_angle'] = ks_angle
+                self.eval['ah_angle'] = ah_angle
+                self.eval['hs_angle'] = hs_angle
+                
                 # 5節のとき、引き分けの「押し」／「引き」回数をカウント
                 if section == 5:
                     if step == 11:      self.eval['push_cnt'] += 1
@@ -1227,16 +1235,16 @@ def print_eval_data(db:MyDb, case_names:list):
                 "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
                 "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
-    R_headers = [
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
+    R_headers = [ 
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
                 "",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <rw(°)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <sr(°)>     <reye(-)>     <split>" 
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <rw(°)>",
+                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>     <split>" 
             ]
     #
     # セクションごとの取得項目リストの定義
@@ -1252,25 +1260,26 @@ def print_eval_data(db:MyDb, case_names:list):
                 "section, case_name, frame_no, (-1*sl), (-1*se), (-1*er), split"
             ]
     R_items_l = [ 
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec",
                 "",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), (-1*rw)",
-                "section, case_name, frame_no, (-1*ks), (-1*sr), eyec, split"
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec, split",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), (-1*rw)",
+                "section, case_name, frame_no, (-1*ks), (-1*ah), (-1*hs), (-1*sr), eyec, split"
             ]
     # セクションごとの凡例の定義
     F_legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態, 5.10 大三\n"\
-        + " sl:Left Shoulder->Left Wrist, rl:Right Wrist->Left Wrist\n"\
-        + " se:Right Shoulder->Elbow, er:Right Elbow->Wrist, sr:Right Shoulder->Wrist\n"\
+        + " sl:left Shoulder->Left wrist, rl:Right Wrist->Left wrist\n"\
+        + " se:right Shoulder->Elbow, er:right Elbow->Right wrist, sr:right Shoulder->Right wrist\n"\
         + " split:完了状態の保持時間\n"\
         + " pull:大三からの引き分け’押／引'の'引'検知率（率が大きいほど、弓手の押しが弱い）\n"\
         + " eyes:眉間長さの尺度（section=2.0で正面向きの目安：ほぼ0.06以下で顔向け良）"
     R_legend = "section:1.00～8.00 甲矢節完了状態, 11.00～18.00 乙矢節完了状態\n"\
-        + " ks:Right Knee->Shoulder, sr:Right Shoulder->Wrist\n"\
+        + " ks:right Knee->Shoulder, ah:right Ankle->Hip, hs:right Hip->Shoulder, sr:right Shoulder->Right wrist\n"\
+        + " rw:Right Wrist vector\n"\
         + " split:完了状態の保持時間\n"\
         + " reye:右目の検出信頼度（0.70以下で顔向け良）"
     
@@ -1291,8 +1300,11 @@ def print_eval_data(db:MyDb, case_names:list):
             for i in range(rows):
                 if sdf.iloc[i]['import'] == 0: continue
                 case_names_l.append(sdf.iloc[i]['case_name'])
-            
+        # 昇順でソートする
+        case_names_l.sort()
+
     # 指定されたケース名リストに対して、セクションごとに評価データを取得して表示する
+    legend = ''        
     for i, section_str in enumerate(F_eval_sections):
         nums = section_str.split('.')
         section = int(nums[0])
@@ -1312,7 +1324,7 @@ def print_eval_data(db:MyDb, case_names:list):
             eval_data_l = db.get_print_eval_data(case_name, section, step, items_l[i])
             for line in eval_data_l:
                 print(f"{line}")
-    # 凡例の表示
-    legend = F_legend if '_3.9' not in case_name else R_legend
+        # 凡例の表示
+        legend = F_legend if '_3.9' not in case_name else R_legend
     print(f"\n[legend]\n {legend}")
 #eof

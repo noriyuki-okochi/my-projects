@@ -240,7 +240,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         Db.outcsv_kyudo_data( data_list, output_dim )  
         Db.csvfile2.flush()
     else:    
-        # 姿勢解析データ
+        # 姿勢解析・評価データ
         rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                    # 右手首移動ベクトルの長さと角度
         lw_norm, lw_angle = arrow[Kn2idx['left_wrist']]                     # 左手首移動ベクトルの長さと角度
         rl_norm, rl_angle = keyPoints.norm('right_wrist','left_wrist')      # 右手首から左手首のベクトルの長さと角度を計算
@@ -252,6 +252,8 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         _, rse_angle = keyPoints.norm('right_shoulder','right_elbow')       # 右肩から右肘のベクトルの長さと角度を計算
         _, lse_angle = keyPoints.norm('left_shoulder','left_elbow')         # 左肩から左肘のベクトルの長さと角度を計算
         _, ks_angle = keyPoints.norm('right_knee','right_shoulder')         # 右膝から右肩のベクトルの長さと角度を計算
+        _, ah_angle = keyPoints.norm('right_ankle','right_hip')             # 右踵から右腰のベクトルの長さと角度を計算
+        _, hs_angle = keyPoints.norm('right_hip','right_shoulder')          # 右腰から右肩のベクトルの長さと角度を計算
         eyes_norm, _ = keyPoints.norm('right_eye','left_eye')               # 右目から左目のベクトルの長さと角度を計算
         hips_norm, _ = keyPoints.norm('right_hip','left_hip')               # 右腰から左腰のベクトルの長さと角度を計算        
         shouls_norm, _ = keyPoints.norm('right_shoulder','left_shoulder')   # 左肩から左肩ベクトルの長さと角度を計算
@@ -264,6 +266,8 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         g.SL_angle = sl_angle
         g.ER_angle = rew_angle
         g.KS_angle = ks_angle
+        g.AH_angle = ah_angle
+        g.HS_angle = hs_angle
         g.RSE_angle = rse_angle
 
         if calc == True: 
@@ -323,11 +327,12 @@ InputPdf:FeaturePdf = None
 def edit_section_name(no, counter):
     # セクション名を編集する
     name = Section_names[no]    
-    if counter > 0:                     # セクション内の動作カウンターが1以上の場合、セクション名にカウンターを追加
+    step_names = StepR_names if Level == 9 else StepF_names
+    if counter >= 0:                     # セクション内の動作カウンターが0以上の場合、セクション名にカウンターを追加
         stepKey = no*100 + counter
         #print(f"stepKey={stepKey}")
-        if stepKey in Step_names:
-            name += f"（{Step_names[stepKey]}）"            # 大三 etc.
+        if stepKey in step_names:
+            name += f"（{step_names[stepKey]}）"            # 大三 etc.
             if stepKey == 511: name += f" {g.Push_counter:2d}"
             elif stepKey == 512: name += f" {g.Pull_counter:2d}"
         else :
@@ -669,7 +674,8 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
             g.Step_counter, g.Split_sec, \
             g.RL_angle, g.ER_angle, g.SL_angle, g.SR_angle,\
             g.RSE_angle, g.EYE_ratio, g.Alart_id, \
-            g.EYE_conf, g.KS_angle if Level == 9 else 0.0, g.RW_angle if Level == 9 else 0.0)
+            g.EYE_conf, \
+            g.KS_angle, g.AH_angle, g.HS_angle, g.RW_angle)
         
         if bSectionChanged and evalModel is not None: 
             # 予測実行(predict)
@@ -704,19 +710,22 @@ def plot(myResult:MyResult, annotated_frame, output_dim=None, nn_gru=False, mode
     if g.Split_last == 0.0:
         cv2.putText(annotated_frame, f"split   : {g.Split_sec:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     else:
-        cv2.putText(annotated_frame, f"split   : {g.Split_sec:6.2f}sec. {g.Split_last:6.2f}sec.", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        cv2.putText(annotated_frame, f"split   : {g.Split_sec:6.2f}sec. {g.Split_last:6.2f}sec.",\
+                    (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 経過時間(lap)の描画
     cv2.putText(annotated_frame, f"lap    : {g.Lap_sec:6.2f}sec.", (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 角度情報(XX_angle)の描画
     if Level == 9:  # Right-side
-        cv2.putText(annotated_frame, f"angle  : {-1*g.KS_angle:6.1f}  {-1*g.SR_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+        cv2.putText(annotated_frame, f"angle  : {-1*g.KS_angle:6.1f}( {-1*g.AH_angle:4.1f},{-1*g.HS_angle:5.1f} )  {-1*g.SR_angle:6.1f}",\
+                    (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     else:           # Front-side
         if g.Section_no == 4 or g.Section_no == 5 or g.Section_no == 6:
             cv2.putText(annotated_frame, f"angle  : {-1*g.RL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
         if g.Section_no == 7 or g.Section_no == 8:
-            cv2.putText(annotated_frame, f"angle  : {-1*g.ER_angle:6.1f}  {-1*g.SL_angle:6.1f}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
+            cv2.putText(annotated_frame, f"angle  : {-1*g.ER_angle:6.1f}  {-1*g.SL_angle:6.1f}",\
+                (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, others_color, 1)
     
     # 警告メッセージの描画
     annotated_frame = draw_text(annotated_frame, Alart_message, (10, 140), RED)
