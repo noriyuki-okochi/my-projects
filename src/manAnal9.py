@@ -64,11 +64,9 @@ def section_started_L9(section_no, myResult:MyResult):
             
     # 1-Asi-bumi  ->  2-Dou-zukuri        
     elif section_no == 1:  
-        #mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglR < {int(PRM[1])} and y_wristR < y_elbow ]")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglR < {int(PRM[1])} and anglSW < {int(PRM[2])} ]")
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,int(PRM[2])), (3,int(PRM[3]))] )  
-        #if normR > thsd(PRM[0]) and int(anglR) < int(PRM[1])  and  xy_wristR[1] < xy_elbow[1]:
         if normR > thsd(PRM[0]) and int(anglR) < int(PRM[1])  and  anglSW < int(PRM[2]):      
             # 右手首の移動ベクトルの長さが50以上の場合（矢つがえ動作開始）
             g.Step_counter += 1
@@ -78,8 +76,8 @@ def section_started_L9(section_no, myResult:MyResult):
     elif section_no == 2:  
         if g.Step_counter == 0:
             # 初期値設定（弦調べ）
-            g.Step_counter = 30
-        if g.Step_counter >= 30:
+            g.Step_counter = 31
+        if g.Step_counter >= 31:
             mylog.log(INFO, f">>>   [ confRY < {(PRM[0]):.2f} ]")
             Stkp.push( [(0,PRM[0])] )  
             if confRY < PRM[0]:  
@@ -138,12 +136,9 @@ def section_started_L9(section_no, myResult:MyResult):
 
     # 6-Kai  ->  7-Hanare        
     elif section_no == 6:  
-        #mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and (anglR > {int(PRM[1])} or anglR < {int(PRM[2])}]")
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
 
-        #Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
         Stkp.push( [(0,PRM[0])] )  
-        #if normR > thsd(PRM[0]) and (anglR > int(PRM[1]) or anglR < int(PRM[2])): 
         if normR > thsd(PRM[0]): 
             # 右手首の移動ベクトルの長さが大きい
             started = True
@@ -270,39 +265,52 @@ def section_completed_L9(section_no, myResult:MyResult):
             if (g.Step_counter%10) == PRM[6]: completed = True
     # 2-Dou-zukuri            
     elif section_no == 2:  
-        if g.Step_counter == 0: g.Step_counter = 1  # 初期化（矢番え動作開始）
-
         if g.Step_counter >= 10 and g.Step_counter < 20:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and anglR < {int(PRM[6])}]")
+            # 取り矢動作開始の判定（早矢のみ）
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and (anglR < {int(PRM[6])} and anglR > {int(PRM[7])}]")
             
-            Stkp.push( [(5,PRM[5]), (6,PRM[6]), (7,PRM[7])] )  
-            if normR > thsd(PRM[5]) and int(anglR) < int(PRM[6]): 
+            Stkp.push( [(5,PRM[5]), (6,PRM[6]), (7,PRM[7]), (8,PRM[8])] )  
+            if normR > thsd(PRM[5]) and (int(anglR) < int(PRM[6]) and int(anglR) > int(PRM[7])):
                 # 右手首の移動ベクトルの長さが大きい場合（取り矢動作開始）
                 g.Step_counter += 1
-                if (g.Step_counter%10) == PRM[7]: g.Step_counter = 20 
+                if (g.Step_counter%10) == PRM[8]: g.Step_counter = 20 
             else:
                 g.Step_counter = int(g.Step_counter/10)*10  # 連続回数をリセット    
         else:
-            mylog.log(INFO, f">>>   [ (normR <= {int(thsd(PRM[0]))} and (anglSW >= {int(PRM[1])} and anglSW <= {int(PRM[2])}) ]")
+            # 早矢の取り矢完了は、右肩から右手首のベクトルの角度のみを条件とする
+            pVal = 1.0 if g.Step_counter < 10 else PRM[2] 
+            mylog.log(INFO, f">>>   [ anglR >= {int(PRM[6])} and (anglSW >= {int(PRM[0])} and anglSW <= {int(PRM[1])}) ]")
             
-            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
-            if ( normR <= thsd(PRM[0])  and (anglSW >= PRM[1] and anglSW <= PRM[2]) ):
-                # 右手首の移動が小さく、右肩から右手首のベクトルの角度が下向き垂直に近い場合（馬手を腰に置く動作完了）
-                g.Step_counter += 1
-                if g.Step_counter < 10:
-                    # 右手首と左手首の移動ベクトルの長さが10未満の場合（矢つがえ動作完了）
-                    mylog.log(INFO, f">>>   [ counter == {int(PRM[3])} ]")
-                    
-                    if g.Step_counter == PRM[3]: g.Step_counter = 10            #(N-1)回保持（初期値=1に注意）
-                elif g.Step_counter >= 20:
-                    # 右手首と左手首の移動ベクトルの長さが10未満の場合（胴作り完了）
-                    mylog.log(INFO, f">>>   [ counter == {int(PRM[4])} ]")
-                    
-                    if (g.Step_counter%10) == PRM[4]: completed = True          #N回保持
-            else:
-                g.Step_counter = int(g.Step_counter/10)*10 + 1 # 連続回数をリセット
-        #
+            Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,pVal), (3,PRM[3]), (4,PRM[4]), (6,PRM[6])] )   
+            if anglR >= PRM[6]  and (anglSW >= PRM[0] and anglSW <= PRM[1]):
+                mylog.log(INFO, f">>>   [ normR <= {int(thsd(pVal))} ]")
+                # 右肩から右手首のベクトルの角度が下向き垂直に近い場合（馬手を腰に置く動作）
+                if  normR <= thsd(pVal) :
+                    # 右手首の移動が小さく、馬手を腰に置く動作完了
+                    g.Step_counter += 1
+                    if g.Step_counter < 10:
+                        # （矢つがえ動作完了）
+                        mylog.log(INFO, f">>>   [ counter == {int(PRM[3])} ]")                        
+                        if g.Step_counter == PRM[3]: g.Step_counter = 10            #(N-1)回保持（初期値=1に注意）
+                    elif g.Step_counter >= 20:
+                        # （胴作り完了）
+                        mylog.log(INFO, f">>>   [ counter == {int(PRM[4])+1} ]")
                         
+                        if (g.Step_counter%10) == PRM[4] + 1: completed = True          #N回保持
+                elif g.Step_counter == 30:
+                    # 馬手を腰に置く動作中
+                    g.Step_counter = 31                   
+            else:
+                #
+                if g.Step_counter >= 31:
+                    mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and (anglR < {int(PRM[6])} and anglR > {int(PRM[7])}]")
+                    
+                    Stkp.push( [(5,PRM[5]), (6,PRM[6]), (7,PRM[7])] )  
+                    if normR > thsd(PRM[5]) and (int(anglR) < int(PRM[6]) and int(anglR) > int(PRM[7])):
+                        # 右手首の移動ベクトルの長さが大きい場合（取りかけ動作開始）
+                        g.Alart_id = Alart_Dozukuri
+                        g.Step_error = True
+        #                        
     # 3-Yu-gamae            
     elif section_no == 3:  
         if g.Step_counter == 0:
@@ -480,10 +488,13 @@ def manual_analize_completed_L9(section_no, myResult:MyResult):
             g.Alart_section = g.Section_no
             mylog.log(INFO, f"[man_analize_completed]: g.Step_error={g.Step_error}, g.Alart_id={g.Alart_id}")
             if g.Alart_id == Alart_Asibumi: g.Section_no = 2        # 足踏み不完全で矢番えの場合
+            if g.Alart_id == Alart_Dozukuri:                        # 胴づくり不完全で取りかけの場合
+                g.Completed = True
+                g.Setep_counter = 31       
             if g.Alart_id == Alart_Monomi: g.Section_no = 4         # 物見なしで打ちおこしの場合
             if g.Alart_id == Alart_KaiNasi: g.Section_no = 7        # 会なしで離れた場合
             if g.Alart_id == Alart_KaiFusoku: g.Section_no = 7      # 会不十分で離れた場合
-            if g.Alart_id != Alart_Daisan:                        # 大三不安定の場合、リセットしない
+            if g.Alart_id != Alart_Daisan:                          # 大三不安定の場合、リセットしない
                 g.Step_counter = 0
                 g.Nop_counter = 0
          
