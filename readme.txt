@@ -279,6 +279,10 @@
      >yoloap -comp 'yoshimoto_2m.0,yoshimoto_2m.9' -at '4.0'  
 
     二つのケース名を指定して、「打ち起こし完了」から動画を重ねて再生する  
+  
+     >yoloap -comp 'yoshimoto_2m.0,yoshimoto_2m.9' -at '4.0' -concat  
+
+    二つのケース名を指定して、「打ち起こし完了」から動画を横に並べて再生する  
 
     >yoloap -comp 'yoshimoto_2m.0,yoshimoto_2m.0' -at '5.10,15.10'  
 
