@@ -77,7 +77,7 @@ $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 #$cases_list_91a = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
 #$cases_list = "iijima_2.0_1,iwata_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,kanoda_2.0_2,h.nakamura_2.0_1"
 #$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1", "s.iwata_3.9h_1,anbe_3.9h_1" 
-$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1,s.iwata_3.9h_1,anbe_3.9h_1" 
+$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1,s.iwata_3.9_1,anbe_3.9_1,tomita_3.9_1" 
 $env:CASE_LIST=$cases_list
 
 # データ拡張レベル設定例（個別ケース毎に指定：0=拡張なし,1=shift,2=warp,4=noize）
@@ -345,7 +345,8 @@ function yoloAp {
         [string]$v8='s',
         [string]$v26='',
         [string]$sample='1.7',
-        [switch]$mask
+        [switch]$mask,
+        [switch]$concat
     )
     if ($v26 -eq '') {
         $param_id = '1.7-' + $v8
@@ -395,6 +396,10 @@ function yoloAp {
     if ( $mask ) {
         $maskon = '-z'
     }
+    $concaton = ''
+    if ( $concat ) {
+        $concaton = '-H'
+    }
     if ($rotate) {
         write-output '・動画を時計回りに90度回転して表示します'
     }
@@ -405,12 +410,12 @@ function yoloAp {
         write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
         write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
         write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
-        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
+        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>' [-concat] ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
         write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3|9:側面}）'
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを生再生する"
-        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
+        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]' [-concat]：指定したケースの動画ファイルを重ねて再生する"
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
@@ -423,8 +428,8 @@ function yoloAp {
         write-output ' w :ファイル出力開始／停止'
         write-output ' t :解析データ出力開始／停止'
         write-output ' s :スナップショットファイルの作成'
-        write-output ' .(>):スキップ'
-        write-output ' ,(<):巻き戻し'
+        write-output ' .(>):スキップ |;(+):第2動画のスキップ'
+        write-output ' ,(<):巻き戻し |-(=):第2動画の巻き戻し'
         write-output ' k(K) :再生速度アップ'
         write-output ' l(L) :再生速度ダウン'
         write-output ' g :グリッド表示・非表示'
@@ -465,7 +470,7 @@ function yoloAp {
     }
     elseif ($multi -ne '') {         
         # マルチ指定動画再生
-        python ./src/yoloApp.py $dbg_level -a -multi $multi --
+        python ./src/yoloApp.py $dbg_level -a -multi $multi $concaton --
     }
     elseif ($one -ne '') {         
         # 単一ケース指定再生
@@ -481,11 +486,11 @@ function yoloAp {
         $i = $case_list.Length
         if ( $i -eq 1 ) {
             # 単一ケース動画再生（指定ケースの動画ファイルを再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -at $at -m --
+            python ./src/yoloApp.py $dbg_level -o $comp -at $at $concaton -m --
         }
         else{
             # マルチ動画再生（指定ケースの動画ファイルを重ねて再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -multi $at -r --
+            python ./src/yoloApp.py $dbg_level -o $comp -multi $at $concaton -r --
         }
     }
     elseif ($clip) {        
