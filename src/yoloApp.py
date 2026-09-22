@@ -80,7 +80,7 @@ Add_beta:float = 1.0 - Add_alpha
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip|-multi [[<frame1_no>],[<frame2_no>]|-r|{-m|-t|-u} <case_name>]\n"\
+    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip|-multi [[<frame1_no>],[<frame2_no>] [-H]|-r|{-m|-t|-u} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-rortate] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
@@ -98,7 +98,7 @@ def help():
     print(" -r(aw-video)")
     print(" -clip(:raw-video)")
     print(" -rotate(:90°clockwise): enabled only '-r' or '-clip'")
-    print(" -multi(-video-layer display):<framex_no>::frame-counter or <section-no>.<step-counter>")
+    print(" -multi(-video-layer display):<framex_no>::frame-counter or <section-no>.<step-counter>,'-H'::Horizontal concat")
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
     print(" -f(rame-count) and lag for sampling data: default=1.7")
@@ -145,6 +145,8 @@ def help():
     print(" p :一時停止／再開")
     print(" .(>):スキップ")
     print(" ,(<):巻き戻し")
+    print(" ;(+):スキップ-第2ファイル")
+    print(" -(=):巻き戻し-第2ファイル")
     print(" c :警告メッセージ、その他、キー設定値のクリア")
     print(" ? :キー操作制御パラメータの表示")
     print(" q :処理の終了")
@@ -396,6 +398,20 @@ def multi_frame_display(frame1, frame2):
     frame2 = cv2.resize(frame2, (w, h))
     # 画像を重ねて表示
     return cv2.addWeighted(frame1, Add_alpha, frame2, Add_beta, 0) 
+#
+# 2つのフレームを横に連結して表示する関数
+#
+def horizontal_concat_display(frame1, frame2):
+    # フレームの高さを揃える
+    h1, w1 = frame1.shape[0:2]
+    h2, w2 = frame2.shape[0:2]
+    h = min(h1, h2)
+    if h1 != h:
+        frame1 = cv2.resize(frame1, (int(w1 * h / h1), h))
+    if h2 != h:
+        frame2 = cv2.resize(frame2, (int(w2 * h / h2), h))
+    # 画像を横に連結して表示
+    return cv2.hconcat([frame1, frame2])
 #
 # グリッド線を描画する関数 
 def draw_grid(img, grid_shape, grid_shift, color=(0, 255, 0), thickness=1):
@@ -770,11 +786,13 @@ def transition_to(section_no, ctl):
 #
 # キー入力操作関数
 #
-def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_video):
+def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_video):
     global Section_color, Alart_message, Eval
     global Tracking_enabled, Update_enabled, Tracking_onece
     global Cv2Video
     
+    cap = caps[0]
+    cap2 = caps[1]
     if ctl['key_inter'] != 0 and (int(time.time()) - ctl['key_inter']) > ctl['key_wait']: 
         # キー入力の間隔が1秒経過したとき、連打タイマーをクリア
         ctl['key_inter'] = 0  
@@ -943,12 +961,20 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
             transition_to(g.Section_no, ctl)
 
     elif key == ord('.') and len(ctl['para_data']) == 0: 
-                                            # (.) フレームカウンターを2秒進める
+        # (.) フレームカウンターを2秒進める
         g.Frame_counter += int(Fps)*2     
         cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
         print(f"フレーム={g.Frame_counter}")
+
+    elif key == ord(';') and cap2 is not None and len(ctl['para_data']) == 0: 
+        # (;) 第2フレームカウンターを2秒進める
+        frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
+        frame_counter += int(Fps)*2     
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+        print(f"フレーム={frame_counter}")
         
-    elif key == ord('>'):                   # (>) nフレーム進める
+    elif key == ord('>'):                   
+        # (>) nフレーム進める
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
             # キー入力データの2文字目以降をフレーム数として設定
             ctl['skipf_frames'] = int(ctl['key_data'][1:])
@@ -974,6 +1000,36 @@ def key_ope(key, ctl, annotated_frame, cap, idir, out_file, raw_video, clip_vide
         else: g.Frame_counter = 1
         cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
         print(f"フレーム={g.Frame_counter}")
+
+    elif key == ord(';') and cap2 is not None and len(ctl['para_data']) == 0: 
+        # (;) 第2フレームカウンターを2秒進める
+        frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
+        frame_counter += int(Fps)*2     
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+        print(f"第2フレーム={frame_counter}")
+
+    elif key == ord('+') and cap2 is not None:                   
+        # (+) nフレーム進める
+        frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
+        frame_counter += ctl['skipf_frames'] 
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+        print(f"第2フレーム={frame_counter}")
+        
+    elif key == ord('-') and cap2 is not None and len(ctl['para_data']) == 0: 
+        # (-) 第2フレームカウンターを2秒戻す
+        frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
+        if frame_counter > int(Fps)*2: frame_counter -= int(Fps)*2
+        else: frame_counter = 1
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+        print(f"第2フレーム={frame_counter}")
+
+    elif key == ord('=') and cap2 is not None:                   
+        # (=) nフレーム戻す
+        frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
+        if frame_counter > ctl['skipb_frames']: frame_counter -= ctl['skipb_frames']
+        
+        cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+        print(f"第2フレーム={frame_counter}")
 
     elif key == ord('j'):
         # 指定フレームへジャンプ                   
@@ -1160,8 +1216,9 @@ def main():
     rotate_video = False                            # 動画を90度回転して表示するオプション
     manual_plot = False                             # 手動でプロット、姿勢解析するオプション
     nn_gru = False                                  # GRUによる姿勢解析オプション
-    multi_frames = False                 #          # 2動画ファイルを重ねて再生するオプション
+    multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     multi_fstart = [0, 0]                           # 2動画ファイルを重ねて再生する開始フレーム
+    concat_frames = False                           # 2動画ファイルを横に連結して表示するオプション
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = True                                 # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
@@ -1675,6 +1732,10 @@ def main():
             print("動画ファイルが見つかりません")
             cap[1].release()
             return
+
+        # 2つのフレームを横に連結して表示するオプション
+        concat_frames = True if '-H' in opts else False  
+        
     #------------------------------------------------------------------------
     # 映像出力ファイルの設定
     #------------------------------------------------------------------------
@@ -1903,7 +1964,8 @@ def main():
                     # 画面を重ねて表示
                     ret, frame1 = cap[1].read()
                     if ret is True: 
-                        frame = multi_frame_display(frame, frame1)
+                        frame = multi_frame_display(frame, frame1) if not concat_frames else \
+                                horizontal_concat_display(frame, frame1)
                 # 生画像を表示する場合
                 annotated_frame = frame
         else:
@@ -1966,15 +2028,7 @@ def main():
                     else:
                         # YOLOv8のplot関数を使用してフレームに描画  
                         # 　kpt_line=False： キーポイントのマークのみを描画）
-                        annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                        
-                '''                
-                if multi_frames and cap[1] is not None:
-                    # 画面を重ねて表示
-                    ret, frame1 = cap[1].read()
-                    if ret is True: 
-                        annotated_frame = multi_frame_display(annotated_frame, frame1)
-                '''
-                
+                        annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                                        
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
         #
@@ -2038,7 +2092,7 @@ def main():
         #
         # キー入力に応じて処理を実行
         #
-        if key_ope(key, keyCtl, annotated_frame, cap[0], idir, out_file, raw_video, clip_video) == False:
+        if key_ope(key, keyCtl, annotated_frame, cap, idir, out_file, raw_video, clip_video) == False:
             # キー操作が終了（'q'）で、ループを抜ける
             print("[main]:Interrapted by 'q'")
             break
