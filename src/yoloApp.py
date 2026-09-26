@@ -784,6 +784,15 @@ def transition_to(section_no, ctl):
             g.Step_counter = 20
     return
 #
+# フレームカウンタをnフレーム戻す
+#
+def rewind_frame(cap, n):
+    frame_counter = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+    frame_counter -= n
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+    return frame_counter
+
+#
 # キー入力操作関数
 #
 def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_video):
@@ -965,14 +974,10 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         g.Frame_counter += int(Fps)*2     
         cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
         print(f"フレーム={g.Frame_counter}")
+        if cap2 is not None:
+            # 第2フレームカウンタを１フレーム戻す
+            rewind_frame(cap2, 1)
 
-    elif key == ord(';') and cap2 is not None and len(ctl['para_data']) == 0: 
-        # (;) 第2フレームカウンターを2秒進める
-        frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
-        frame_counter += int(Fps)*2     
-        cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
-        print(f"フレーム={frame_counter}")
-        
     elif key == ord('>'):                   
         # (>) nフレーム進める
         if len(ctl['key_data']) > 1 and ctl['key_data'][1:].isdigit():
@@ -982,6 +987,9 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         g.Frame_counter += ctl['skipf_frames'] 
         cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
         print(f"フレーム={g.Frame_counter}")
+        if cap2 is not None:
+            # 第2フレームカウンタを１フレーム戻す
+            rewind_frame(cap2, 1)
     
     elif key == ord(',') and len(ctl['para_data']) == 0:                   
         # (,) フレームカウンターを2秒戻す
@@ -989,6 +997,9 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         else: g.Frame_counter = 1
         cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
         print(f"フレーム={g.Frame_counter}")
+        if cap2 is not None:
+            # 第2フレームカウンタを１フレーム戻す
+            rewind_frame(cap2, 1)
     
     elif key == ord('<'):                   
         # (<) nフレーム戻す
@@ -1000,20 +1011,27 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         else: g.Frame_counter = 1
         cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
         print(f"フレーム={g.Frame_counter}")
+        if cap2 is not None:
+            # 第2フレームカウンタを１フレーム戻す
+            rewind_frame(cap2, 1)
 
-    elif key == ord(';') and cap2 is not None and len(ctl['para_data']) == 0: 
+    elif key == ord(';') and cap2 is not None: 
         # (;) 第2フレームカウンターを2秒進める
         frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
         frame_counter += int(Fps)*2     
         cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
         print(f"第2フレーム={frame_counter}")
+        # フレームカウンタを１フレーム戻す
+        g.Frame_counter = rewind_frame(cap, 1)
 
     elif key == ord('+') and cap2 is not None:                   
-        # (+) nフレーム進める
+        # (+) 第2フレームカウンターをnフレーム進める
         frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
         frame_counter += ctl['skipf_frames'] 
         cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
         print(f"第2フレーム={frame_counter}")
+        # フレームカウンタを１フレーム戻す
+        g.Frame_counter = rewind_frame(cap, 1)
         
     elif key == ord('-') and cap2 is not None and len(ctl['para_data']) == 0: 
         # (-) 第2フレームカウンターを2秒戻す
@@ -1022,14 +1040,18 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         else: frame_counter = 1
         cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
         print(f"第2フレーム={frame_counter}")
+        # フレームカウンタを１フレーム戻す
+        g.Frame_counter = rewind_frame(cap, 1)
 
     elif key == ord('=') and cap2 is not None:                   
-        # (=) nフレーム戻す
+        # 第2フレームカウンターを(=) nフレーム戻す
         frame_counter = int(cap2.get(cv2.CAP_PROP_POS_FRAMES))
         if frame_counter > ctl['skipb_frames']: frame_counter -= ctl['skipb_frames']
         
         cap2.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
         print(f"第2フレーム={frame_counter}")
+        # フレームカウンタを１フレーム戻す
+        g.Frame_counter = rewind_frame(cap, 1)
 
     elif key == ord('j'):
         # 指定フレームへジャンプ                   
@@ -1109,6 +1131,8 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         ctl['para_data'] += '.'
     elif key == ord(',') and len(ctl['para_data']) > 0:
         ctl['para_data'] += ','
+    elif key == ord('-') and len(ctl['para_data']) > 0:
+        ctl['para_data'] += '-'
     elif key >= ord('0') and key <= ord('9') and len(ctl['para_data']) > 0:
         ctl['para_data'] += chr(key)
 
