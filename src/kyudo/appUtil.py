@@ -1179,14 +1179,20 @@ def delete_frame_info(db:MyDb, case_name):
 # 登録ケースの画像ファイルパス取得関数
 # db: MyDbデータベースオブジェクト
 # idir: 画像ファイルの格納ディレクトリ
-# case_name: ケース名   
-def get_case_img_path(db:MyDb, idir: str, case_name: str):
+# case_name: ケース名 
+# shape: YOLO-shape解析済動画を選択  
+def get_case_img_path(db:MyDb, idir: str, case_name: str, shape=False):
     img_path = None
     path, _ = db.get_file_path(case_name)
     # 画像ファイルのパスを生成して返す
     # 例: path='c:\users/usr/picture/Rool/case1.jpeg' -> img_path='idir/case1.jpeg'
     if path is not None:
         filename = os.path.basename(path)           # ファイル名を取得
+        if shape:
+            shape_file = f"_{filename}"
+            shape_path = os.path.join(idir, shape_file)
+            if os.path.isfile(shape_path):
+                filename = shape_file
         img_path = os.path.join(idir, filename)     # 画像ファイルのパスを生成
     return img_path
 #

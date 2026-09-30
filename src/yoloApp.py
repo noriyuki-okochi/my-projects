@@ -1248,6 +1248,7 @@ def main():
     multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     multi_fstart = [0, 0]                           # 2動画ファイルを重ねて再生する開始フレーム
     concat_frames = False                           # 2動画ファイルを横に連結して表示するオプション
+    shape = False                                   # YOLO-shapeによる解析画像を選択
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = True                                 # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
@@ -1338,6 +1339,8 @@ def main():
         if '-rotate' in opts: 
             rotate_video = True # 動画を90度回転して表示するオプション   
 
+    if '-y' in opts:
+        shape = True
     if '-o' in opts:
         # 動画ファイルの選択をケース名で指定する
         cases, _ = get_opt_values(args, '-o', type='c', sep=',')
@@ -1347,7 +1350,7 @@ def main():
                 if fps is None:
                     print(f"> '{case}' not found in frame_info table.")
                     return
-                path = get_case_img_path(Db, idir, case)
+                path = get_case_img_path(Db, idir, case, shape)
                 if path is None:
                     print(f">  image file({path}) for '{case}' not found.")
                     return
@@ -1718,7 +1721,8 @@ def main():
         Eval.open_csv(case_name, step_no, Db.csvpath1)
         # トラッキングデータの情報テーブルに登録 
         img_file = os.path.basename(file_name[0])        # 'memo'に初期設定する画像ファイル名を取得
-        memo = f"{img_file}: {param_nm}:s{step_no})"
+        hybrid = 'hybrid' if nn_gru else ''
+        memo = f"{img_file}: {param_nm}:s{step_no}:{hybrid}"
         Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1, memo] )     
     #---------------------------------------------------------------------  
     # クリッピング領域指定
