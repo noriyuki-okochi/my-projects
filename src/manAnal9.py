@@ -138,10 +138,13 @@ def section_started_L9(section_no, myResult:MyResult):
     elif section_no == 6:  
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
 
-        Stkp.push( [(0,PRM[0])] )  
+        Stkp.push( [(0,PRM[0]),(0,PRM[1])] )  
         if normR > thsd(PRM[0]): 
             # 右手首の移動ベクトルの長さが大きい
-            started = True
+            g.Step_counter += 1
+            mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
+            if g.Step_counter == PRM[1]:
+                started = True
     
     
     # 7-Hanare  ->  8-Zan-shin        
