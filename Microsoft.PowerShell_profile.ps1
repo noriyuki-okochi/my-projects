@@ -346,7 +346,8 @@ function yoloAp {
         [string]$v26='',
         [string]$sample='1.7',
         [switch]$mask,
-        [switch]$concat
+        [switch]$concat,
+        [switch]$shape
     )
     if ($v26 -eq '') {
         $param_id = '1.7-' + $v8
@@ -400,6 +401,10 @@ function yoloAp {
     if ( $concat ) {
         $concaton = '-H'
     }
+    $shapeon = ''
+    if ( $shape ) {
+        $shapeon = '-y'
+    }
     if ($rotate) {
         write-output '・動画を時計回りに90度回転して表示します'
     }
@@ -415,7 +420,7 @@ function yoloAp {
         write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
         write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを生再生する"
-        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]' [-concat]：指定したケースの動画ファイルを重ねて再生する"
+        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]' [-concat] [-shape]：指定したケースの動画ファイルを重ねて再生する"
         write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
@@ -486,11 +491,11 @@ function yoloAp {
         $i = $case_list.Length
         if ( $i -eq 1 ) {
             # 単一ケース動画再生（指定ケースの動画ファイルを再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -at $at $concaton -m --
+            python ./src/yoloApp.py $dbg_level -o $comp -at $at $concaton $shapeon -m --
         }
         else{
             # マルチ動画再生（指定ケースの動画ファイルを重ねて再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -multi $at $concaton -r --
+            python ./src/yoloApp.py $dbg_level -o $comp -multi $at $concaton $shapeon -r --
         }
     }
     elseif ($clip) {        

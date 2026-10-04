@@ -85,7 +85,7 @@ def help():
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-rortate] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
-        + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [--] [-at <frame_no>]")
+        + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [-at <frame_no>] [--]")
     print(" --- Notation---")
     print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
     print(" --- Option ---")
@@ -1064,12 +1064,17 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
             ctl['key_data'] = ''            # キー入力データをクリア
             print(f"フレーム={g.Frame_counter}")
 
-    elif key == ord('\t') and ctl['at_case'] is not None:
+    elif key == ord('\t') and ctl['at_case'][0] is not None:
         # 次セクション完了フレームへジャンプ 
-        frame = Db.get_frame_no_at(ctl['at_case'], ctl['at_section'] + 1, 0)
+        frame = Db.get_frame_no_at(ctl['at_case'][0], ctl['at_section'] + 1, 0)
         if frame is not None:
             g.Frame_counter = min(frame, ctl['frame_count']) 
             cap.set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
+            if ctl['at_case'][1] is not None:
+                frame = Db.get_frame_no_at(ctl['at_case'][1], ctl['at_section'] + 1, 0)
+                if frame is not None:
+                    cap2.set(cv2.CAP_PROP_POS_FRAMES, frame)
+            #                
             ctl['at_section'] += 1
             print(f"フレーム={g.Frame_counter} at ({ctl['at_section']})")
             
@@ -1243,6 +1248,7 @@ def main():
     multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     multi_fstart = [0, 0]                           # 2動画ファイルを重ねて再生する開始フレーム
     concat_frames = False                           # 2動画ファイルを横に連結して表示するオプション
+    shape = False                                   # YOLO-shapeによる解析画像を選択
     mosaic = False                                  # モザイク処理を行うオプション
     guidance = True                                 # '-g'キー操作ガイダンス表示
     idir = PICT_PATH                                # 初期ディレクトリを指定
@@ -1280,7 +1286,7 @@ def main():
         'grid_shape': (6, 6),                       # グリッド分割数(行,列)
         'grid_shift': (0, 0),                       # グリッド表示シフト量(行,列)
         'zoom_rect': None,                          # ズーム領域
-        'at_case': None,                            # '-o'指定のケース名
+        'at_case': [None,None],                     # '-o'指定のケース名
         'at_section':0,                             # '-at'指定のセクション番号
         'fps_ratio':1.0                             # '-w'指定の出力ファイルFPS算出係数
     }
@@ -1333,6 +1339,8 @@ def main():
         if '-rotate' in opts: 
             rotate_video = True # 動画を90度回転して表示するオプション   
 
+    if '-y' in opts:
+        shape = True
     if '-o' in opts:
         # 動画ファイルの選択をケース名で指定する
         cases, _ = get_opt_values(args, '-o', type='c', sep=',')
@@ -1342,7 +1350,7 @@ def main():
                 if fps is None:
                     print(f"> '{case}' not found in frame_info table.")
                     return
-                path = get_case_img_path(Db, idir, case)
+                path = get_case_img_path(Db, idir, case, shape)
                 if path is None:
                     print(f">  image file({path}) for '{case}' not found.")
                     return
@@ -1365,10 +1373,11 @@ def main():
             # <section>.<step>指定
             at_l = []
             fstart = args[idx].split(',')
-            for val_s in fstart:
+            for i, val_s in enumerate(fstart):
                 at = val_s.strip().split('.')
                 if at[0].isnumeric() and at[1].isnumeric(): 
                     at_l.append(at)
+                    if i == 0: keyCtl['at_section'] = int(at[0])
             # 指定数のチェック
             s = len(at_l)
             if s == 1: at_l.append(at_l[0])     # 第１指定のみの時、第２にコピー
@@ -1385,6 +1394,7 @@ def main():
                             f"case={case},section={int(at_l[i][0])}, step={int(at_l[i][1])}")
                     break
                 multi_fstart[i] = frame_no
+                keyCtl['at_case'][i] = case                
             if frame_no == -1:
                 print(f"[main]:無効なフレーム番号が指定されました.")
                 return                
@@ -1711,7 +1721,8 @@ def main():
         Eval.open_csv(case_name, step_no, Db.csvpath1)
         # トラッキングデータの情報テーブルに登録 
         img_file = os.path.basename(file_name[0])        # 'memo'に初期設定する画像ファイル名を取得
-        memo = f"{img_file}: {param_nm}:s{step_no})"
+        hybrid = 'hybrid' if nn_gru else ''
+        memo = f"{img_file}: {V8_model}:s{step_no}:{hybrid}"
         Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1, memo] )     
     #---------------------------------------------------------------------  
     # クリッピング領域指定
@@ -1909,7 +1920,9 @@ def main():
             frame_no = -1 if no is None else no
             if frame_no != -1:
                 # キー操作（tab)の情報
-                keyCtl['at_case'] = case_name_l[0]
+                keyCtl['at_case'][0] = case_name_l[0]
+                if len(case_name_l) == 2:
+                    keyCtl['at_case'][1] = case_name_l[1]                
                 keyCtl['at_section'] = opt_vals[0]
         else: pass
         if frame_no == -1:    

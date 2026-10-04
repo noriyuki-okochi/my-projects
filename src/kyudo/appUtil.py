@@ -647,6 +647,7 @@ class MyEval:
         self.alarts: list = []              # 警告リスト
         self.deduct_msgs: list = []         # 減点リスト
         self.score_on: bool = False         # 総合評価点数表示のON/OFF
+        self.score_onece: bool = False      # 評価済のON/OFF
         self.score_text: str = ""           # 総合評価点数表示用のテキスト
         self.scores: list = [0]*8           # 予測スコアリスト(8節分)
         self.csvpath: str = None            # 評価結果保存用のCSVファイルパス
@@ -769,6 +770,7 @@ class MyEval:
         self.section = -1               # 現在のセクション（節） 番号(0-9)
         self.completed = 0              # 現在の完了状態(0/1)
         self.step = -1                  # ステップ番号
+        self.score_onece = False        # 評価済のON/OFF
         # 評価データの初期化
         self.eval = self.eval_init.copy() 
         # 評価データリストの初期化    
@@ -951,7 +953,7 @@ class MyEval:
                     if (self.eval['push_cnt'] + self.eval['pull_cnt']) > 0:
                         self.eval['pull_rate'] = self.eval['pull_cnt']/(self.eval['push_cnt'] + self.eval['pull_cnt'])
             else:
-                if section == 2 and step == 40 and self.step == 30:
+                if section == 2 and (step == 40 and self.step >= 30 and not self.score_onece):
                     # 2節のステップ40（箆調べ）は2点加算
                     self.eval['eyes_ratio'] = eyes_ratio
                     self.eval['eye_conf'] = eye_conf
@@ -965,7 +967,8 @@ class MyEval:
                     if self.predict:
                         self.set_eval_list()  # 評価データの特徴量リストを更新する
                         self.add_eval_pdf()   # 評価データの特徴量データフレームに追加する
-                
+                    
+                    self.score_onece = True
             # 保持時間の更新
             self.eval['split_tm'] = split
         # 
@@ -1179,14 +1182,20 @@ def delete_frame_info(db:MyDb, case_name):
 # 登録ケースの画像ファイルパス取得関数
 # db: MyDbデータベースオブジェクト
 # idir: 画像ファイルの格納ディレクトリ
-# case_name: ケース名   
-def get_case_img_path(db:MyDb, idir: str, case_name: str):
+# case_name: ケース名 
+# shape: YOLO-shape解析済動画を選択  
+def get_case_img_path(db:MyDb, idir: str, case_name: str, shape=False):
     img_path = None
     path, _ = db.get_file_path(case_name)
     # 画像ファイルのパスを生成して返す
     # 例: path='c:\users/usr/picture/Rool/case1.jpeg' -> img_path='idir/case1.jpeg'
     if path is not None:
         filename = os.path.basename(path)           # ファイル名を取得
+        if shape:
+            shape_file = f"_{filename}"
+            shape_path = os.path.join(idir, shape_file)
+            if os.path.isfile(shape_path):
+                filename = shape_file
         img_path = os.path.join(idir, filename)     # 画像ファイルのパスを生成
     return img_path
 #
