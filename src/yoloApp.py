@@ -1722,7 +1722,7 @@ def main():
         # トラッキングデータの情報テーブルに登録 
         img_file = os.path.basename(file_name[0])        # 'memo'に初期設定する画像ファイル名を取得
         hybrid = 'hybrid' if nn_gru else ''
-        memo = f"{img_file}: {param_nm}:s{step_no}:{hybrid}"
+        memo = f"{img_file}: {V8_model}:s{step_no}:{hybrid}"
         Db.insert_frame_info( [file_name[0], Fps, frame_height, frame_width, Db.csvpath1, memo] )     
     #---------------------------------------------------------------------  
     # クリッピング領域指定
