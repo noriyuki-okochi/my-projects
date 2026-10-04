@@ -25,8 +25,8 @@ def section_started_L9(section_no, myResult:MyResult):
     normK, _ = arrow[Kn2idx['right_knee']]                              # 右膝の移動ベクトルの長さと角度
     normR, anglR = arrow[Kn2idx['right_wrist']]                         # 右手首の移動ベクトルの長さと角度
     lenSW, anglSW = keyPoints.norm('right_shoulder', 'right_wrist')     # 右肩と右手首のベクトルの長さと角度を計算
-    _, anglSE_ = keyPoints.norm('right_shoulder', 'right_elbow')        # 右肩と右肘のベクトルの長さと角度を計算
-    _, anglEW_ = keyPoints.norm('right_elbow', 'right_wrist')           # 右肘と右手首のベクトルの長さと角度を計算
+    _, anglSE = keyPoints.norm('right_shoulder', 'right_elbow')        # 右肩と右肘のベクトルの長さと角度を計算
+    _, anglEW = keyPoints.norm('right_elbow', 'right_wrist')           # 右肘と右手首のベクトルの長さと角度を計算
 
     started = False
     # 共通の開始条件を取得
@@ -45,7 +45,7 @@ def section_started_L9(section_no, myResult:MyResult):
             + f"    boxid={ibox}, H={int(thsd.block_height)}:  wristR=[{int(xy_wristR[0])}, {int(xy_wristR[1])}],"\
             + f"    normR={int(normR)}({thsd.ratio(normR):.3f}), anglR={int(anglR)}°,  gradR={gradR:.3f}, conf={conf:.2f}")
     mylog.log(INFO, f"    lenSW={int(lenSW)}({thsd.ratio(lenSW):.3f}), anglSW={int(anglSW)}°,"\
-                    f" anglSE={int(anglSE_)}°, anglEW={int(anglEW_)}°, xy_elbow=[{int(xy_elbow[0])}, {int(xy_elbow[1])}]")
+                    f" anglSE={int(anglSE)}°, anglEW={int(anglEW)}°, xy_elbow=[{int(xy_elbow[0])}, {int(xy_elbow[1])}]")
     #
     # 次の節への移行条件を判定
     #
@@ -161,7 +161,7 @@ def section_started_L9(section_no, myResult:MyResult):
         mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglEW > {int(thsd(PRM[1]))} ]")
 
         Stkp.push( [(0,PRM[0]), (1,PRM[1]), (1,PRM[2])] )  
-        if normR > thsd(PRM[0]) and anglEW_ > thsd(PRM[1]):
+        if normR > thsd(PRM[0]) and anglEW > thsd(PRM[1]):
             # 右手首と左手首の移動ベクトルの長さが大きい場合（弓だおし開始）
             g.Step_counter += 1
             mylog.log(INFO, f">>>   [ counter == {int(PRM[2])} ]")
@@ -172,21 +172,21 @@ def section_started_L9(section_no, myResult:MyResult):
     # 9-''(弓倒し)  ->  0-Start
     elif section_no == 9:  
         mylog.log(INFO, f">>>   normK={int(normK)}({thsd.ratio(normK):.3f})")
-        mylog.log(INFO, f">>>   [ normK > {int(thsd(PRM[2]))} ]")
+        mylog.log(INFO, f">>>   [ normK > {int(thsd(PRM[3]))} ]")
 
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2])] )  
-        if normK > thsd(PRM[2]):
+        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
+        if normK > thsd(PRM[3]):
             # 右膝の移動ベクトルの長さが大きい場合（退場開始）
             g.Step_counter = 22
             started = True
         else:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} ]")
-            if normR > thsd(PRM[0]):
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglEW < {int(PRM[1])} ]")
+            if normR > thsd(PRM[0]) and anglEW < int(PRM[1]):
                 # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
                 g.Step_counter += 1
-                mylog.log(INFO, f">>>   [ counter == {int(PRM[1])} ]")
+                mylog.log(INFO, f">>>   [ counter == {int(PRM[2])} ]")
 
-                if (g.Step_counter%10) == PRM[1]:
+                if (g.Step_counter%10) == PRM[2]:
                     g.Step_counter = 30 
                     started = True
 
