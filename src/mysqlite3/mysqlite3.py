@@ -390,7 +390,7 @@ class MyDb:
         
         sql = 'select * from frame_info'
         if name is not None:
-            sql += f" where case_name='{name}'"
+            sql += f" where case_name like '%{name}%'"
         return pandas.read_sql_query(sql, con=self.conn)
 #
 # insert act_param table
