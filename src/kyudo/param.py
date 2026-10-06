@@ -99,11 +99,11 @@ CompleteAction_params = [
         [0.015, 0.015, 0.015, 75.0, 125.0, 0.8, 5, None],               # 1.足踏み
         [75.0, 125.0, 0.015, 2, 1, 0.035, 45.0,  -90.0, 3],             # 2.胴作り
         [0.015, 0.750, 5, 0.045, -45.0, None, None, None],              # 3.弓構え
-        [0.015, -30.0, 5, None, None, None, None, None],                # 4.打起こし
+        [0.010, -30.0, 5, None, None, None, None, None],                # 4.打起こし
         [0.010, 5, None, None, None, None, None, None],                 # 5.引分け
         [0.010, 0.010, 3, 0.045, 0.0, None, None, None],                # 6.会
         [2, None, None, None, None, None, None, None],                  # 7.離れ
-        [0.015, 2, None, None, None, None, None, None],                 # 8.残心
+        [0.015, 2, 0.035, 10.0, None, None, None, None],                # 8.残心
         [0.015, 75.0, 2, None, None, None, None, None],                 # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]               #10.共通
      ]
@@ -167,11 +167,11 @@ CompleteAction_params = [
         [0.015, 0.015, 0.015, 75.0, 125.0, 0.8, 5, None],               # 1.足踏み
         [75.0, 125.0, 0.015, 2, 1, 0.035, 45.0, -90.0, 3],              # 2.胴作り
         [0.015, 0.750, 5, 0.045, -45.0, None, None, None],              # 3.弓構え
-        [0.015, -30.0, 5, None, None, None, None, None],                # 4.打起こし
+        [0.010, -30.0, 5, None, None, None, None, None],                # 4.打起こし
         [0.010, 5, None, None, None, None, None, None],                 # 5.引分け
         [0.010, 0.010, 3, 0.045, 0.0, None, None, None],                # 6.会
         [2, None, None, None, None, None, None, None],                  # 7.離れ
-        [0.015, 2, None, None, None, None, None, None],                 # 8.残心
+        [0.015, 2, 0.035, 10.0, None, None, None, None],                # 8.残心
         [0.015, 75.0, 2, None, None, None, None, None],                 # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]               #10.共通
      ]
@@ -261,7 +261,7 @@ StartAction_params = [
         [0.045, 1, None, None, None, None, None, None],                 # 6.会
         [3, None, None, None, None, None, None, None],                  # 7.離れ
         [0.020, 0.0, 3, None, None, None, None, None],                  # 8.残心
-        [0.035, 10.0, 5, 0.035, None, None, None, None],                # 9.弓倒し
+        [0.035, 0.0, 45.0, 3, 0.035, None, None, None, None],           # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]               #10.共通
      ]
     },          
@@ -287,7 +287,7 @@ StartAction_params = [
      'act': 1,
      'param': [
         [0.120, 0.140, None, None, None, None, None, None],          # 0.
-        [0.080, 2, None, None, None, None, None, None],              # 1.足踏み
+        [0.080, 2, None, None, None, None, None, None],              # 1.足踏
         [0.035, 0.035, 3, None, None, None, None, None],             # 2.胴作り
         [0.025, 0.025, 3, None, None, None, None, None],             # 3.弓構え
         [0.015, 0.015, -45.0, 45.0, 2, None, None, None],            # 4.打起こし
@@ -329,7 +329,7 @@ StartAction_params = [
         [0.045, 1, None, None, None, None, None, None],                 # 6.会
         [3, None, None, None, None, None, None, None],                  # 7.離れ
         [0.020, 0.0, 3, None, None, None, None, None],                  # 8.残心
-        [0.035, 10.0, 5, 0.035, None, None, None, None],                # 9.弓倒し
+        [0.035, 0.0, 45.0, 3, 0.035, None, None, None, None],           # 9.弓倒し
         [0.900, None, None, None, None, None, None, None]               #10.共通
      ]
     }              
@@ -355,6 +355,7 @@ Alart_Daisan = 40     # 「大三移行不安定」のアラートID
 Alart_KaiNasi = 50    # 「会なし離れ」のアラートID
 Alart_KaiFusoku = 60  # 「会不十分な離れ」のアラートID
 Alart_Hanare = 70     # 「離れタイミングずれ」のアラートID
+Alart_zansin = 80     # 「残心静止なし」のアラートID
 #
 Alart_msg = {
    0:'',
@@ -371,21 +372,23 @@ Alart_msg = {
    60:'Warning:Detected illegal action in section-6.(KAI fusoku)',
    600:'<警告>：「会不十分な離れ」を検知しました。',
    70:'Warning:Detected illegal action in section-7.(Timing un-match)',
-   700:'<警告>：「弓手押しタイミングの遅れ」を検知しました。'
+   700:'<警告>：「弓手押しタイミングの遅れ」を検知しました。',
+   80:'Warning:Detected illegal action in section-8.(SEISI fusoku)',
+   800:'<警告>：「残心静止不十分」を検知しました。'
 }
 #
 # 評価の減点条件のパラメータ定義
 #
 Diduct_params = {
     #  key_name: ( (operator, value, deduction_score), 'message.unit')
-    's4_rl_angle': (('>',10.0, 1),  '矢の傾きが大きい.度'),         # 矢が水平でない場合に減点する
-    's4_rl_angle': (('<',-10.0, 1), '矢の傾きが大きい.度'),         # 矢が水平でない場合に減点する
-    's5_pull_rate': (('>',0.65, 2),   '引き優位.%'),               # 引きの割合がこの値を超える場合に減点する
-    's6_split_tm': (('<',2.0, 2),   '会の保持時間が短い.秒'),       # 会の時間がこの値未満の場合に減点する
-    's6_split_tm': (('<',1.0, 3),   '会の保持時間が短い.秒'),       # 会の時間がこの値未満の場合に減点する
-    's8_split_tm': (('<',1.5, 2),   '残身の保持時間が短い.秒'),     # 残身の時間がこの値未満の場合に減点する
-    's8_split_tm': (('<',1.0, 3),   '残身の保持時間が短い.秒'),     # 残身の時間がこの値未満の場合に減点する
-    's8_sl_angle': (('>',5.0, 1),   '弓手の下がりが大きい.度')      # 弓手の下がりがこの値を超える場合に減点する
+    'F4_rl_angle': (('>',10.0, 1),  '矢の傾きが大きい.度'),         # 矢が水平でない場合に減点する
+    'F4_rl_angle': (('<',-10.0, 1), '矢の傾きが大きい.度'),         # 矢が水平でない場合に減点する
+    'F5_pull_rate': (('>',0.65, 2),   '引き優位.%'),               # 引きの割合がこの値を超える場合に減点する
+    'F6_split_tm': (('<',2.0, 2),   '会の保持時間が短い.秒'),       # 会の時間がこの値未満の場合に減点する
+    'F6_split_tm': (('<',1.0, 3),   '会の保持時間が短い.秒'),       # 会の時間がこの値未満の場合に減点する
+    'F8_split_tm': (('<',1.5, 2),   '残身の保持時間が短い.秒'),     # 残身の時間がこの値未満の場合に減点する
+    'F8_split_tm': (('<',1.0, 3),   '残身の保持時間が短い.秒'),     # 残身の時間がこの値未満の場合に減点する
+    'F8_sl_angle': (('>',5.0, 1),   '弓手の下がりが大きい.度')      # 弓手の下がりがこの値を超える場合に減点する
 }
 #
 # eof
