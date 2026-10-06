@@ -627,6 +627,7 @@ function kyudo {
         [switch]$help,
         [switch]$h,
         [string]$list='',
+        [string]$name='',
         [string]$delete,
         [string]$rename='',
         [string]$to='',
@@ -661,7 +662,7 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list	case|case_name|key|pt                     ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
+        write-output '>kyudo  -list	case [-name <部分名>]|case_name|key|pt    ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
@@ -684,7 +685,7 @@ function kyudo {
         }
         elseif ( $list -eq 'case' ) {
             # 登録済ケース名一覧表示（詳細）
-            python ./src/kyudoApp.py  $dbg_option -case -L
+            python ./src/kyudoApp.py  $dbg_option -case -L $name
         }
         elseif ( $list -eq 'case_name' ) {
             # 登録済ケース名一覧表示

@@ -140,9 +140,15 @@ def main():
 
     if len(case_names) > 0 and case_names[0].upper() == '-L':
         # 登録済ケースの一覧表示
-        fdf = db.pandas_read_frame()
+        like_str:str = None
+        if case_names[0] == '-L':
+            opt_vals, _ = get_opt_values(args, '-L')
+            if len(opt_vals) > 0 :      # 指定文字列の部分一致で検索する 
+                like_str = opt_vals[0]
+        
+        fdf = db.pandas_read_frame(like_str)
         print(f"[kyudoApp]info:{fdf.shape}")
-        rows, cols = fdf.shape
+        rows, _ = fdf.shape
         for i in range(0, rows):
             if case_names[0] == '-L':
                 print(f"----({i+1})----")
