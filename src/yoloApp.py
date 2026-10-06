@@ -302,7 +302,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
                 face_front = 2
 
         # 右手首移動量の勾配（指数平滑移動平均）を計算する
-        _, rw_grad = keyPoints.get_grad(rw_norm)
+        _, rw_grad = keyPoints.Get_grad(rw_norm)
 
         # 解析データリストを作成
         data_list = [box_id, box_conf, box_w, box_h,\
@@ -366,7 +366,7 @@ def edit_key_mode(frame_height, iwait, out_file, videoWriteEnabled, raw_video, c
 #
 def edit_key_ope(out_file, raw_video, clip_video):
  
-        ope_str = '(q)uit:(p)ause:(<)back:(>)forward:(k)fast:(l)slow:(s)nap'
+        ope_str = '(q)uit:(p)ause:(<)back:(>)forward:(k)fast:(l)slow'
         if out_file != '':  ope_str += ':(w)rite'
         if Tracking_only:   ope_str += ':(t)racking'
         if Update_tracking: ope_str += ':(u)pdate-tracking'
@@ -2025,8 +2025,20 @@ def main():
                 preResult.clear()
                 annotated_frame = frame
             else:
-                myResult.draw_line = draw_kpt_no
+                if myResult.conf('right_wrist') < 0.9:
+                    mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):手首の信頼度が低いため、直近の検出結果で描画")
+                    myResult = preResult.get(None) if preResult.len() > 0 else None
+                    if myResult is None: continue
+                '''
+                    #myResult.Skip_count_up()
+                    #continue
+                
+                else:
+                    for i in range( myResult.Get_skip_count() ):
+                        prePointsBuffer.append( myResult )                        
+                '''
                 # 検出結果をフレームに描画
+                myResult.draw_line = draw_kpt_no
                 if manual_plot:
                     # 補正用の直近リングバッファに保存
                     preResult.append( myResult )

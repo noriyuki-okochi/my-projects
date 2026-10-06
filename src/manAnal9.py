@@ -33,7 +33,7 @@ def section_started_L9(section_no, myResult:MyResult):
     PRM = StartAction_param['param'][10]                                # 10は共通の開始条件     
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
-    gradR, _ = keyPoints.get_grad(normR)                             # 右手首の移動量の勾配を計算
+    gradR, _ = keyPoints.Get_grad(normR)                             # 右手首の移動量の勾配を計算
     
     if conf < PRM[0] and (section_no > 0 and section_no < 8):
         # 右手首の信頼度が低い
@@ -174,19 +174,19 @@ def section_started_L9(section_no, myResult:MyResult):
         mylog.log(INFO, f">>>   normK={int(normK)}({thsd.ratio(normK):.3f})")
         mylog.log(INFO, f">>>   [ normK > {int(thsd(PRM[3]))} ]")
 
-        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
-        if normK > thsd(PRM[3]):
+        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3]), (4,PRM[4])] )  
+        if normK > thsd(PRM[4]):
             # 右膝の移動ベクトルの長さが大きい場合（退場開始）
             g.Step_counter = 22
             started = True
         else:
-            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglEW < {int(PRM[1])} ]")
-            if normR > thsd(PRM[0]) and anglEW < int(PRM[1]):
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[0]))} and anglR < {int(PRM[1])} and anglSW < {int(PRM[2])} ]")
+            if normR > thsd(PRM[0]) and anglR < int(PRM[1]) and anglSW < int(PRM[2]):
                 # 右手首の移動ベクトルの長さが大きい場合（矢つがえ開始）
                 g.Step_counter += 1
-                mylog.log(INFO, f">>>   [ counter == {int(PRM[2])} ]")
+                mylog.log(INFO, f">>>   [ counter == {int(PRM[3])} ]")
 
-                if (g.Step_counter%10) == PRM[2]:
+                if (g.Step_counter%10) == PRM[3]:
                     g.Step_counter = 30 
                     started = True
 
@@ -228,7 +228,7 @@ def section_completed_L9(section_no, myResult:MyResult):
     PRM = CompleteAction_param['param'][10]    # 10は共通の開始条件 
     conf = keyPoints.conf('right_wrist')                                # 右手首の座標の信頼度
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
-    gradR, _ = keyPoints.get_grad(normR)                                # 右手首の移動量の勾配を計算
+    gradR, _ = keyPoints.Get_grad(normR)                                # 右手首の移動量の勾配を計算
 
     if conf < PRM[0]  and (section_no > 1 and section_no < 9):
         # 右手首の信頼度が低い
@@ -419,7 +419,7 @@ def section_completed_L9(section_no, myResult:MyResult):
     # 8-Zan-shin    
     elif section_no == 8:  
         mylog.log(INFO, f">>>   [ normR < {int(thsd(PRM[0]))} ]")
-        Stkp.push( [(0,PRM[0]), (1,PRM[1])] )  
+        Stkp.push( [(0,PRM[0]), (1,PRM[1]), (2,PRM[2]), (3,PRM[3])] )  
         if normR < thsd(PRM[0]) :
             # 右手首と左手首の移動ベクトルの長さが50以下の場合（姿勢の保持で完了）
             g.Step_counter = g.Step_counter + 1
@@ -427,6 +427,12 @@ def section_completed_L9(section_no, myResult:MyResult):
 
             if g.Step_counter == PRM[1]:  
                 completed = True
+        else:
+            mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[2]))} and anglEW > {int(PRM[3])} ]")
+            if normR > thsd(PRM[2]) and anglEW > int(PRM[3]):
+                # 右手首の移動ベクトルの長さが大きい場合（弓倒し開始）
+                g.Alart_id = Alart_zansin
+                g.Step_error = True
 
     elif section_no == 9:  
         if g.Step_counter == 0:
@@ -497,6 +503,7 @@ def manual_analize_completed_L9(section_no, myResult:MyResult):
             if g.Alart_id == Alart_Monomi: g.Section_no = 4         # 物見なしで打ちおこしの場合
             if g.Alart_id == Alart_KaiNasi: g.Section_no = 7        # 会なしで離れた場合
             if g.Alart_id == Alart_KaiFusoku: g.Section_no = 7      # 会不十分で離れた場合
+            if g.Alart_id == Alart_zansin: g.Section_no = 9         # 残心静止なしで弓倒しの場合
             if g.Alart_id != Alart_Daisan:                          # 大三不安定の場合、リセットしない
                 g.Step_counter = 0
                 g.Nop_counter = 0

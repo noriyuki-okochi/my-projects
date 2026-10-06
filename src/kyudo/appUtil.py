@@ -165,7 +165,8 @@ class BoundaryBoxError(Exception):
 class MyResult(Keypoint):
     MaxBox_id:int = None
     XYWH:int = [None, None, None, None]
-    Skip:bool = False
+    Skip:bool = False                               # 対象ボックスが見つからなかった場合にTrue
+    Skip_count:int = 0                              # スキップした右手首の信頼度が低いフレームのカウンタ
     Pre_norm:float = 0.0                            # 右手首の移動量（直前の値）
     Ring_grad:RingBuffer = RingBuffer(Ema_size)     # 右手首の移動量勾配のリングバッファ
     # キーポイントの接続ラインを定義
@@ -366,7 +367,7 @@ class MyResult(Keypoint):
         return norm/MyResult.XYWH[3]        # 距離をボックスの高さで正規化して返す
     
     # 直前の移動量との勾配、指数平滑移動平均を計算する関数
-    def get_grad(self, now_norm):
+    def Get_grad(self, now_norm):
         # 直前の移動量との差分を計算
         grad = now_norm - MyResult.Pre_norm
         MyResult.Pre_norm = now_norm 
@@ -377,6 +378,15 @@ class MyResult(Keypoint):
         pdf['ema'] = pdf['buffer'].ewm(span=Ema_size, adjust=False).mean()  
         return grad, pdf['ema'].iloc[-1]
 
+    def Skip_count_up(self):
+        MyResult.Skip_count += 1
+        return MyResult.Skip_count
+    
+    def Get_skip_count(self):
+        count = MyResult.Skip_count
+        MyResult.Skip_count = 0
+        return count
+    
     # キーポイントの接続ライン（腕、胴、目）を描画する関数
     def plot3(self, annotated_frame):        
         # キーポイントの接続ラインを描画
@@ -786,18 +796,20 @@ class MyEval:
     # 評価点数の減算条件をチェックして減点数を計算する    
     def check_deduction(self, section: int):
         deduction = 0
-        if self.lv_no == 9:
-            return deduction  # レベル9（Right-side）の場合、警告の有無をパスする（暫定）
         
         if self.eval['alart_cnt'] > 0:
             # 警告の有無をチェックして減点する
             deduction += Eval_alart_deduction
-            mlog.log(INFO, f"[check_deduction]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")            
+            mlog.log(INFO, f"[check_deduction]: section({section}) alart_cnt={self.eval['alart_cnt']}  deduction={Eval_alart_deduction}")                    
         #
         # セクションごとの減点条件をチェックして減点数を計算する        
         bRet = False
+        c_f = 'R' if self.lv_no == 9 else 'F'  # レベル9（Right-side）の場合、減点条件のキー名の先頭を'R'にする
         c_key, c_msg, c_ope, c_value = '', '', '', 0
-        for key_nm, data in Diduct_params.items():  # key_nm: 's<section_no>_<key of check data>'
+        for key_nm, data in Diduct_params.items():  # key_nm: '{F|R}<section_no>_<key of check data>'
+            if key_nm[0] != c_f: 
+                # key_nmの形式が'<c_f><section_no>_<key>'でない場合はスキップ
+                continue  
             sect_no = int(key_nm[1])                # セクション番号を取得（例: 's8_rl_angle' -> 8）
             key = key_nm[3:]                        # 評価データのキーを取得（例: 's8_rl_angle' -> 'rl_angle'）
             if sect_no == section:
