@@ -689,7 +689,7 @@ function kyudo {
         }
         elseif ( $list -eq 'case_name' ) {
             # 登録済ケース名一覧表示
-            python ./src/kyudoApp.py  $dbg_option -case -l
+            python ./src/kyudoApp.py  $dbg_option -case -l  $name
         }
         elseif ( $list -eq 'pt' ) {
             # 作成済モデルファイル一覧表示
