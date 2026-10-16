@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 from copy import copy 
 import numpy as np
-import pandas as pd
 import copy
 
 # local package
@@ -80,9 +79,10 @@ Add_beta:float = 1.0 - Add_alpha
 # YOLOv8-poseモデルは、Ultralyticsの事前学習済みモデルを使用しています。
 def help():
     print(" --- command ---")
-    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-clip|-multi [[<frame1_no>],[<frame2_no>] [-H]|-r|{-m|-t|-u} <case_name>]\n"\
+    print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-multi [<frame1_no>[,<frame2_no>] [-H]]\n"\
+        + "                         [{-clip|-r} [-rortate]|-m|{-t|-u|-e} <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
-        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-rortate] [-w [<fps>]] [-z]\n"\
+        + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
         + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [-at <frame_no>] [--]")
@@ -101,6 +101,7 @@ def help():
     print(" -multi(-video-layer display):<framex_no>::frame-counter or <section-no>.<step-counter>,'-H'::Horizontal concat")
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
+    print(" -e(mploy tracking_data in table)")
     print(" -f(rame-count) and lag for sampling data: default=1.7")
     print(" -W(window-size::ring-buffer-size: default=8)")
     print(" -V(8-pose model-file):default=v8s")
@@ -123,8 +124,9 @@ def help():
     print(" w :出力ファイルへの書き込み開始／停止")
     print(" t :トラッキング開始／停止（姿勢解析開始後、有効）")
     print(" u :トラキングデータのDB更新")
-    print(" b :トラッキング動作完了のタグ更新（'-u'時、有効）")
-    print(" n :トラッキング動作開始（節移行）のタグ更新（'-u'時、有効）")
+    #print(" b :トラッキング動作完了のタグ更新（'-u'時、有効）")
+    #print(" n :トラッキング動作開始（節移行）のタグ更新（'-u'時、有効）")
+    print(" b :blind-modeの切り替え")
     print(" a :ログファイルへのアテンションメッセージ出力")
     print(" I :アクティブな動作解析パラメータのDB登録（'-m'時、有効）")
     print(" f :パラメータ（実数値）入力開始：(0-9.)[,(0-9.)]...:'m'キー押下で終了")
@@ -138,8 +140,8 @@ def help():
     print(" G :グリッド表示シフト（シフト量は数値入力キー’i’で指定：：(0|1)(グリッド幅の割合<分子><分母>)）")
     print(" 0 :姿勢解析開始")
     print(" 1-8:節の開始")
-    print(" Sp:節の完了移行")
-    print(" Tb:次節の完了")
+    print(" SP:節の完了移行")
+    print(" TB:次節の完了")
     print(" k(K) :再生速度アップ")
     print(" l(L) :再生速度ダウン")
     print(" p :一時停止／再開")
@@ -222,7 +224,7 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         # トラッキングデータ
         for name, idx in Kn2idx.items():
             key_id = idx
-            if idx > 12: continue
+            #if idx > 12: continue          # 2026/10/16 全キーポイントに拡張
             
             key_name = name
             x = keyPoints.points[idx][0]                    # キーポイントX座標(Numpy)
@@ -1082,18 +1084,21 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
             
         elif ctl['at_section'] < 19: ctl['at_section'] += 1
         else: ctl['at_section'] = 1
-                    
+
     elif key == ord('n') and Update_tracking:
         # 節の動作開始（次の節へ移行）を更新
-        ctl['tag2_section'] += 1 
-        Db.update_tracking_tag( 'tag2', ctl['tag2_section'] )  
-        print(f"tag2登録(n): value={ctl['tag2_section']}")
-
+        #ctl['tag2_section'] += 1 
+        #Db.update_tracking_tag( 'tag2', ctl['tag2_section'] )  
+        #print(f"tag2登録(n): value={ctl['tag2_section']}")
+        pass
     elif key == ord('b') and Update_tracking:
         # 節の動作完了を登録
-        Db.update_tracking_tag( 'tag1', ctl['tag1_section'] )  
-        print(f"tag1登録(b): value={ctl['tag1_section']}")
-        ctl['tag1_section'] += 1 
+        #Db.update_tracking_tag( 'tag1', ctl['tag1_section'] )  
+        #print(f"tag1登録(b): value={ctl['tag1_section']}")
+        #ctl['tag1_section'] += 1
+        pass 
+    elif key == ord('b'):
+        ctl['blind_mode'] = True if not ctl['blind_mode'] else False  
         
     elif key == ord('a'):
         ctl['attention'] += 1
@@ -1244,6 +1249,7 @@ def main():
     clip_video = False                              # 生画像をクリップしてファイルを作成
     rotate_video = False                            # 動画を90度回転して表示するオプション
     manual_plot = False                             # 手動でプロット、姿勢解析するオプション
+    employ_tracking = False                         # DBのトラッキングデータ(keypoints)を採用する
     nn_gru = False                                  # GRUによる姿勢解析オプション
     multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     multi_fstart = [0, 0]                           # 2動画ファイルを重ねて再生する開始フレーム
@@ -1288,7 +1294,8 @@ def main():
         'zoom_rect': None,                          # ズーム領域
         'at_case': [None,None],                     # '-o'指定のケース名
         'at_section':0,                             # '-at'指定のセクション番号
-        'fps_ratio':1.0                             # '-w'指定の出力ファイルFPS算出係数
+        'fps_ratio':1.0,                            # '-w'指定の出力ファイルFPS算出係数
+        'blind_mode':False                          # '-b'指定のブラインドモード
     }
     # print command line(arguments)
     args = sys.argv
@@ -1491,19 +1498,23 @@ def main():
         manual_plot = True
         Update_tracking = True  # トラッキングを更新するオプション
         i = args.index('-u')
-    if Tracking_only or Update_tracking:
+    if not raw_video and ( '-e' in opts) :
+        manual_plot = True
+        employ_tracking = True  # DBのトラッキングデータを採用する
+        i = args.index('-e')
+    if Tracking_only or Update_tracking or employ_tracking:
         if i + 1 < len(args) and (not args[i + 1].startswith('-')):
             case_name = args[i + 1]  # ケース名を取得
             if len(case_name) == 0:
-                print("(-t)ケース名の指定がありません")
+                print("ケース名の指定がありません")
                 return
             Db.case_name = case_name   
             fps, _ = Db.get_fps()
-            if Update_tracking and fps is None:
+            if (Update_tracking or employ_tracking) and fps is None:
                 print(f"> '{case_name}' not found in frame_info table.")
                 return
         else:
-            print("(-t)ケース名の指定がありません")
+            print("ケース名の指定がありません")
             return
     #
     # トラッキングデータのケース名を設定
@@ -1962,6 +1973,14 @@ def main():
     preFrame = None                                     # 前回のフレームを保存する変数
     actStr = 'action :'
     ratio = frame_height/frame_width if frame_height < frame_width else frame_width/frame_height
+    #
+    if employ_tracking:
+        # トラッキングデータを採用する場合、DBからトラッキングデータを取得
+        results_df = Db.pandas_read_keypoints()
+        if results_df is None:
+            mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):トラッキングデータがありません")
+            return
+        print(f"[main]: case_name={Db.case_name}: results_df shape: {results_df.shape[0]} rows, {results_df.shape[1]} columns")
     # メインループ
     while True:
         # 次のフレームの読み込み
@@ -2010,13 +2029,20 @@ def main():
             #frame = adjust_frame_contrast(frame, alpha=1.8, beta=20)  # コントラストと明るさを調整
             #
             # YOLOで骨格検出
-            results = model.predict(frame)
-            if len(results) == 0 or len(results[0].keypoints) == 0:
-                mylog.log(INFO, "[main]検出結果がありません")
-                continue
-                        
-            # 面積最大のボックスを取得、信頼度の低いキーポイント座標データは前回採用データで置き換える
-            result = results[0]
+            if employ_tracking:
+                # トラッキングデータを採用する場合、DBからトラッキングデータを取得
+                result = employ_tracking_data(results_df, g.Frame_counter)
+                if result is None:
+                    mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):トラッキングデータがありません")
+                    continue
+            else:
+                results = model.predict(frame)
+                if len(results) == 0 or len(results[0].keypoints) == 0:
+                    mylog.log(INFO, "[main]検出結果がありません")
+                    continue
+                # 面積最大のボックスを取得、信頼度の低いキーポイント座標データは前回採用データで置き換える
+                result = results[0]
+                #mylog.log(INFO, f"[main]: result={result}")
             try:
                 myResult = MyResult(result, g.Frame_counter, manual_plot)
             except BoundaryBoxError as e:
@@ -2050,7 +2076,7 @@ def main():
                     if (g.Frame_counter%Sample_frames) == 0 or g.Frame_counter < Sample_frames:
                         # 検出結果（補正済）を保存 
                         prePointsBuffer.append( myResult )                        
-                        mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: {type(results)}, {len(results)}個の結果,"\
+                        mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: ,"\
                                     + f"フレーム={g.Frame_counter}, buffer_length={prePointsBuffer.length}")
 
                     # 生画像に手動（OpenCV）で描画
@@ -2080,15 +2106,14 @@ def main():
                         annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                                        
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
-        #
-        if keyCtl['grid']:
-            # グリッドを表示        
-            draw_grid(annotated_frame, keyCtl['grid_shape'], keyCtl['grid_shift'], GRAY, 1)
-        #
         if keyCtl['videoWrite']:
             # 出力ファイルに書き込み
             Cv2Video.write(annotated_frame)
         
+        if keyCtl['grid']:
+            # グリッドを表示        
+            draw_grid(annotated_frame, keyCtl['grid_shape'], keyCtl['grid_shift'], GRAY, 1)
+        #
         # ウィンドウに操作ガイダンスを表示
         if guidance is True:
             # キー操作モード
@@ -2131,9 +2156,14 @@ def main():
                 cv2.putText(annotated_frame, actStr, pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, WHITE, 1)            
         #    
         # ウィンドウに表示する   
-        cv2.imshow('YOLO Pose Detection', annotated_frame)
+        #
+        #if not keyCtl['blind_mode'] or g.Frame_counter < 2:
+            #print(f"[main]:{g.Frame_counter}:ブラインドモードのため、描画せずに次のフレームへ")
+            #continue  # ブラインドモードの場合は、描画せずに次のフレームへ
+        if not keyCtl['blind_mode']:
+            cv2.imshow('YOLO Pose Detection', annotated_frame)
         #print(f"({g.Frame_counter})")
-        #キー入力をチェックするする
+        #キー入力をチェックするする（1*iwaitミリ秒待つ）
         key = cv2.waitKey(keyCtl['iwait']) & 0xFF
         if key == -1: 
             # キー入力がない場合は次のフレームへ

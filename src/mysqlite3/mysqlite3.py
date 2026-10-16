@@ -352,6 +352,14 @@ class MyDb:
         sql = f"select * from tracking_data where key_id={key_id} and case_name='{self.case_name}'"
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
+#   read keypoints(return pandas-DataFrame)
+#       
+    def pandas_read_keypoints(self,  frame_no=None):
+        sql = f"select * from tracking_data where case_name='{self.case_name}' order by frame_no, key_id asc"
+        if frame_no is not None:
+            sql += f" and frame_no={frame_no}"
+        return pandas.read_sql_query(sql, con=self.conn, index_col='key_id')
+#
 #   read kyudo_data of each case_name(return pandas-DataFrame)
 #       
     def pandas_read_kyudo(self, cols=None, cases=None):

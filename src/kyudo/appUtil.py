@@ -10,6 +10,7 @@ from datetime import datetime
 import time
 from PIL import Image, ImageFont, ImageDraw
 import cv2
+import torch
 #
 # local package
 from  kyudo.env import * 
@@ -247,7 +248,8 @@ class MyResult(Keypoint):
         
         boxes = result.boxes    # 検出されたバウンディングボックスの取得
         max_box_no = 0          # ボックスの番号
-        mlog.log(DEBUG, f"[get_max_box]: {type(boxes)},{boxes.shape}:{len(boxes)}個のボックス")
+        #mlog.log(DEBUG, f"[get_max_box]: {type(boxes)},{boxes.shape}:{len(boxes)}個のボックス")
+        mlog.log(DEBUG, f"[get_max_box]: {type(boxes)}:{len(boxes)}個のボックス")
         
         # 最前面の物体を決定（面積が最も大きいものを選択）
         area = np.array([])
@@ -416,7 +418,60 @@ class MyResult(Keypoint):
                 else self.plot2(annotated_frame) if self.draw_line == 2 \
                 else self.plot1(annotated_frame)
 
+#
+# YOLOーResult疑似オブジェクト
+# 
+class myKeyPoints:
+    def __init__(self, box_max=1):
+        self.xy = [torch.Tensor() for _ in range(box_max)]
+        self.conf = [torch.Tensor() for _ in range(box_max)]
+    def __len__(self):
+        return len(self.xy)
+    
+class myBoxes:
+    def __init__(self, box_max=1):
+        self.xywh = [torch.Tensor() for _ in range(box_max)]
+        self.conf = [torch.Tensor() for _ in range(box_max)]    
+    def __len__(self):
+        return len(self.xywh)
+    
+class myResults:
+    def __init__(self, keypoints: myKeyPoints = None, boxes: myBoxes = None):
+        self.keypoints = keypoints if keypoints is not None else myKeyPoints()
+        self.boxes = boxes if boxes is not None else myBoxes()
+#
+# トラッキングデータをDBから取得し、YOLOーResultオブジェクトに変換する関数
+# 　results_df: トラッキングデータの全フレームデータ（DBから取得したデータフレーム）
+#   frame_no: 取得するフレーム番号
+def employ_tracking_data(results_df: pd.DataFrame, frame_no: int):
+    # 属性オブジェクトの初期作成
+    boxes = myBoxes(box_max=1)
+    keypoints = myKeyPoints(box_max=1)
+    
+    # 指定フレームのトラッキングデータを抽出
+    rslt_df = results_df[results_df['frame_no'] == frame_no] 
+    #print(f"[employ_tracking_data]: rslt_df shape: {rslt_df.shape[0]} rows, {rslt_df.shape[1]} columns")
+    if not rslt_df.empty:
+        key_max = rslt_df.shape[0]      # 抽出キーポイントの数を取得
+        # 属性オブジェクトboxesのtensorデータを設定
+        boxes.xywh[0] = torch.tensor( [0, 0, rslt_df.loc[0]['box_w'], rslt_df.loc[0]['box_h']] )
+        boxes.conf[0] = torch.tensor( [1.0] )
+        
+        # 属性オブジェクトkeypointsのtensorデータに設定するリストを作成
+        points_l = []
+        confs_l = []
+        for id in range(key_max):
+            points_l.append( [rslt_df.loc[id]['x'], rslt_df.loc[id]['y']] )
+            confs_l.append( rslt_df.loc[id]['xy_conf'] )
+            
+        keypoints.xy[0] = torch.tensor( points_l )
+        keypoints.conf[0] = torch.tensor( confs_l)
+        
+    # YOLOーResult疑似オブジェクトmuResultsを返す
+    return myResults(keypoints=keypoints, boxes=boxes) if not rslt_df.empty else None
+#
 ##    特徴量のデータフレームクラス
+#
 class FeaturePdf:
     # 入力データ次元数に応じた特徴量のカラム名リスト
     # ・env.py定義の読み込みリストの別名と一致させる
@@ -1234,7 +1289,7 @@ def rename_frame_info(db:MyDb, from_name, to_name):
             #print(f"[rename_frame_info]:info: {tbl}:{rcnt} records  deleted. {from_name}.")
             print(f"[rename_frame_info]:info: {tbl}:{rcnt} records  renamed from {from_name} to {to_name}.")
         #
-    return None            
+    return None   
 #
 # 評価データの表示関数
 # db: MyDbデータベースオブジェクト
