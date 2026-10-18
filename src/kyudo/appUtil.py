@@ -62,6 +62,8 @@ class RingBuffer:
         
     def len(self):
         return self.length
+    def __len__(self):
+        return self.length
     
     def to_pdf(self):
         # リングバッファの内容をデータフレームに変換して返す
@@ -87,6 +89,8 @@ class StackActParam:
     def clear(self):
         self.pars = []
     def len(self):
+        return len(self.pars)
+    def __len__(self):
         return len(self.pars)
     
 # 動作解析パラメータ設定用のスタック   
