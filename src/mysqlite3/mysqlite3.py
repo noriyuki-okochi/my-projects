@@ -32,7 +32,7 @@ class MyDb:
         self.csvpath2 = ''        # kyudo_data用CSV出力ファイルパス
         self.csvfile2 = None
         
-    def open_csv(self):
+    def open_csv(self, manual = True):
         # CSV出力ファイルの作成
         timestamp = datetime.now().strftime('%Y%m%d')
         self.csvpath1 = self.dbpath[:self.dbpath.rfind('/')+1] + f"track{timestamp}_{self.case_name}.csv"
@@ -45,25 +45,26 @@ class MyDb:
         self.csvfile1.write(names)
         self.csvfile1.flush()
 
-        self.csvpath2 = self.dbpath[:self.dbpath.rfind('/')+1] + f"kyudo{timestamp}_{self.case_name}.csv"
-        self.csvfile2 = open( self.csvpath2, 'w')
-        # カラム名を出力
-        names ="case_name,frame_no,"\
-            +  "box_id,box_conf,box_w,box_h,"\
-            +  "rw_norm,rw_angle,"\
-            +  "lw_norm,lw_angle,"\
-            +  "rl_norm,rl_angle,"\
-            +  "hr_norm,hr_angle,"\
-            +  "sr_norm,sr_angle,"\
-            +  "sl_norm,sl_angle,"\
-            +  "rew_angle,rse_angle,"\
-            +  "lew_angle,lse_angle,"\
-            +  "eyes_norm,hips_norm,"\
-            +  "rw_grad,"\
-            +  "tag1,tag2,"\
-            +  "section,completed,label,inserted_at,time_epoch\n"
-        self.csvfile2.write(names)
-        self.csvfile2.flush()
+        if manual:
+            self.csvpath2 = self.dbpath[:self.dbpath.rfind('/')+1] + f"kyudo{timestamp}_{self.case_name}.csv"
+            self.csvfile2 = open( self.csvpath2, 'w')
+            # カラム名を出力
+            names ="case_name,frame_no,"\
+                +  "box_id,box_conf,box_w,box_h,"\
+                +  "rw_norm,rw_angle,"\
+                +  "lw_norm,lw_angle,"\
+                +  "rl_norm,rl_angle,"\
+                +  "hr_norm,hr_angle,"\
+                +  "sr_norm,sr_angle,"\
+                +  "sl_norm,sl_angle,"\
+                +  "rew_angle,rse_angle,"\
+                +  "lew_angle,lse_angle,"\
+                +  "eyes_norm,hips_norm,"\
+                +  "rw_grad,"\
+                +  "tag1,tag2,"\
+                +  "section,completed,label,inserted_at,time_epoch\n"
+            self.csvfile2.write(names)
+            self.csvfile2.flush()
             
 
     def rollback(self):

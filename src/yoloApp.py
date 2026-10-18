@@ -80,7 +80,7 @@ Add_beta:float = 1.0 - Add_alpha
 def help():
     print(" --- command ---")
     print(" python ./src/yoloApp.py {-c [<id>]|-a|-o <case1_name>[,<case2_name>]} [-multi [<frame1_no>[,<frame2_no>] [-H]]\n"\
-        + "                         [{-clip|-r} [-rortate]|-m|{-t|-u|-e} <case_name>]\n"\
+        + "                         [{-clip|-r} [-rortate] [-m [{-t|-u} <case_name>] [-e <case_name>]\n"\
         + "                         [-gru <model-path> [inputkey=6|7|8]] [classes=3|19]] [-s<step-no>]\n"\
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
@@ -208,7 +208,7 @@ def get_camera_pos(myResult):
     return CameraPos_name[ipos]
 #
 # 解析結果をトラッキングする関数              
-def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=True, calc=False):
+def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf=None, output_dim=0, csvout=True, calc=False):
     boxes = myResult.boxes                              # バウンダリーボックスリスト(Tensor)
     box_id = myResult.boxid
     
@@ -225,7 +225,6 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
         for name, idx in Kn2idx.items():
             key_id = idx
             #if idx > 12: continue          # 2026/10/16 全キーポイントに拡張
-            
             key_name = name
             x = keyPoints.points[idx][0]                    # キーポイントX座標(Numpy)
             y = keyPoints.points[idx][1]                    # キーポイントY座標(Numpy)
@@ -239,10 +238,11 @@ def tracking_result( myResult:MyResult ,inputPdf:FeaturePdf, output_dim, csvout=
             Db.csvfile1.flush()
 
         # 姿勢解析データ
-        data_list = inputPdf.get_kyudo_data_list()
-        # CSVファイルに書き込み
-        Db.outcsv_kyudo_data( data_list, output_dim )  
-        Db.csvfile2.flush()
+        if inputPdf is not None:
+            data_list = inputPdf.get_kyudo_data_list()
+            # CSVファイルに書き込み
+            Db.outcsv_kyudo_data( data_list, output_dim )  
+            Db.csvfile2.flush()
     else:    
         # 姿勢解析・評価データ
         rw_norm, rw_angle = arrow[Kn2idx['right_wrist']]                    # 右手首移動ベクトルの長さと角度
@@ -1410,7 +1410,8 @@ def main():
             return
         print(f"[main]:開始フレーム={multi_fstart}")
        
-    if not raw_video and ('-m' in opts):            # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
+    # 手動（OpenCV）で解析データをプロット、姿勢解析するオプション
+    if not raw_video and ('-m' in opts):            
         manual_plot = True
 
     # キーポイントの描画形式番号を指定する
@@ -1430,6 +1431,9 @@ def main():
     _, _, _, _, section_dim, completed_dim = Hyper_parameters
         
     if not raw_video and ('-gru' in opts):          # GRUで姿勢解析するオプション
+        if not manual_plot:
+            print(f"[main]:'-m'オプションが指定されていません。'-m'オプションを指定してください。")
+            return                
         nn_gru = True
         opt_vals, _ = get_opt_values(args, '-gru')
         if len(opt_vals) > 0: model_pth = opt_vals[0]
@@ -1486,40 +1490,66 @@ def main():
                 print("クラス数は3か19のどちらかで指定してください")
                 return
     
+    # 登録済みのトラッキングデータを採用するオプション
+    if not raw_video and ( '-e' in opts) :
+        if draw_kpt_no == 0:
+            print("キーポイント描画形式番号(kpt)は1～3の範囲で指定してください")
+            return
+        employ_tracking = True  # DBのトラッキングデータを採用する
+        names, _ = get_opt_values(args, '-e')
+        if len(names) > 0: 
+            case_name_e = names[0]
+            fps, _ = Db.get_fps(case_name_e)
+            if (Update_tracking or employ_tracking) and fps is None:
+                print(f"> '{case_name_e}' not found in frame_info table.")
+                return            
+        else:
+            print("ケース名の指定がありません")
+            return
+
+    # 解析トラッキングデータをCSV出力するオプション
     if not raw_video and ( '-t' in opts) :
-        manual_plot = True
         Tracking_only = True                            # トラッキングのみを行うオプション
         Eval_enabled = True                             # 評価用のデータ作成をセット
         # トラッキングデータリストのインスタンス作成
         if not nn_gru: 
             InputPdf = FeaturePdf(input_key, seq_frames)
         i = args.index('-t')
+        
+    # 登録済みのトラッキングデータを更新するオプション
     if not raw_video and ( '-u' in opts) :
-        manual_plot = True
-        Update_tracking = True  # トラッキングを更新するオプション
+        if not manual_plot:
+            print(f"[main]:'-m'オプションが指定されていません。'-m'オプションを指定してください。")
+            return                
+        Update_tracking = True  
         i = args.index('-u')
-    if not raw_video and ( '-e' in opts) :
-        manual_plot = True
-        employ_tracking = True  # DBのトラッキングデータを採用する
-        i = args.index('-e')
-    if Tracking_only or Update_tracking or employ_tracking:
+
+    if Tracking_only or Update_tracking:
         if i + 1 < len(args) and (not args[i + 1].startswith('-')):
             case_name = args[i + 1]  # ケース名を取得
             if len(case_name) == 0:
                 print("ケース名の指定がありません")
                 return
-            Db.case_name = case_name   
-            fps, _ = Db.get_fps()
-            if (Update_tracking or employ_tracking) and fps is None:
+            fps, _ = Db.get_fps(case_name)
+            if Update_tracking  and fps is None:
                 print(f"> '{case_name}' not found in frame_info table.")
                 return
         else:
             print("ケース名の指定がありません")
             return
+        
+    # トラッキングデータを採用する場合、DBからトラッキングデータを取得
+    if employ_tracking:
+        Db.case_name = case_name_e
+        results_df = Db.pandas_read_keypoints()
+        if results_df is None or results_df.shape[0] == 0:
+            print(f"[main]: '{case_name_e}' のトラッキングデータがありません")
+            return
+        print(f"[main]: loaded tracking_data.:case_name={Db.case_name}: results_df shape: {results_df.shape[0]} rows, {results_df.shape[1]} columns")
     #
     # トラッキングデータのケース名を設定
     if Tracking_only: 
-        fps, x = Db.get_fps()
+        fps, x = Db.get_fps(case_name)
         if fps is not None:
             print(f"> '{case_name}' already registered. Are you sure?[y/n].")
             ans = input('>>')
@@ -1728,8 +1758,12 @@ def main():
     #
     if Tracking_only:
         # トラッキングデータ、姿勢解析データの出力先CSVファイルを開く
-        Db.open_csv()
-        Eval.open_csv(case_name, step_no, Db.csvpath1)
+        Db.case_name = case_name
+        Db.open_csv(manual_plot)
+        if manual_plot:
+            Eval.open_csv(case_name, step_no, Db.csvpath1)
+        else:
+            step_no = '_'
         # トラッキングデータの情報テーブルに登録 
         img_file = os.path.basename(file_name[0])        # 'memo'に初期設定する画像ファイル名を取得
         hybrid = 'hybrid' if nn_gru else ''
@@ -1947,7 +1981,7 @@ def main():
         cap[0].set(cv2.CAP_PROP_POS_FRAMES, g.Frame_counter)
     #
     # ウィンドウの更新間隔とキー入力待ち時間の初期値を設定
-    if raw_video is True:
+    if raw_video is True or employ_tracking is True:
         keyCtl['iwait_init'] = int(1/Fps * 1000) + 1  # 生画像を表示する場合、FPS値からキー入力待ち時間を設定
     else: 
         keyCtl['iwait_init'] = 1
@@ -1974,14 +2008,9 @@ def main():
     actStr = 'action :'
     ratio = frame_height/frame_width if frame_height < frame_width else frame_width/frame_height
     #
-    if employ_tracking:
-        # トラッキングデータを採用する場合、DBからトラッキングデータを取得
-        results_df = Db.pandas_read_keypoints()
-        if results_df is None:
-            mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):トラッキングデータがありません")
-            return
-        print(f"[main]: case_name={Db.case_name}: results_df shape: {results_df.shape[0]} rows, {results_df.shape[1]} columns")
+    #
     # メインループ
+    #
     while True:
         # 次のフレームの読み込み
         ret, frame = cap[0].read()
@@ -2027,15 +2056,17 @@ def main():
         else:
             # フレームのコントラストと明るさを調整
             #frame = adjust_frame_contrast(frame, alpha=1.8, beta=20)  # コントラストと明るさを調整
+            
             #
-            # YOLOで骨格検出
+            # 姿勢解析データの検出
             if employ_tracking:
-                # トラッキングデータを採用する場合、DBからトラッキングデータを取得
+                # DBから検出済のトラッキングデータを取得
                 result = employ_tracking_data(results_df, g.Frame_counter)
                 if result is None:
                     mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):トラッキングデータがありません")
                     continue
             else:
+                # YOLOで骨格検出
                 results = model.predict(frame)
                 if len(results) == 0 or len(results[0].keypoints) == 0:
                     mylog.log(INFO, "[main]検出結果がありません")
@@ -2044,6 +2075,7 @@ def main():
                 result = results[0]
                 #mylog.log(INFO, f"[main]: result={result}")
             try:
+                # 検出結果をMyResultクラスに変換する
                 myResult = MyResult(result, g.Frame_counter, manual_plot)
             except BoundaryBoxError as e:
                 print(f"フレーム({g.Frame_counter}):{e}")
@@ -2055,35 +2087,28 @@ def main():
                     mylog.log(INFO, f"[main]:フレーム({g.Frame_counter}):手首の信頼度が低いため、直近の検出結果で描画")
                     myResult = preResult.get(None) if preResult.len() > 0 else None
                     if myResult is None: continue
-                '''
-                    #myResult.Skip_count_up()
-                    #continue
+
+                # 補正用の直近リングバッファに保存
+                preResult.append( myResult )
                 
-                else:
-                    for i in range( myResult.Get_skip_count() ):
-                        prePointsBuffer.append( myResult )                        
-                '''
-                # 検出結果をフレームに描画
-                myResult.draw_line = draw_kpt_no
+                # {Sample_frames}フレーム毎に検出結果を保存
+                if (g.Frame_counter%Sample_frames) == 0 or g.Frame_counter < Sample_frames:
+                    # 検出結果（補正済）を保存 
+                    prePointsBuffer.append( myResult )                        
+                    mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: ,"\
+                                + f"フレーム={g.Frame_counter}, buffer_length={prePointsBuffer.length}")
+                # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
+                myResult.calc_arrow_length_angles(prePointsBuffer)
+
+                # 生画像に手動（OpenCV）で描画
+                if Tracking_only or Update_tracking: 
+                    Db.frame_no = g.Frame_counter     # トラッキングデータのフレーム番号を設定  
+
+                # 検出結果をフレームに描画するキーポイントを指定する
+                myResult.draw_line = draw_kpt_no                
+                    
                 if manual_plot:
-                    # 補正用の直近リングバッファに保存
-                    preResult.append( myResult )
-                    
-                    # キーポイントの過去サンプリング位置からの変位ベクトルの長さ、角度を計算する    
-                    myResult.calc_arrow_length_angles(prePointsBuffer)
-
-                    # {Sample_frames}フレーム毎に検出結果を保存
-                    if (g.Frame_counter%Sample_frames) == 0 or g.Frame_counter < Sample_frames:
-                        # 検出結果（補正済）を保存 
-                        prePointsBuffer.append( myResult )                        
-                        mylog.log(DEBUG, f"[main]: {datetime.now().strftime('%H-%M-%S')}:検出結果保存: ,"\
-                                    + f"フレーム={g.Frame_counter}, buffer_length={prePointsBuffer.length}")
-
-                    # 生画像に手動（OpenCV）で描画
                     # 射法八節の姿勢解析を実行
-                    if Tracking_only or Update_tracking: 
-                        Db.frame_no = g.Frame_counter     # トラッキングデータのフレーム番号を設定  
-                    
                     annotated_frame = frame
                     if prePointsBuffer.len() > 1:
                         annotated_frame = plot( myResult, frame, output_dim, \
@@ -2099,8 +2124,12 @@ def main():
                                 annotated_frame = mosaic_area( annotated_frame, rect[0], rect[1], rect[2], rect[3] )
                 else:
                     if draw_kpt_no != 0:
+                        # YOLOv8の解析結果を選択したキーポイントのラインをフレームに描画  
                         annotated_frame = myResult.plot(frame)
-                    else:
+                        if Tracking_enabled and len(prePointsBuffer) == buffer_size:
+                            tracking_result(myResult, csvout=True)
+                            
+                    elif not employ_tracking:
                         # YOLOv8のplot関数を使用してフレームに描画  
                         # 　kpt_line=False： キーポイントのマークのみを描画）
                         annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                                        
@@ -2191,8 +2220,18 @@ def main():
     # リソースの解放
     if Tracking_only: 
         Db.csvfile1.close()
-        Db.csvfile2.close()
-        Eval.csvfd.close()
+        if manual_plot:
+            Db.csvfile2.close()
+            Eval.csvfd.close()
+        else:
+            # ---- トラッキングデータをtrack_dataテーブルへ登録 ----
+            _, csvfile = Db .get_file_path()
+            count_t = import_csv_to_db(csvfile, Db, 'tracking_data', case_name)
+            if count_t > 0:                 
+                # インポート実行回数更新
+                _, count = Db.get_fps()
+                Db.update_frame_info('import', (count+1) )  # インポート実行回数を更新
+                print(f"[main]:トラッキングデータをDBに登録しました: {count_t}件")
     if Cv2Video is not None:
         Cv2Video.release()
     Db.close() 
