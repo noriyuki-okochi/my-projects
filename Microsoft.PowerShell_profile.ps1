@@ -3,7 +3,7 @@ $env:DB_PATH = './yolo-kyudo_local.db'
 #$env:DB_PATH = './yolo-kyudo.db'
 #
 # 動画ファイル検索位置設定
-$env:ROLL_PATH='E:/share/Pictures/Camera Roll/'
+$env:ROLL_PATH='D:/Pictures/Camera Roll/'
 # ホームディレクトリ設定
 $HOME_DIR = 'f:/share/YOLO'
 #
@@ -103,9 +103,13 @@ function help {
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
 }
 # 仮想環境アクティベート関数
-function actv26env {
+function actV26env {
     .v26/Scripts/activate
     write-output '仮想環境:.v26がアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
+}
+function actMobileenv {
+    .mobile/Scripts/activate
+    write-output '仮想環境:.mobileがアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
 }
 function home {
     set-location $HOME_DIR
@@ -337,6 +341,7 @@ function yoloAp {
         [switch]$clip,
         [switch]$rotate,
         [string]$case,
+        [string]$employ='',
         [string]$multi='',
         [string]$one='',
         [string]$comp='',
@@ -411,17 +416,32 @@ function yoloAp {
     #
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>yoloAp -update [-v8 {s|m}] -level <no>                    ：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3|9}）'
-        write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
-        write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
-        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>' [-concat] ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
-        write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3|9:側面}）'
-        write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
-        write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
-        write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを生再生する"
-        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]' [-concat] [-shape]：指定したケースの動画ファイルを重ねて再生する"
-        write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
+        write-output '>yoloAp -update [-v8 {s|m}] -level <no>                    ：姿勢解析パラメータを更新する'
+        write-output '>yoloAp -clip	[-rotate]	                           ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存'
+        write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する'
+        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>' [-concat] ：選択した動画ファイルを重ねて再生する"
+        write-output '>yoloAp -yolo	[{-case|-employ} <ケース名>] [-at <開始フレーム>] [-kpt <kpt-no>]                ：指定した動画ファイルを骨格解析して再生・保存'
+        write-output '>yoloAp -man [-employ <ケース名>] [-level <no>] [-kpt <kpt-no>] [-v{8|26} {s|m}] [-mask] [-eval] ：指定した動画の射形をロジック解析しながら再生'
+        write-output '>yoloAp -case <ケース名>  ...                              ：指定した動画の射形を解析しながら再生,解析データをファイル出力'
+        write-output '>yoloAp -gru {<GRUモデル>|-} [-case <ケース名>] ...        ：指定した動画の射形を学習済GRUモデルで解析しながら再生（解析レベル指定でHybrid解析）'
+        write-output ">yoloAp -one <ケース名> [-at <開始フレーム>]               ：指定したケースの動画ファイルを生再生"
+        write-output ">yoloAp -comp '<ケース名1>[,<ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]' [-concat] [-shape]：指定したケースの動画ファイルを重ねて再生"
+        write-output '>yoloAp -h                                                 :コマンドの詳細パラメータを表示'
+        write-output ''
+        write-output "> (*1) '...'は、'-man'の後続オプションを同じことを表現するための省略記法"
+        write-output '> (*2) -levelオプションは、解析レベルを指定（<no>::解析レベル {0|1|2|3|9(側面)}）'
+        write-output '> (*3) -kptオプションは、骨格描画のキーポイントを指定（<kpt-no>::描画ポイント {0(全)|1(上)|2(側)|3(前)}）'
+        write-output '> (*4) -employオプションは、登録済ケースの動画ファイルを再生、解析する場合に指定'
+        #write-output '> (*5) -caseオプションは、解析データを登録する場合に指定'
+        #write-output '> (*6) -maskオプションは、解析時に矩形範囲をマスクする場合に指定'
+        #write-output '> (*7) -evalオプションは、評価モデルを使用して解析を行う場合に指定'
+        #write-output '> (*8) -concatオプションは、複数動画を横に並べて再生する場合に指定'
+        #write-output '> (*9) -shapeオプションは、姿勢解析済動画を優先して表示する場合に指定'
+        #write-output '> (*10) -v8オプションは、V8モデルを使用する場合に指定（s:シングルヘッド|m:マルチヘッド）'
+        #Write-output '> (*11) -v26オプションは、V26モデルを使用する場合に指定（s:シングルヘッド|m:マルチヘッド）'
+        #write-output '> (*12) -atオプションは、動画再生の開始フレームを指定'
+        #write-output '> (*13) -fpsオプションは、動画再生のフレームレート倍率を指定'
+        #write-output '> (*14) -rotateオプションは、動画を時計回りに90度回転して再生する場合に指定'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
         write-output ' 0 :解析開始'
@@ -429,7 +449,7 @@ function yoloAp {
         write-output ' q :再生終了'
         write-output ' p :一時停止／再開'
         write-output ' r :繰り返し再生開始／停止（"-r"時のみ有効）'
-        write-output ' z :矩形範囲のズーム表示'
+        write-output ' z :矩形範囲のズーム表示' 
         write-output ' w :ファイル出力開始／停止'
         write-output ' t :解析データ出力開始／停止'
         write-output ' s :スナップショットファイルの作成'
@@ -449,7 +469,14 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
+        if ($employ -ne '') {
+            # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析
+            python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
+        }
+        else {
+            # フォルダ選択ダイアログで動画ファイルを選択
+            python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
+        }
     }
     elseif ($raw) {         
         # 動画生再生
@@ -471,7 +498,20 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py $dbg_level -a $v -kpt $kpt -w -at $at --
+        if ($employ -ne '') {
+            # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで姿勢描画
+            python ./src/yoloApp.py $dbg_level -o $employ $v -kpt $kpt -w -at $at -e $employ --
+        }
+        else {
+            # フォルダ選択ダイアログ動画ファイルを選択
+            if ($case -ne '') {
+                # ケース指定時、トラッキングデータを登録
+                python ./src/yoloApp.py $dbg_level -a -t $case $v -kpt $kpt -w -at $at --
+            }
+            else {
+                python ./src/yoloApp.py $dbg_level -a $v -kpt $kpt -w -at $at --
+            }
+        }
     }
     elseif ($multi -ne '') {         
         # マルチ指定動画再生
@@ -512,7 +552,14 @@ function yoloAp {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py $dbg_level -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
+        if ($employ -ne '') {
+            # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析、結果保存
+            python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
+        }
+        else {
+            # フォルダ選択ダイアログで動画ファイルを選択、解析、結果保存
+            python ./src/yoloApp.py $dbg_level -a -m -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
+        }
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -527,11 +574,25 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
+            if ($employ -ne '') {
+                # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析、結果保存
+                python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
+            }
+            else {
+                # フォルダ選択ダイアログで動画ファイルを選択、解析、結果保存
+                python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
+            }
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
+            if ($employ -ne '') {
+                # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析
+                python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
+            }
+            else {
+                # フォルダ選択ダイアログで動画ファイルを選択、解析
+                python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
+            }
         }
     }
     else{
@@ -990,7 +1051,7 @@ function eval {
 }
 # 仮想環境作成済の時は、プロファイル読み込み時に仮想環境をアクティベートする
 if (Test-Path -Path .v26/Scripts/Activate.ps1) {
-    actv26env
+    actV26env
 }
 # コマンドエイリアス設定
 #Set-Alias -Name help -Value help
