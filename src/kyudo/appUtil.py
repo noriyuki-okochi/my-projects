@@ -1158,6 +1158,9 @@ def import_csv_to_db(csvfile:str, db:MyDb, tbl_name:str, case_name:str):
     
     # CSVファイルを読み込む
     df = pd.read_csv(csvfile)
+    if len(df) == 0:
+        print(f"[import_csv_to_db]error: csv-file({csvfile}) is empty.")
+        return 0
     #print(f"[import_csv_to_db]:read_csv:{df.shape}, case_name:{df['case_name'][0]}")
     if df['case_name'][0] != case_name:
         # ケース名が異なるとき、ケース名を置換して登録する
