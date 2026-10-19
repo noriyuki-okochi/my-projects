@@ -85,7 +85,7 @@ def help():
         + "                         [-f'<frame_count>[.<lag>]'] [-W<window_size>] [-V{8|26}{n|s|m}]  [-eval [<model-path>]] [-w [<fps>]] [-z]\n"\
         + "                         [{-{p|P}'(<section-no>,<index>)=<value>'}...] [{-S(<section-no>}...]\n"\
         + "                         [-I ['<frame_name>' -s<step-no>]] [-g[<level>[<color>]]]\n"\
-        + "                         [-kpt <no>] [-h] [-v] [-d<debug-level>] [-at <frame_no>] [--]")
+        + "                         [-kpt <no>] [-b] [-h] [-v] [-d<debug-level>] [-at <frame_no>] [--]")
     print(" --- Notation---")
     print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
     print(" --- Option ---")
@@ -102,6 +102,7 @@ def help():
     print(" -t(racking::create-csvfile)")
     print(" -u(pdate tracking_data in table)")
     print(" -e(mploy tracking_data in table)")
+    print(" -b(lind and through)")
     print(" -f(rame-count) and lag for sampling data: default=1.7")
     print(" -W(window-size::ring-buffer-size: default=8)")
     print(" -V(8-pose model-file):default=v8s")
@@ -842,13 +843,13 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
         # 't'キーで一開始／停止
         Tracking_enabled = True if Tracking_enabled is False else False  
         if Tracking_enabled: 
-            print(f"トラッキングを開始します: {Db.csvpath1}")
+            print(f"{datetime.now().strftime('%H:%M:%S')}:トラッキングを開始します: {Db.csvpath1}")
             if not Tracking_onece:
                 Db.update_frame_info('start_frame', g.Frame_counter)  # 開始フレーム番号
                 Tracking_onece = True
             mylog.log(INFO, f">> Trucking start: {Db.csvpath1}")
         else: 
-            print("トラッキングを停止します")
+            print(f"{datetime.now().strftime('%H:%M:%S')}:トラッキングを停止します")
             Db.update_frame_info('stop_frame', g.Frame_counter)   # 停止フレーム番号
             mylog.log(INFO, ">> Trucking pause")
 
@@ -1234,7 +1235,8 @@ def key_ope(key, ctl, annotated_frame, caps, idir, out_file, raw_video, clip_vid
 #
 def main(): 
     global Section_color, Alart_message
-    global Tracking_only, Tracking_enabled, Update_tracking, Update_enabled, Eval_enabled, Eval_sframes
+    global Tracking_only, Tracking_enabled, Tracking_onece, Update_tracking, Update_enabled
+    global Eval_enabled, Eval_sframes
     global Window_size, Sample_frames, Sample_lag, V8_model, Debug_opt, Level
     global StartAction_param, CompleteAction_param
     global Rect_area
@@ -1251,6 +1253,7 @@ def main():
     manual_plot = False                             # 手動でプロット、姿勢解析するオプション
     employ_tracking = False                         # DBのトラッキングデータ(keypoints)を採用する
     nn_gru = False                                  # GRUによる姿勢解析オプション
+    blind_through = False                           # ブラインド & スルー(no-waite)オプション
     multi_frames = False                            # 2動画ファイルを重ねて再生するオプション
     multi_fstart = [0, 0]                           # 2動画ファイルを重ねて再生する開始フレーム
     concat_frames = False                           # 2動画ファイルを横に連結して表示するオプション
@@ -1506,7 +1509,7 @@ def main():
         else:
             print("ケース名の指定がありません")
             return
-
+        
     # 解析トラッキングデータをCSV出力するオプション
     if not raw_video and ( '-t' in opts) :
         Tracking_only = True                            # トラッキングのみを行うオプション
@@ -1537,6 +1540,9 @@ def main():
         else:
             print("ケース名の指定がありません")
             return
+
+    if not manual_plot and Tracking_only and '-b' in opts:
+        blind_through = True    # ブラインド & スルー(no-waite)オプション
         
     # トラッキングデータを採用する場合、DBからトラッキングデータを取得
     if employ_tracking:
@@ -1750,9 +1756,10 @@ def main():
     # フレームのサイズを取得
     frame_height = int(cap[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_width = int(cap[0].get(cv2.CAP_PROP_FRAME_WIDTH)) 
-    keyCtl['frame_count'] = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
-
+    frame_max = int(cap[0].get(cv2.CAP_PROP_FRAME_COUNT))
+    
     out_frame_width, out_frame_height = frame_width, frame_height
+    keyCtl['frame_count'] = frame_max
     # フレームレートを取得
     Fps = cap[0].get(cv2.CAP_PROP_FPS)       
     #
@@ -1994,6 +2001,15 @@ def main():
     #        
     print(f"[main]:iwait={keyCtl['iwait']}")
     mylog.log(INFO, f"[main]:iwait={keyCtl['iwait']}")
+    
+    if  blind_through: 
+        # '-t'、'-b'が指定で、自動トラッキング開始
+        Tracking_enabled = True
+        Tracking_onece = True
+        print(f"[main]:{datetime.now().strftime('%H:%M:%S')}:トラッキングオン（ブラインド＆スルーモード） ")
+        mylog.log(INFO, f"[main]:トラッキングオン")
+    #
+    # 解析パラメータのログ出力
     if manual_plot:
         print_param(CompleteAction_param)
         print_param(StartAction_param)
@@ -2135,6 +2151,14 @@ def main():
                         annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                                        
         #        
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
+        
+        if blind_through:
+            if g.Frame_counter == 1 or (int(g.Frame_counter % 80) == 0): # 80フレームごとに進捗を表示
+                progress = (g.Frame_counter / frame_max) * 100
+                print(f"[main]:{datetime.now().strftime('%H:%M:%S')}:({g.Frame_counter:4d}/{frame_max:<4d}): {int(progress):>3d}% " )
+            # WaitKey、imshowせずに次のフレームへ
+            continue
+        
         if keyCtl['videoWrite']:
             # 出力ファイルに書き込み
             Cv2Video.write(annotated_frame)
@@ -2186,12 +2210,9 @@ def main():
         #    
         # ウィンドウに表示する   
         #
-        #if not keyCtl['blind_mode'] or g.Frame_counter < 2:
-            #print(f"[main]:{g.Frame_counter}:ブラインドモードのため、描画せずに次のフレームへ")
-            #continue  # ブラインドモードの場合は、描画せずに次のフレームへ
         if not keyCtl['blind_mode']:
             cv2.imshow('YOLO Pose Detection', annotated_frame)
-        #print(f"({g.Frame_counter})")
+
         #キー入力をチェックするする（1*iwaitミリ秒待つ）
         key = cv2.waitKey(keyCtl['iwait']) & 0xFF
         if key == -1: 

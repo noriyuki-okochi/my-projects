@@ -338,6 +338,7 @@ function yoloAp {
         [float]$fps=1.0,
         [switch]$yolo,
         [int]$kpt=3,
+        [switch]$blind,
         [switch]$clip,
         [switch]$rotate,
         [string]$case,
@@ -420,7 +421,7 @@ function yoloAp {
         write-output '>yoloAp -clip	[-rotate]	                           ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存'
         write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する'
         write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>' [-concat] ：選択した動画ファイルを重ねて再生する"
-        write-output '>yoloAp -yolo	[{-case|-employ} <ケース名>] [-at <開始フレーム>] [-kpt <kpt-no>]                ：指定した動画ファイルを骨格解析して再生・保存'
+        write-output '>yoloAp -yolo	[{-case|-employ} <ケース名>] [-at <開始フレーム>] [-kpt <kpt-no>] [-blind]       ：指定した動画ファイルを骨格解析して再生・保存'
         write-output '>yoloAp -man [-employ <ケース名>] [-level <no>] [-kpt <kpt-no>] [-v{8|26} {s|m}] [-mask] [-eval] ：指定した動画の射形をロジック解析しながら再生'
         write-output '>yoloAp -case <ケース名>  ...                              ：指定した動画の射形を解析しながら再生,解析データをファイル出力'
         write-output '>yoloAp -gru {<GRUモデル>|-} [-case <ケース名>] ...        ：指定した動画の射形を学習済GRUモデルで解析しながら再生（解析レベル指定でHybrid解析）'
@@ -506,7 +507,13 @@ function yoloAp {
             # フォルダ選択ダイアログ動画ファイルを選択
             if ($case -ne '') {
                 # ケース指定時、トラッキングデータを登録
-                python ./src/yoloApp.py $dbg_level -a -t $case $v -kpt $kpt -w -at $at --
+                if ($blind) {
+                    # ブラインドで処理する
+                    python ./src/yoloApp.py $dbg_level -a -t $case $v -kpt $kpt -w -at $at -b -- 
+                }
+                else {
+                    python ./src/yoloApp.py $dbg_level -a -t $case $v -kpt $kpt -w -at $at --
+                }
             }
             else {
                 python ./src/yoloApp.py $dbg_level -a $v -kpt $kpt -w -at $at --
