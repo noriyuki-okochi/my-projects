@@ -35,10 +35,10 @@ def section_started_L9(section_no, myResult:MyResult):
     confRY = keyPoints.conf('right_eye')                                # 右目の座標の信頼度
     gradR, _ = keyPoints.Get_grad(normR)                             # 右手首の移動量の勾配を計算
     
-    if conf < PRM[0] and (section_no > 0 and section_no < 8):
+    if (conf < PRM[0] and (section_no > 0 and section_no < 8)) or thsd.ratio(normR) > 0.2:
         # 右手首の信頼度が低い
-        mylog.log(INFO, f"started({section_no}): right-wrist-conf={conf:.2f}({PRM[0]:.2f}), "\
-                      + f" skip....")
+        mylog.log(INFO, f"started({section_no}): right-wrist-conf={conf:.2f}({PRM[0]:.2f}),"\
+            + f"normR={int(normR)}({thsd.ratio(normR):.3f}) skip....")
         return started
 
     mylog.log(INFO, f"started ({section_no}):フレーム={g.Frame_counter}:    counter={g.Step_counter}\n"\
