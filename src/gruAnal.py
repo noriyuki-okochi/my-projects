@@ -82,8 +82,10 @@ def correct_action_by_rules9(action, section, completed):
                 r_action = 0
             if action == 1 and g.Step_counter == 31:        # 動作完了が早すぎる（乙矢の腰）
                 r_action = 0
+            if action == 2 and g.Step_counter < 32:         # 動作開始が早すぎる
+                r_action = 0
         elif section == 3:      # 「弓構え」
-            if action == 1 and g.Step_counter < 21:         # 動作完了が早すぎる（物見前）
+            if action == 1 and g.Step_counter < 23:         # 動作完了が早すぎる（物見前）
                 r_action = 0
             if action == 2 and g.Step_counter < 12:         # 動作開始が早すぎる
                 r_action = 0
@@ -105,6 +107,8 @@ def correct_action_by_rules9(action, section, completed):
                 r_action = 0
         elif section == 9:      # 「弓倒し」
             if action == 1 and g.Step_counter < 2:          # 動作完了が早すぎる
+                r_action = 0
+            if action == 2 and g.Step_counter < 31:         # 動作開始が早すぎる
                 r_action = 0
     #
     if r_action != action:
