@@ -218,7 +218,7 @@ class MyResult(Keypoint):
         self.confs = result.keypoints.conf[boxid].numpy()   # 対象ボックスのキーポイントの信頼度リスト
         self.points = result.keypoints.xy[boxid].numpy()    # 対象ボックスのキーポイントの座標リスト
         self.xywh = result.boxes.xywh[boxid].numpy()        # バウンディングボックスの座標リスト [x, y, w, h]
-        self.draw_line = 3                                  # 描画するライン番号(1:upper 2:right-side, 3:front)
+        self.draw_line = 3                                  # 描画するライン番号(0:nop,1:upper, 2:right-side, 3:front)
         
         if manual:        
             # 対象ボックスの合理性検証
@@ -418,9 +418,11 @@ class MyResult(Keypoint):
     
     # draw_lineの設定値に応じてキーポイントの接続ラインを描画する関数
     def plot(self, annotated_frame):
-        return self.plot3(annotated_frame) if self.draw_line == 3 \
-                else self.plot2(annotated_frame) if self.draw_line == 2 \
-                else self.plot1(annotated_frame)
+        if self.draw_line != 0:
+            annotated_frame = self.plot3(annotated_frame) if self.draw_line == 3 \
+                                else self.plot2(annotated_frame) if self.draw_line == 2 \
+                                else self.plot1(annotated_frame)
+        return annotated_frame
 
 #
 # YOLOーResult疑似オブジェクト
@@ -1308,26 +1310,26 @@ def print_eval_data(db:MyDb, case_names:list):
     #
     # セクションごとの表示ヘッダー
     F_headers = [
-                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "     <section>      <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <er(°)/pull(%)>",
+                "     <section>          <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>          <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>          <case>        <frame>      <rl(°)>     <se(°)>     <er(°)>     <eyes(-)>",
+                "     <section>          <case>        <frame>      <sl(°)>     <rl(°)>     <er(°)>     <eyes(-)>",
+                "     <section>          <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <er(°)/pull(%)>",
                 "",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <split(sec.)>",
-                "     <section>      <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
-                "     <section>      <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
+                "     <section>          <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>   <split(sec.)>",
+                "     <section>          <case>        <frame>      <sl(°)>     <rl(°)>     <se(°)>",
+                "     <section>          <case>        <frame>      <sl(°)>     <se(°)>     <er(°)>   <split(sec.)>" 
             ]
     R_headers = [ 
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
                 "",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>     <split>",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <rw(°)>",
-                "     <section>      <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>     <split>" 
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>     <split>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <rw(°)>",
+                "     <section>          <case>        <frame>      <ks(°)>     <ah(°)>     <hs(°)>     <sr(°)>     <reye(-)>     <split>" 
             ]
     #
     # セクションごとの取得項目リストの定義

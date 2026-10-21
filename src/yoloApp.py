@@ -113,7 +113,7 @@ def help():
     print(" -P(arameter set in g.CompletedAction_parames)")
     print(" -S(kip illegal-action-check): section-no=3,5")
     print(" -I(nitial entry to act_table from Actin_params::<frame_name><step-no>')")
-    print(" -kpt <no>: draw key-point-line type:1=upper,2=right-side,3=front(default),0=yolo standard")
+    print(" -kpt <no>: draw key-point-line type:1=upper,2=right-side,3=front(default),9=yolo standard")
     print(" -h(elp)")
     print(" -g(uidance)<level><color>::[0|1|2|3]:0=dont display(default=3):[Y|G|B|W]: yellow, green, black, white")
     print(" -v(erborse)")
@@ -1937,10 +1937,10 @@ def main():
     
     if len(case_name_l) > 0:
         mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name_l}")
-        print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name_l}")
+        print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name_l}:kpt_no={draw_kpt_no}")
     else:
         mylog.log(INFO, f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
-        print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}")
+        print(f"[main]:起動パラメータ情報:WindowSize={Window_size}:case_name={case_name}:kpt_no={draw_kpt_no}")
     
     mylog.log(INFO, f"[main]:フレーム情報: {file_name[0]}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
     print(f"[main]:フレーム情報: {file_name[0]}: {frame_width}x{frame_height}, Fps={Fps:.2f}")
@@ -2139,7 +2139,7 @@ def main():
                             for rect in areas:
                                 annotated_frame = mosaic_area( annotated_frame, rect[0], rect[1], rect[2], rect[3] )
                 else:
-                    if draw_kpt_no != 0:
+                    if draw_kpt_no != 9:
                         # YOLOv8の解析結果を選択したキーポイントのラインをフレームに描画  
                         annotated_frame = myResult.plot(frame)
                         if Tracking_enabled and len(prePointsBuffer) == buffer_size:
@@ -2149,7 +2149,7 @@ def main():
                         # YOLOv8のplot関数を使用してフレームに描画  
                         # 　kpt_line=False： キーポイントのマークのみを描画）
                         annotated_frame = myResult.result.plot(boxes=True, labels=False, kpt_line=True, kpt_radius=3)                                        
-        #        
+        #     
         preFrame = annotated_frame.copy()  # 前回のフレームへ保存
         
         if blind_through:
