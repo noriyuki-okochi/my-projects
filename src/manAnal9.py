@@ -308,11 +308,14 @@ def section_completed_L9(section_no, myResult:MyResult):
                 if g.Step_counter >= 31:
                     mylog.log(INFO, f">>>   [ normR > {int(thsd(PRM[5]))} and (anglR < {int(PRM[6])} and anglR > {int(PRM[7])}]")
                     
-                    Stkp.push( [(5,PRM[5]), (6,PRM[6]), (7,PRM[7])] )  
+                    Stkp.push( [(5,PRM[5]), (6,PRM[6]), (7,PRM[7]), (9,PRM[9])] )  
                     if normR > thsd(PRM[5]) and (int(anglR) < int(PRM[6]) and int(anglR) > int(PRM[7])):
                         # 右手首の移動ベクトルの長さが大きい場合（取りかけ動作開始）
                         g.Alart_id = Alart_Dozukuri
                         g.Step_error = True
+                    else:
+                        mylog.log(INFO, f">>>   [ confRY < {PRM[9]:.3f} ]")
+                        if confRY < PRM[9]: completed = True    # 「箆調べ」で完了とする
         #                        
     # 3-Yu-gamae            
     elif section_no == 3:  
