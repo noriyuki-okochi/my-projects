@@ -17,7 +17,8 @@ $logfile = './log/console.log'
 # 環境変数の設定
 #
 # データ入力キー設定
-$env:INPUT_KEY="91"
+$env:INPUT_KEY="91"                     # front-side default
+#$env:INPUT_KEY="911"                   # right-side defalut
 $inputkey = $env:INPUT_KEY
 $env:EVAL_INPUT_KEY="170"
 $evalkey = $env:EVAL_INPUT_KEY
@@ -26,7 +27,8 @@ $env:MODEL_TYPE="-models"               # シングルヘッドをデフォルト
 $env:EVAL_MODEL_TYPE="-modelc"          # 畳み込みモデルをデフォルト
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo_91a_modelse_9-96-3.pt"
+$env:MODEL_PT="./kyudo_91a_modelse_9-96-3.pt"       # front-side default
+#$env:MODEL_PT="./kyudo_911a_modelse_11-96-3.pt"    # right-side default
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
 $env:EARLY_STOP="0"
@@ -101,6 +103,10 @@ function help {
     write-output '> kyudo  -help : 姿勢解析データの登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> eval   -help : 射形評価データの学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
+    write-output '> home         : ホームディレクトリに移動する'
+    write-output '> actV26Env    : 仮想環境をアクティブにする'
+    write-output '> actMobileEnv : 仮想環境をアクティブにする'
+    write-output '> deactivate   : 仮想環境から復帰する'
 }
 # 仮想環境アクティベート関数
 function actV26env {
@@ -431,7 +437,7 @@ function yoloAp {
         write-output ''
         write-output "> (*1) '...'は、'-man'の後続オプションを同じことを表現するための省略記法"
         write-output '> (*2) -levelオプションは、解析レベルを指定（<no>::解析レベル {0|1|2|3|9(側面)}）'
-        write-output '> (*3) -kptオプションは、骨格描画のキーポイントを指定（<kpt-no>::描画ポイント {0(全)|1(上)|2(側)|3(前)}）'
+        write-output '> (*3) -kptオプションは、骨格描画のキーポイントを指定（<kpt-no>::描画ポイント {9(全)|1(上)|2(側)|3(前)}）'
         write-output '> (*4) -employオプションは、登録済ケースの動画ファイルを再生、解析する場合に指定'
         #write-output '> (*5) -caseオプションは、解析データを登録する場合に指定'
         #write-output '> (*6) -maskオプションは、解析時に矩形範囲をマスクする場合に指定'
