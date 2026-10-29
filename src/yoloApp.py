@@ -2225,7 +2225,7 @@ def main():
             # キー操作が終了（'q'）で、ループを抜ける
             print("[main]:Interrapted by 'q'")
             break
-        if key == ord('a'):
+        if not raw_video and key == ord('a'):
             # 'a'キーが押された場合の処理
             val = myResult.get_normalized_value('right_shoulder', 'left_shoulder')
             print(f"Normalized value: {val:.4f}")
