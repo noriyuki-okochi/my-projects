@@ -1,6 +1,10 @@
 .vscode/
 yolo.code-workspace
+mobile.code-workspace
 .v26/
+.mobile/
+.build/
+.buildozer/
 csv/
 pt/
 *_tb/
@@ -8,9 +12,15 @@ pt/
 !log/stub.log
 *.csv
 *.db
-!yolo-kyudo.db
+!yolo-kyudo-local.db
 *.pt
+*.spec
 !kyudo2_80_modelse_8-96-3.pt
+!kyudo_911a_modelse_11-96-3.pt
+!yolo8m-pose.pt
+!yolo8s-pose.pt
+!yolo26s-pose.pt
+!yolo26m-pose.pt
 *.xlsx
 *.txt
 !readme.txt
@@ -23,3 +33,6 @@ src/*__.*
 src/.ipynb_checkpoints
 src/__pycache__
 src/*/__pycache__
+src/m*.py
+src/*.kv
+!src/man*.py
