@@ -3,7 +3,7 @@ $env:DB_PATH = './yolo-kyudo_local.db'
 #$env:DB_PATH = './yolo-kyudo.db'
 #
 # 動画ファイル検索位置設定
-$env:ROLL_PATH='E:/share/Pictures/Camera Roll/'
+$env:ROLL_PATH='D:/Pictures/Camera Roll/'
 # ホームディレクトリ設定
 $HOME_DIR = 'f:/share/YOLO'
 #
@@ -17,7 +17,8 @@ $logfile = './log/console.log'
 # 環境変数の設定
 #
 # データ入力キー設定
-$env:INPUT_KEY="91"
+$env:INPUT_KEY="91"                     # front-side default
+#$env:INPUT_KEY="911"                   # right-side defalut
 $inputkey = $env:INPUT_KEY
 $env:EVAL_INPUT_KEY="170"
 $evalkey = $env:EVAL_INPUT_KEY
@@ -26,7 +27,8 @@ $env:MODEL_TYPE="-models"               # シングルヘッドをデフォルト
 $env:EVAL_MODEL_TYPE="-modelc"          # 畳み込みモデルをデフォルト
 $modelx = $env:MODEL_TYPE
 # 学習済モデルファイル設定
-$env:MODEL_PT="./kyudo_91a_modelse_9-96-3.pt"
+$env:MODEL_PT="./kyudo_91a_modelse_9-96-3.pt"       # front-side default
+#$env:MODEL_PT="./kyudo_911a_modelse_11-96-3.pt"    # right-side default
 $env:L2_LAMBDA="0.0"
 $l2_lambda = $env:L2_LAMBDA
 $env:EARLY_STOP="0"
@@ -75,17 +77,21 @@ $cases_list = "iijima_2.0", "anbe_2.0", "iwata_2.0", "nemoto_2.1", "sato_2.1"
 $cases_list = "nemoto_2.2", "sato_2.2", "yoshimo_2m.2"
 # 一括ケース設定例
 #$cases_list_91a = "iijima_2.0_1,anbe_2.0_1,iwata_2.0_1,y.shihan_2.0_1,yoshida_2.0_1,oshima_2.0_1,n.iijima_2.0_1,sato_2.1_1,nemoto_2.1_1,kanoda_2.3_1,sueyoshi_2.3_1,h.nakamura_2.0_1"
-$cases_list = "iijima_2.0_1,iwata_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,kanoda_2.0_2,h.nakamura_2.0_1"
+#$cases_list = "iijima_2.0_1,iwata_2.0_1,okochi_2.0_1,oshima_2.0_1,n.iijima_2.0_1,kanoda_2.0_2,h.nakamura_2.0_1"
+#$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1", "s.iwata_3.9h_1,anbe_3.9h_1" 
+$cases_list = "okochi_3.9_1,nakajima_3.9_1,h.nakamura_3.9_1,s.iwata_3.9_1,anbe_3.9_1,tomita_3.9_1" 
 $env:CASE_LIST=$cases_list
 
 # データ拡張レベル設定例（個別ケース毎に指定：0=拡張なし,1=shift,2=warp,4=noize）
 #$augment_list = '0,1,2,3,4,5,6,7'
-$augment_list = '0'
+$augment_list = '0,0'
 $env:AUGMENT_LIST=$augment_list
 #
 $dbg_level = '-d1'
+#$dbg_level = '-d0'
 $dbg_option = '-d'
 #
+$confirm = $true
 function help {
     # プロファイルの表示
     write-output $profile
@@ -97,11 +103,19 @@ function help {
     write-output '> kyudo  -help : 姿勢解析データの登録／学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> eval   -help : 射形評価データの学習・予測／データ表示ツールの使用ガイダンスを表示する'
     write-output '> model  -help : モデルのパラメータ表示／設定ツールの使用ガイダンスを表示する'
+    write-output '> home         : ホームディレクトリに移動する'
+    write-output '> actV26Env    : 仮想環境をアクティブにする'
+    write-output '> actMobileEnv : 仮想環境をアクティブにする'
+    write-output '> deactivate   : 仮想環境から復帰する'
 }
 # 仮想環境アクティベート関数
-function actv26env {
+function actV26env {
     .v26/Scripts/activate
     write-output '仮想環境:.v26がアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
+}
+function actMobileenv {
+    .mobile/Scripts/activate
+    write-output '仮想環境:.mobileがアクティブになりました。deactivateコマンドで仮想環境を終了できます。'
 }
 function home {
     set-location $HOME_DIR
@@ -330,9 +344,11 @@ function yoloAp {
         [float]$fps=1.0,
         [switch]$yolo,
         [int]$kpt=3,
+        [switch]$blind,
         [switch]$clip,
         [switch]$rotate,
         [string]$case,
+        [string]$employ='',
         [string]$multi='',
         [string]$one='',
         [string]$comp='',
@@ -341,7 +357,9 @@ function yoloAp {
         [string]$v8='s',
         [string]$v26='',
         [string]$sample='1.7',
-        [switch]$mask
+        [switch]$mask,
+        [switch]$concat,
+        [switch]$shape
     )
     if ($v26 -eq '') {
         $param_id = '1.7-' + $v8
@@ -391,23 +409,46 @@ function yoloAp {
     if ( $mask ) {
         $maskon = '-z'
     }
+    $concaton = ''
+    if ( $concat ) {
+        $concaton = '-H'
+    }
+    $shapeon = ''
+    if ( $shape ) {
+        $shapeon = '-y'
+    }
     if ($rotate) {
         write-output '・動画を時計回りに90度回転して表示します'
     }
     #
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>yoloAp -update [-v8 {s|m}] -level <no>                    ：姿勢解析パラメータを更新する（no:解析レベル {0|1|2|3|9}）'
-        write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する（一時停止／巻戻し・スキップ／再生速度変更可）'
-        write-output '>yoloAp -clip	[-rotate]	        ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存する（モザイク処理範囲の指定可）'
-        write-output '>yoloAp -yolo	[-at <開始フレーム>] [-kpt <draw-kpt-no]   ：選択した動画ファイルを骨格解析して再生する'
-        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>'           ：選択した動画ファイルを重ねて再生する（一時停止／巻戻し・スキップ／再生速度変更可）"
-        write-output '>yoloAp -man [-level <no>] [-v{8|26} {s|m}] [-mask] [-eval]：選択した動画の射形をロジック解析しながら再生する（no:解析レベル {0|1|2|3|9}）'
-        write-output '>yoloAp -case <登録ケース名> [-level <no>]                 ：選択した動画の射形を解析しながら再生し,解析結果データ、画像をファイル出力する'
-        write-output '>yoloAp -gru {<GRUモデル>|-} [-level <no>] [-v{8|26} {s|m}]：選択した動画の射形を学習済GRUモデルで解析しながら再生する（解析レベル指定でHybrid解析）'
-        write-output ">yoloAp -one <登録ケース名> [-at <開始フレーム>]           ：指定したケースの動画ファイルを生再生する"
-        write-output ">yoloAp -comp '<登録ケース名1>[,登録ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]'：指定したケースの動画ファイルを重ねて再生する"
-        write-output '>yoloAp -h               ：コマンドの詳細パラメータを表示する'
+        write-output '>yoloAp -update [-v8 {s|m}] -level <no>                    ：姿勢解析パラメータを更新する'
+        write-output '>yoloAp -clip	[-rotate]	                           ：選択した動画ファイルを切り取り（平面的／時間的）、別ファイルに保存'
+        write-output '>yoloAp -raw	[-at <開始フレーム>] [-fps <FPS-ratio>]    ：選択した動画ファイルを生再生する'
+        write-output ">yoloAp -multi '<開始フレーム1>,<開始フレーム2>' [-concat] ：選択した動画ファイルを重ねて再生する"
+        write-output '>yoloAp -yolo	[{-case|-employ} <ケース名>] [-at <開始フレーム>] [-kpt <kpt-no>] [-blind]       ：指定した動画ファイルを骨格解析して再生・保存'
+        write-output '>yoloAp -man [-employ <ケース名>] [-level <no>] [-kpt <kpt-no>] [-v{8|26} {s|m}] [-mask] [-eval] ：指定した動画の射形をロジック解析しながら再生'
+        write-output '>yoloAp -case <ケース名>  ...                              ：指定した動画の射形を解析しながら再生,解析データをファイル出力'
+        write-output '>yoloAp -gru {<GRUモデル>|-} [-case <ケース名>] ...        ：指定した動画の射形を学習済GRUモデルで解析しながら再生（解析レベル指定でHybrid解析）'
+        write-output ">yoloAp -one <ケース名> [-at <開始フレーム>]               ：指定したケースの動画ファイルを生再生"
+        write-output ">yoloAp -comp '<ケース名1>[,<ケース名2>]' -at '<開始フレーム1>[,<開始フレーム2>]' [-concat] [-shape]：指定したケースの動画ファイルを重ねて再生"
+        write-output '>yoloAp -h                                                 :コマンドの詳細パラメータを表示'
+        write-output ''
+        write-output "> (*1) '...'は、'-man'の後続オプションを同じことを表現するための省略記法"
+        write-output '> (*2) -levelオプションは、解析レベルを指定（<no>::解析レベル {0|1|2|3|9(側面)}）'
+        write-output '> (*3) -kptオプションは、骨格描画のキーポイントを指定（<kpt-no>::描画ポイント {9(全)|1(上)|2(側)|3(前)}）'
+        write-output '> (*4) -employオプションは、登録済ケースの動画ファイルを再生、解析する場合に指定'
+        #write-output '> (*5) -caseオプションは、解析データを登録する場合に指定'
+        #write-output '> (*6) -maskオプションは、解析時に矩形範囲をマスクする場合に指定'
+        #write-output '> (*7) -evalオプションは、評価モデルを使用して解析を行う場合に指定'
+        #write-output '> (*8) -concatオプションは、複数動画を横に並べて再生する場合に指定'
+        #write-output '> (*9) -shapeオプションは、姿勢解析済動画を優先して表示する場合に指定'
+        #write-output '> (*10) -v8オプションは、V8モデルを使用する場合に指定（s:シングルヘッド|m:マルチヘッド）'
+        #Write-output '> (*11) -v26オプションは、V26モデルを使用する場合に指定（s:シングルヘッド|m:マルチヘッド）'
+        #write-output '> (*12) -atオプションは、動画再生の開始フレームを指定'
+        #write-output '> (*13) -fpsオプションは、動画再生のフレームレート倍率を指定'
+        #write-output '> (*14) -rotateオプションは、動画を時計回りに90度回転して再生する場合に指定'
         write-output ''
         write-output '・動画再生中に、画面タップしてキー入力することで以下の処理ができます。'
         write-output ' 0 :解析開始'
@@ -415,12 +456,12 @@ function yoloAp {
         write-output ' q :再生終了'
         write-output ' p :一時停止／再開'
         write-output ' r :繰り返し再生開始／停止（"-r"時のみ有効）'
-        write-output ' z :矩形範囲のズーム表示'
+        write-output ' z :矩形範囲のズーム表示' 
         write-output ' w :ファイル出力開始／停止'
         write-output ' t :解析データ出力開始／停止'
         write-output ' s :スナップショットファイルの作成'
-        write-output ' .(>):スキップ'
-        write-output ' ,(<):巻き戻し'
+        write-output ' .(>):スキップ |;(+):第2動画のスキップ'
+        write-output ' ,(<):巻き戻し |-(=):第2動画の巻き戻し'
         write-output ' k(K) :再生速度アップ'
         write-output ' l(L) :再生速度ダウン'
         write-output ' g :グリッド表示・非表示'
@@ -435,7 +476,14 @@ function yoloAp {
     }
     elseif ($man) {         
         # 動画再生・ロジック解析
-        python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
+        if ($employ -ne '') {
+            # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析
+            python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
+        }
+        else {
+            # フォルダ選択ダイアログで動画ファイルを選択
+            python ./src/yoloApp.py $dbg_level -a -m -w $v $slevel $maskon $evalon $eval_model -kpt $kpt --
+        }
     }
     elseif ($raw) {         
         # 動画生再生
@@ -457,11 +505,30 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py $dbg_level -a $v -kpt $kpt -w -at $at --
+        if ($employ -ne '') {
+            # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで姿勢描画
+            python ./src/yoloApp.py $dbg_level -o $employ $v -kpt $kpt -w -at $at -e $employ --
+        }
+        else {
+            # フォルダ選択ダイアログ動画ファイルを選択
+            if ($case -ne '') {
+                # ケース指定時、トラッキングデータを登録
+                if ($blind) {
+                    # ブラインドで処理する
+                    python ./src/yoloApp.py $dbg_level -a -t $case $v -kpt $kpt -w -at $at -b -- 
+                }
+                else {
+                    python ./src/yoloApp.py $dbg_level -a -t $case $v -kpt $kpt -w -at $at --
+                }
+            }
+            else {
+                python ./src/yoloApp.py $dbg_level -a $v -kpt $kpt -w -at $at --
+            }
+        }
     }
     elseif ($multi -ne '') {         
         # マルチ指定動画再生
-        python ./src/yoloApp.py $dbg_level -a -multi $multi --
+        python ./src/yoloApp.py $dbg_level -a -multi $multi $concaton -w --
     }
     elseif ($one -ne '') {         
         # 単一ケース指定再生
@@ -470,18 +537,18 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py $dbg_level -o  $one -at $at -r --
+        python ./src/yoloApp.py $dbg_level -o  $one -at $at -r -w --
     }
     elseif ($comp -ne '') {         
         $case_list = $comp.Split(',')
         $i = $case_list.Length
         if ( $i -eq 1 ) {
             # 単一ケース動画再生（指定ケースの動画ファイルを再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -at $at -m --
+            python ./src/yoloApp.py $dbg_level -o $comp -at $at $concaton $shapeon -m -w --
         }
         else{
             # マルチ動画再生（指定ケースの動画ファイルを重ねて再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -multi $at -r --
+            python ./src/yoloApp.py $dbg_level -o $comp -multi $at $concaton $shapeon -r -w --
         }
     }
     elseif ($clip) {        
@@ -498,7 +565,14 @@ function yoloAp {
             # レベルのデフォルトは2に設定
             $slevel='-s2'
         }
-        python ./src/yoloApp.py $dbg_level -a -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
+        if ($employ -ne '') {
+            # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析、結果保存
+            python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
+        }
+        else {
+            # フォルダ選択ダイアログで動画ファイルを選択、解析、結果保存
+            python ./src/yoloApp.py $dbg_level -a -m -w -t  $case  $v $slevel -f"$sample" classes=3 $maskon $evalon $eval_model -kpt $kpt --
+        }
     }
     elseif ($gru -ne '') {  
         # 動画再生・GRU解析
@@ -513,11 +587,25 @@ function yoloAp {
         }
         if ( $case -ne '' ) {
             # 動画再生・GRU解析、結果保存
-            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
+            if ($employ -ne '') {
+                # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析、結果保存
+                python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
+            }
+            else {
+                # フォルダ選択ダイアログで動画ファイルを選択、解析、結果保存
+                python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w -t $case $maskon $evalon $eval_model -kpt $kpt --
+            }
         }
         else{
             # 動画再生・GRU解析
-            python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
+            if ($employ -ne '') {
+                # 指定登録ケースの動画ファイルを再生、登録済トラッキングデータで解析
+                python ./src/yoloApp.py $dbg_level -o $employ -e $employ -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
+            }
+            else {
+                # フォルダ選択ダイアログで動画ファイルを選択、解析
+                python ./src/yoloApp.py $dbg_level -a -m -gru  $model $v $slevel -f"$sample" -w $maskon $evalon $eval_model -kpt $kpt --
+            }
         }
     }
     else{
@@ -613,6 +701,7 @@ function kyudo {
         [switch]$help,
         [switch]$h,
         [string]$list='',
+        [string]$name='',
         [string]$delete,
         [string]$rename='',
         [string]$to='',
@@ -647,7 +736,7 @@ function kyudo {
     $model = "-model"
     if ($help) {
         write-output '・コマンド -オプション'
-        write-output '>kyudo  -list	case|case_name|key|pt                     ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
+        write-output '>kyudo  -list	case [-name <部分名>]|case_name|key|pt    ：登録済ケース名、入力データキー、または作成済モデルファイルの一覧を表示する'
         write-output '>kyudo  -deletet <登録ケース名>	                          ：登録ケース名、データファイルを削除する'
         write-output '>kyudo  -rename  <登録ケース名> -to <変更ケース名>        ：登録ケース名をリネームする'
         write-output '>kyudo  -import  <登録ケース名>                           ：解析結果データファイルのデータをデータベースに登録する'
@@ -670,11 +759,11 @@ function kyudo {
         }
         elseif ( $list -eq 'case' ) {
             # 登録済ケース名一覧表示（詳細）
-            python ./src/kyudoApp.py  $dbg_option -case -L
+            python ./src/kyudoApp.py  $dbg_option -case -L $name
         }
         elseif ( $list -eq 'case_name' ) {
             # 登録済ケース名一覧表示
-            python ./src/kyudoApp.py  $dbg_option -case -l
+            python ./src/kyudoApp.py  $dbg_option -case -l  $name
         }
         elseif ( $list -eq 'pt' ) {
             # 作成済モデルファイル一覧表示
@@ -749,25 +838,38 @@ function kyudo {
                 }
                 $i = 1
                 foreach ( $case_name in $cases_list ) {
-                    if ($aug_levels.Length -gt 0) {
-                        # ケース毎のデータ拡張レベルを参照する
-                        if ( $i -le $aug_levels.Length ) {
-                            $aug_level = $aug_levels[$i-1]
+                    $answer = "c"
+                    if ($confirm -eq $true) {
+                        $answer = Read-Host "> ケース['$case_name'] の学習を実行しますか?[a(ll)|c(ontinue)|s(kip)]:"
+                        Write-Output $answer
+                        if ($answer -eq "a") {
+                            $answer = "c"
+                            $confirm = $false
+                        }
+                    }
+                    if ($answer -eq "c") {
+                        if ($aug_levels.Length -gt 0) {
+                            # ケース毎のデータ拡張レベルを参照する
+                            if ( $i -le $aug_levels.Length ) {
+                                $aug_level = $aug_levels[$i-1]
+                            }
+                            else {
+                                # デフォルトに再設定
+                                $aug_level = 0
+                            }
+                        }
+                        if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
+                            python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
+                            #Write-Output $confirm
                         }
                         else {
-                            # デフォルトに再設定
-                            $aug_level = 0
+                            python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
+                            #Write-Output $confirm
                         }
-                    }
-                    if ( $idx -ge 0 -and $len -gt ($idx + 1) ) {
-                        python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx $args[$idx+1] -f0 $input_frames -n"$i" 
-                    }
-                    else {
-                        python ./src/kyudoApp.py $dbg_option -case $case_name -valid $valid_case classes=3 augment=$aug_level eta=$eta -hparam "($hparam)" -train $modelx -f0 $input_frames -n"$i" 
-                    }
-                    #Write-Output $LASTEXITCODE
-                    if ( $LASTEXITCODE -ne 0 ) {
-                        break
+                        #Write-Output $LASTEXITCODE
+                        if ( $LASTEXITCODE -ne 0 ) {
+                            break
+                        }
                     }
                     $i++    
                 }
@@ -962,7 +1064,7 @@ function eval {
 }
 # 仮想環境作成済の時は、プロファイル読み込み時に仮想環境をアクティベートする
 if (Test-Path -Path .v26/Scripts/Activate.ps1) {
-    actv26env
+    actV26env
 }
 # コマンドエイリアス設定
 #Set-Alias -Name help -Value help

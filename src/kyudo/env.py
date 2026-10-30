@@ -40,8 +40,12 @@ V8_models_l = ['V8n', 'V8s', 'V8m', 'V26s', 'V26m' ]  # YOLOv8,26モデルのリ
 # セクション名の定義
 Section_names = [' ', '1.足踏み', '2.胴造り', '3.弓構え', '4.打起し', 
                   '5.引分け', '6.会', '7.離れ', '8.残身', '']  # セクション名
-Step_names = { 201: '矢番え', 221: '取矢', 222: '取矢', 231: '矢番え', 230: '弦調べ', 240:'箆調べ',\
-               310: '取掛け・手の内', 311: '物見',\
+StepF_names = { 201: '矢番え', 221: '取矢', 222: '取矢', 230: '矢番え', 231: '弦調べ', 240:'箆調べ',\
+               310: '取掛け・手の内', 320: '取掛け・手の内', 311: '物見',\
+               510: '大三', 511: '押し', 512: '引き', 601: '口割',\
+               901: '弓倒し', 922: '退場'}          # ステップ名
+StepR_names = { 200: '矢番え', 212: '取矢', 220: '取矢', 230: '矢番え', 231: '弦調べ', 240:'箆調べ',\
+               310: '取掛け・手の内', 320: '取掛け・手の内', 311: '物見',\
                510: '大三', 511: '押し', 512: '引き', 601: '口割',\
                901: '弓倒し', 922: '退場'}          # ステップ名
   
@@ -53,7 +57,7 @@ Kn2idx = {'nose':0, 'left_eye':1, 'right_eye':2, 'left_ear':3, 'right_ear':4,
 
 # Kyudo_dataテーブルの登録データ項目名リスト
 # ・tracking_result()関数でセットするデータ項目名リスト(data_listの順序)
-Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
+Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',
                 'rw_norm', 'rw_angle',\
                 'lw_norm', 'lw_angle',\
                 'rl_norm', 'rl_angle',\
@@ -62,12 +66,14 @@ Kyudo_data_names = ['box_id', 'box_conf','box_w', 'box_h',\
                 'sl_norm', 'sl_angle',\
                 'rew_angle', 'rse_angle',\
                 'lew_angle', 'lse_angle',\
-                'eyes_norm', 'hips_norm'\
+                'eyes_norm', 'hips_norm',\
+                'rw_grad',\
                 'tag1', 'tag2'
                 ]
-
-# 学習用データの読み込みリスト
+#
+# 学習用データの読み込みリスト（Front-Side）
 # ・データベースから読み込むSQL文のデータ項目名と別名
+#
 Features_list_50 = ['rw_norm/box_h as rw_ratio',\
                 'lw_norm/box_h as lw_ratio',\
                 'hr_norm/box_h as hr_ratio',\
@@ -145,7 +151,79 @@ Features_list_91 = ['rw_norm/box_h as rw_ratio',\
                 'section','completed'
                 ]
 #
+# 学習用データの読み込みリスト（Right-Side）
+# ・データベースから読み込むSQL文のデータ項目名と別名
+#
+Ema_size:int = 16                   # 指数平滑移動平均のウィンドウサイズ
+Grad_threshold:float = 1.2          # 勾配の閾値
+Grad_item = f'CASE WHEN rw_grad < -{Grad_threshold:.2f} THEN 2 \
+                WHEN rw_grad > {Grad_threshold:.2f} THEN 1 \
+                ELSE 0 END as grad'
+Features_list_907 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'tag2 as body',\
+                Grad_item,\
+                'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_908 = ['rw_norm/box_h as rw_ratio',\
+                'hr_norm/box_h as hr_ratio',\
+                'rw_grad as rw_acc',\
+                'tag2 as body',\
+                Grad_item,\
+                'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_909 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'hr_norm/box_h as hr_ratio',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                Grad_item,\
+                'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_910 = ['rw_norm/box_h as rw_ratio',\
+                'rw_grad as rw_acc',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                Grad_item,\
+                'tag1 as face',\
+                'section','completed'
+                ]
+
+Features_list_911 = ['rw_norm/box_h as rw_ratio',\
+                'rw_angle/180.0 as rw_deg',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'rse_angle/180.0 as se_deg',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                'tag1 as face',\
+                'section','completed'
+                ]
+# （※）右手の移動量勾配を特徴量に追加するリスト（有効な改善は見られなかった）
+Features_list_912 = ['rw_norm/box_h as rw_ratio',\
+                'rw_angle/180.0 as rw_deg',\
+                'hr_norm/box_h as hr_ratio',\
+                'hr_angle/180.0 as hr_deg',\
+                'rew_angle/180.0 as ew_deg',\
+                'rse_angle/180.0 as se_deg',\
+                'sr_angle/180.0 as sr_deg',\
+                'tag2 as body',\
+                Grad_item,\
+                'tag1 as face',\
+                'section','completed'
+                ]
+#
 Features_lists = {
+    # Front-Sideの特徴量リスト
     50: Features_list_50,       # プロット専用特徴量リスト
     60: Features_list_60,
     61: Features_list_61,
@@ -155,16 +233,24 @@ Features_lists = {
     80: Features_list_80,
     81: Features_list_81,
     90: Features_list_90,
-    91: Features_list_91
+    91: Features_list_91,
+    # Right-Sideの特徴量リスト
+    907: Features_list_907,     # プロット専用特徴量リスト
+    908: Features_list_908,     # プロット専用特徴量リスト
+    909: Features_list_909,     # プロット専用特徴量リスト
+    910: Features_list_910,     # プロット専用特徴量リスト
+    911: Features_list_911,
+    912: Features_list_912
     }
 #
 # EvalNNで使用する特徴量リスト
+# Front-Sideの特徴量リスト
 Eval_Features_list_90 = ['(rl+180)/360.0 as rl_deg',
                 '(er+180)/360.0 as er_deg',
                 '(sl+180)/360.0 as sl_deg',
                 '(se+180)/360.0 as se_deg',
                 'eyes as eyes_ratio',
-                'IIF((pull+push)=0,0.0,cast(pull as reat)/cast((pull+push) as real)) as pull_rate',
+                'IIF((pull+push)=0,0.0,cast(pull as real)/cast((pull+push) as real)) as pull_rate',
                 'split/60.0 as split_m',
                 'completed','section'
                 ]
@@ -173,7 +259,7 @@ Eval_Features_list_170 = ['(rl+180)/360.0 as rl_deg',
                 '(sl+180)/360.0 as sl_deg',
                 '(se+180)/360.0 as se_deg',
                 'eyes as eyes_ratio',
-                'IIF((pull+push)=0,0.0,cast(pull as reat)/cast((pull+push) as real)) as pull_rate',
+                'IIF((pull+push)=0,0.0,cast(pull as real)/cast((pull+push) as real)) as pull_rate',
                 'split/60.0 as split_m',
                 'IIF(section=1,1,0) as sec_0',
                 'IIF(section=2,1,0) as sec_1',
@@ -187,9 +273,18 @@ Eval_Features_list_170 = ['(rl+180)/360.0 as rl_deg',
                 'section'
                 ]
 #
+# Right-Sideの特徴量リスト
+Eval_Features_list_906 = ['(ks+180)/360.0 as ks_deg',
+                '(er+180)/360.0 as er_deg',
+                'reye as eye_conf',
+                'split/60.0 as split_m',
+                'completed','section'
+                ]
+#
 Eval_Features_lists = {
     90: Eval_Features_list_90,                   # 評価用特徴量リスト
-    170: Eval_Features_list_170
+    170: Eval_Features_list_170,
+    906: Eval_Features_list_906
 }
 # プロット用の特徴量キー番号リスト
 Eval_data_names = ['rl_deg', 'er_deg','sl_deg', 'se_deg']
@@ -247,11 +342,12 @@ l2_lambda = os.getenv('L2_LAMBDA')
 if l2_lambda != None:
     L2_lambda = float(l2_lambda)
 
-Sequence_frames:int = 96                        # GRU用入力シーケンスのフレーム数
+Sequence_frames:int = 96    # GRU用入力シーケンスのフレーム数
 Batch_size:int = 192
 N_epoch:int = 301
-R_factor:float = 1.0   # 学習率減衰の係数
-Face_dim:int = 4       # 顔向き埋め込みベクトルの次元数
+R_factor:float = 1.0        # 学習率減衰の係数
+Face_dim:int = 4            # 顔向き埋め込みベクトルの次元数
+Grad_dim:int = 4            # 右手首の移動量勾配埋め込みベクトルの次元数
 Section_dim:int = 8
 Completed_dim:int = 4
 Hyper_parameters = (Sequence_frames, \
@@ -262,7 +358,7 @@ HiddenS_size:int = 64        # GRU（シングルヘッド）の隠れ層サイ�
 HiddenM_size:int = 32        # GRU（マルチヘッド）の隠れ層サイズ
 
 # 学習の早期終了条件の設定
-Early_stop = 0         # Early stoppingの基準
+Early_stop = 0              # Early stoppingの基準
 early_stop = os.getenv('EARLY_STOP')
 if early_stop != None:
     Early_stop = int(early_stop)
@@ -275,9 +371,9 @@ if augment_param != None:
 Augment_level:int = 0
 #
 # 移動平均のウィンドウサイズと重みの設定
-Window_size = 8   # ウィンドウサイズを設定
+Window_size = 8             # ウィンドウサイズを設定
 WMA_weights = np.arange(1, Window_size + 1)
-Param_max = 10    # パラメータの最大個数
+Param_max = 10              # パラメータの最大個数
 # 
 # テキスト属性
 #

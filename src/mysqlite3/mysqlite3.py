@@ -32,7 +32,7 @@ class MyDb:
         self.csvpath2 = ''        # kyudo_data用CSV出力ファイルパス
         self.csvfile2 = None
         
-    def open_csv(self):
+    def open_csv(self, manual = True):
         # CSV出力ファイルの作成
         timestamp = datetime.now().strftime('%Y%m%d')
         self.csvpath1 = self.dbpath[:self.dbpath.rfind('/')+1] + f"track{timestamp}_{self.case_name}.csv"
@@ -45,24 +45,26 @@ class MyDb:
         self.csvfile1.write(names)
         self.csvfile1.flush()
 
-        self.csvpath2 = self.dbpath[:self.dbpath.rfind('/')+1] + f"kyudo{timestamp}_{self.case_name}.csv"
-        self.csvfile2 = open( self.csvpath2, 'w')
-        # カラム名を出力
-        names ="case_name,frame_no,"\
-            +  "box_id,box_conf,box_w,box_h,"\
-            +  "rw_norm,rw_angle,"\
-            +  "lw_norm,lw_angle,"\
-            +  "rl_norm,rl_angle,"\
-            +  "hr_norm,hr_angle,"\
-            +  "sr_norm,sr_angle,"\
-            +  "sl_norm,sl_angle,"\
-            +  "rew_angle,rse_angle,"\
-            +  "lew_angle,lse_angle,"\
-            +  "eyes_norm,hips_norm,"\
-            +  "tag1,tag2,"\
-            +  "section,completed,label,inserted_at,time_epoch\n"
-        self.csvfile2.write(names)
-        self.csvfile2.flush()
+        if manual:
+            self.csvpath2 = self.dbpath[:self.dbpath.rfind('/')+1] + f"kyudo{timestamp}_{self.case_name}.csv"
+            self.csvfile2 = open( self.csvpath2, 'w')
+            # カラム名を出力
+            names ="case_name,frame_no,"\
+                +  "box_id,box_conf,box_w,box_h,"\
+                +  "rw_norm,rw_angle,"\
+                +  "lw_norm,lw_angle,"\
+                +  "rl_norm,rl_angle,"\
+                +  "hr_norm,hr_angle,"\
+                +  "sr_norm,sr_angle,"\
+                +  "sl_norm,sl_angle,"\
+                +  "rew_angle,rse_angle,"\
+                +  "lew_angle,lse_angle,"\
+                +  "eyes_norm,hips_norm,"\
+                +  "rw_grad,"\
+                +  "tag1,tag2,"\
+                +  "section,completed,label,inserted_at,time_epoch\n"
+            self.csvfile2.write(names)
+            self.csvfile2.flush()
             
 
     def rollback(self):
@@ -351,6 +353,14 @@ class MyDb:
         sql = f"select * from tracking_data where key_id={key_id} and case_name='{self.case_name}'"
         return pandas.read_sql_query(sql, con=self.conn, index_col='frame_no')
 #
+#   read keypoints(return pandas-DataFrame)
+#       
+    def pandas_read_keypoints(self,  frame_no=None):
+        sql = f"select * from tracking_data where case_name='{self.case_name}' order by frame_no, key_id asc"
+        if frame_no is not None:
+            sql += f" and frame_no={frame_no}"
+        return pandas.read_sql_query(sql, con=self.conn, index_col='key_id')
+#
 #   read kyudo_data of each case_name(return pandas-DataFrame)
 #       
     def pandas_read_kyudo(self, cols=None, cases=None):
@@ -389,7 +399,7 @@ class MyDb:
         
         sql = 'select * from frame_info'
         if name is not None:
-            sql += f" where case_name='{name}'"
+            sql += f" where case_name like '%{name}%'"
         return pandas.read_sql_query(sql, con=self.conn)
 #
 # insert act_param table
@@ -492,7 +502,7 @@ class MyDb:
                 if c == 'split':                # 'split'はSQL1で取得したデータを採用する
                     val = df1.iloc[0]['split'] 
                 print_text += f"{val:12.2f}" if isinstance(val, float) \
-                                else f"{val:12} " if isinstance(val, int) else f"{val:>16}"
+                                else f"{val:12} " if isinstance(val, int) else f"{val:>20}"
                 # 以下は、完了移行前のステップのデータを表示するための措置
                 #if section == 5 and step == 0 and c == 'frame_no':
                 #    # 引き分け移行時の引き・押し比率データを表示するため、空白を追加

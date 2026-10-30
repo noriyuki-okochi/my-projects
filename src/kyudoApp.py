@@ -14,13 +14,24 @@ from datetime import datetime
 
 # local package
 from kyudo.env import * 
-from kyudo.param import * 
+from kyudo.param import *
 from mysqlite3.mysqlite3 import MyDb
 from kyudo.kyudoModel import *
 from kyudo.kyudoUtils import *
 from kyudo.appUtil import * 
 
 #print(http.__file__)
+def help():
+    print("kyudoApp.py -case -L(ist)|{*|'<case-name>{,<case_name>'}... -D(elete)|-R(name)|-U(pdate) <memo>|-E(val) <label>|-import [<csv-file-path>]|-eval}\n"\
+        + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
+        + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
+        + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
+        + "        [ {-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] [{-models|-modelm} ['<model-path>']] ]\n"\
+        + "        [-valid <case_name>|none] [augment=<level>]\n"\
+        + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
+        + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
+    print(" --- Notation---")
+    print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
 #
 # start of main
 #
@@ -58,16 +69,7 @@ def main():
 
     opts:str = [opt for opt in args if opt.startswith('-')]
     if '-h' in opts:        #debug write
-        print("kyudoApp.py -case -L(ist)|{*|'<case-name>{,<case_name>'}... -D(elete)|-R(name)|-U(pdate) <memo>|-E(val) <label>|-import [<csv-file-path>]|-eval}\n"\
-            + "        [<key_name1>[{ <key_name2>}...]|*]|{-loss <loss-file-path>}|{-predicted <predicted-file-path>}] \n"\
-            + "        [-m(ulti)] [-b(ottom)] [-s(lider)] [-second <col_name1>{ <col_name2>}...] [-range '<min>[,<max>']]\n"\
-            + "        [{-p(ast-frames)|-f(irst-frame)}'<count1>[,<count2>']] [<display-frames-count>] \n"\
-            + "        [ {-train|-predict} [inputkey=<num>] [classes=<num>] [section=<no>] [eta=<rate>] [{-models|-modelm} ['<model-path>']] ]\n"\
-            + "        [-valid <case_name>|none] [augment=<level>]\n"\
-            + "        [-hparam '(<s_frame>,<batch_size>,<n_epoc>[,<r_factor>,<section_embed_dim>,<completed_embed_dim>])']\n"\
-            + "        [-inputkey] [-h(elp)] [-d(ebug)] [-n(o-prompt)]\n")
-        print(" --- Notation---")
-        print(" '|': or,  '[]': optional,  '{}': group,  '...': repeat,  '<>': value")
+        help()
         exit(0)
     # 
     cmds:str = [ key for key in args if key not in key_names and not key.isnumeric()]
@@ -138,9 +140,14 @@ def main():
 
     if len(case_names) > 0 and case_names[0].upper() == '-L':
         # 登録済ケースの一覧表示
-        fdf = db.pandas_read_frame()
+        like_str:str = None
+        opt_vals, _ = get_opt_values(args, case_names[0])
+        if len(opt_vals) > 0 :      # 指定文字列の部分一致で検索する 
+            like_str = opt_vals[0]
+        
+        fdf = db.pandas_read_frame(like_str)
         print(f"[kyudoApp]info:{fdf.shape}")
-        rows, cols = fdf.shape
+        rows, _ = fdf.shape
         for i in range(0, rows):
             if case_names[0] == '-L':
                 print(f"----({i+1})----")
@@ -303,7 +310,8 @@ def main():
         features = Features_lists[input_key]
         input_dim = len(features)
         face_embed:bool = True if 'face' in get_feature_colnames(features) else False
-        log_write(f"[kyudoApp]:input_dim={input_dim}, face_embed={face_embed}")
+        grad_embed:bool = True if 'grad' in get_feature_colnames(features) else False
+        log_write(f"[kyudoApp]:input_dim={input_dim}, face_embed={face_embed}, grad_embed={grad_embed}")
         log_write(f"[kyudoApp]:features:{features}")
         if section is None:
             # 指定ケース名の全セクションのデータを読み込み（frame_noをインデックスに設定）
@@ -376,6 +384,7 @@ def main():
             log_write(f"[kyudoApp]:hidden_size={HiddenS_size}")
             model = KyudoGRUs( input_size = input_dim, output_size = num_classes,
                             hidden_size = HiddenS_size,
+                            grad_embed_dim = Grad_dim if grad_embed else None,
                             face_embed_dim = Face_dim if face_embed else None,
                             section_embed_dim = section_dim,
                             completed_embed_dim = completed_dim )
@@ -649,7 +658,7 @@ def main():
             #
             # 'kyudo-data'テーブルからのデータ読み込み
             # (-lossオプション指定時はCSVファイルから読み込み)
-            cols:list = []
+            col_names:list = []
             db.case_name = case_name
             if plot_loss:
                 # CSVファイル読み込みのlossデータ
@@ -669,8 +678,8 @@ def main():
                     act = act_np[i]
                     if act == 1: completed = 1  # 動作完了
                     if act == 2:                # 次セクションの動作開始
-                        if section == 9:    # 最終セクション
-                            section = 2     # 胴づくり
+                        if section == 9:        # 最終セクション
+                            section = 2         # 胴づくり
                         else: section += 1
                         completed = 0
                     sect_np[i] = section
@@ -685,7 +694,7 @@ def main():
             elif predict:
                 # 予測結果データフレームの読み込み
                 features = Features_lists[input_key]
-                cols = get_feature_colnames( features )
+                col_names = get_feature_colnames( features )
                 dfk = df_p  
                 dfk.dropna(how="any", inplace=True)  # 欠測値(NaN)を含む行を削除
                 mdfk = dfk
@@ -702,7 +711,8 @@ def main():
                     features.append('label')
                     features.append('tag1')
                     features.append('tag2')
-                    cols = get_feature_colnames( features )
+                    col_names = get_feature_colnames( features )
+                    print(f"[kyudoApp]col_names: {col_names}")
                     if section is None:
                         dfk = db.pandas_read_kyudo( features )        # 学習用特徴量(input_frames, input_dim)                       
                     else:
@@ -717,22 +727,22 @@ def main():
                 if not input_key_opt:
                     # データの正規化
                     dfk['rw_ratio'] = dfk["rw_norm"]/dfk["box_h"]
-                    cols.append('rw_ratio') 
+                    col_names.append('rw_ratio') 
                     dfk['eyes_ratio'] = dfk["eyes_norm"]/dfk["box_w"]
-                    cols.append('eyes_ratio') 
+                    col_names.append('eyes_ratio') 
                     dfk['rl_ratio'] = dfk["rl_norm"]/dfk["box_h"]
-                    cols.append('rl_ratio')
+                    col_names.append('rl_ratio')
                     dfk['hr_ratio'] = dfk["hr_norm"]/dfk["box_h"]
-                    cols.append('hr_ratio')
+                    col_names.append('hr_ratio')
                     dfk['hr_deg'] = dfk["hr_angle"]/180.0
-                    cols.append('hr_deg')
+                    col_names.append('hr_deg')
                     '''
                     dfk['lw_ratio'] = dfk["lw_norm"]/dfk["box_h"]
-                    cols.append('lw_ratio') 
+                    col_names.append('lw_ratio') 
                     dfk['sr_deg'] = dfk["sr_angle"]/180.0
-                    cols.append('sr_deg')
+                    col_names.append('sr_deg')
                     dfk['se_deg'] = dfk["rse_angle"]/180.0
-                    cols.append('se_deg')
+                    col_names.append('se_deg')
                     '''
                 # 特異値の補正
                 for col in dfk.columns:
@@ -772,11 +782,22 @@ def main():
             #
             # データのプロット
             #
+            test_flag = False
+            if test_flag and 'rw_acc' in mdfk.columns:
+                # 指数平滑移動平均の計算
+                mdfk["ema16_acc"] = mdfk["rw_acc"].ewm(span=16,adjust=False).mean()
+                col_names.append("ema16_acc")
+                #mdfk["grad"] = mdfk["ema16_acc"].apply(lambda x: 3 if x < -Grad_threshold else 2 if x > Grad_threshold else 1)
+                mdf["grad"] = mdfk["ema16_acc"].apply( lambda x: encode_acc(x, Grad_threshold) )
+                # 単純移動平均の計算
+                #mdfk["sma16_acc"] = mdfk["rw_acc"].rolling(window=16).mean()
+                #col_names.append("sma16_acc")
+            
             if key == 'all':        # 学習データの入力項目プロット
-                for name in cols:
-                    if name == 'face' or name == 'body': 
-                        continue    # faceは除外
-                    secondary:bool = True if 'deg' in name else False
+                for name in col_names:
+                    if name in ['face', 'body', 'grad']: continue    # 除外
+                    secondary:bool = True if 'deg' in name or 'acc' in name \
+                                          else False
                     try :
                         fig = fig.add_trace( go.Scatter(x=mdfk.index, 
                                                     name = name,
@@ -869,6 +890,17 @@ def main():
                                     col = 1,   
                                     secondary_y = False
                             )
+                # < grad:gradient >
+                if 'grad' in mdf.columns:
+                    
+                    fig = fig.add_trace( go.Bar(x=mdf.index, 
+                                                name = "grad",
+                                                y = mdf["grad"], 
+                                                marker_color = "red"),
+                                        row = irow, 
+                                        col = 1,   
+                                        secondary_y = False
+                                )
                 # < section >
                 fig = fig.add_trace( go.Bar(x=mdf.index, 
                                         name="section",
@@ -972,14 +1004,14 @@ def main():
             if len(second_names) > 0:
                 fig.update_yaxes(title_text=second_names[0], secondary_y=True, showgrid=False,
                                 row=2, col=1)
-            fig.update_yaxes(title_text="label/face/body", range=(0, 3), secondary_y=False,
+            fig.update_yaxes(title_text="label/face/body", range=(-1, 3), secondary_y=False,
                                 row=2, col=1)
             fig.update_yaxes(title_text="section-no/completed", range=(0, 10), secondary_y=True, showgrid=True, 
                                 row=2, col=1)
             fig.update_traces(dict(showlegend = False), 
                                 row=2, col=1)
             if m_compare:
-                fig.update_yaxes(title_text="label/face", range=(0, 3), secondary_y=False,
+                fig.update_yaxes(title_text="label/face", range=(-1, 3), secondary_y=False,
                                     row=1, col=1)
                 fig.update_yaxes(title_text="section-no", range=(0, 10), secondary_y=True, showgrid=True, 
                                     row=1, col=1)

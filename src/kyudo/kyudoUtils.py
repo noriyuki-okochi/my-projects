@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from torch.optim import lr_scheduler
 import numpy as np
+
 #import matplotlib.pyplot as plt
 from datetime import datetime
 
@@ -108,6 +109,13 @@ def get_feature_colnames( features ):
 def get_device():
     print(f"[get_device]:device={device}")
     return device
+#
+# 移動量勾配のエンコーディング
+# 
+def encode_acc( acc ,   threshold=Grad_threshold):
+    if acc < -threshold: return 3
+    elif acc > threshold: return 2
+    else: return 1
 #
 # セクションと完了状態の更新関数
 # action: モデルの出力アクション  
