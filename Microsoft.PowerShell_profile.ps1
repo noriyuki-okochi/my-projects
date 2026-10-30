@@ -528,7 +528,7 @@ function yoloAp {
     }
     elseif ($multi -ne '') {         
         # マルチ指定動画再生
-        python ./src/yoloApp.py $dbg_level -a -multi $multi $concaton --
+        python ./src/yoloApp.py $dbg_level -a -multi $multi $concaton -w --
     }
     elseif ($one -ne '') {         
         # 単一ケース指定再生
@@ -537,18 +537,18 @@ function yoloAp {
             # 未指定（デフォルト）時、1を再設定
             $at = '1'
         }
-        python ./src/yoloApp.py $dbg_level -o  $one -at $at -r --
+        python ./src/yoloApp.py $dbg_level -o  $one -at $at -r -w --
     }
     elseif ($comp -ne '') {         
         $case_list = $comp.Split(',')
         $i = $case_list.Length
         if ( $i -eq 1 ) {
             # 単一ケース動画再生（指定ケースの動画ファイルを再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -at $at $concaton $shapeon -m --
+            python ./src/yoloApp.py $dbg_level -o $comp -at $at $concaton $shapeon -m -w --
         }
         else{
             # マルチ動画再生（指定ケースの動画ファイルを重ねて再生）
-            python ./src/yoloApp.py $dbg_level -o $comp -multi $at $concaton $shapeon -r --
+            python ./src/yoloApp.py $dbg_level -o $comp -multi $at $concaton $shapeon -r -w --
         }
     }
     elseif ($clip) {        
